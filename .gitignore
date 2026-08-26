@@ -1,0 +1,6 @@
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Nothing else is ignored here on purpose: this folder is the deliverable, so the
+# AARs, the dashboard, the docs and the APK are all meant to be in the repo.
