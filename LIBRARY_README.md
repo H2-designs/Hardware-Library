@@ -4,7 +4,7 @@ Two Android libraries extracted from the proven MDB Slave app:
 
 | Artifact | What it is |
 |---|---|
-| `mqtt-lib-1.3.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, with broker **username/password** auth) **plus the Rabbah compact-log layer**: `RabbahLog` (one function to ship a log), the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — usable with zero MDB involvement). |
+| `mqtt-lib-1.3.1.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, with broker **username/password** auth) **plus the Rabbah compact-log layer**: `RabbahLog` (one function to ship a log), the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — usable with zero MDB involvement). |
 | `mdb-lib-6.4.1.aar` | The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. Every bus exchange ships as ONE unified log code carrying both **rx** (frame received) and **tx** (our reply). |
 
 ## RabbahLog — sending logs (the compact codebook envelope)
@@ -93,7 +93,7 @@ status line, and an `inbox` subscription you can hit with `mosquitto_pub`.
 Preferred: consume the modules directly (`implementation project(':mdb-lib')`,
 `project(':mqtt-lib')`) — see the demo `app/`.
 
-If consuming raw AARs instead: add `mqtt-lib-1.3.0.aar`, `mdb-lib-6.4.1.aar`, **and**
+If consuming raw AARs instead: add `mqtt-lib-1.3.1.aar`, `mdb-lib-6.4.1.aar`, **and**
 `CM30-HardwareLibrary-1.0.9.aar` (mdb-lib needs it at runtime; AARs do not nest).
 
 ## Integration — the whole thing
@@ -252,4 +252,4 @@ flag; the engine reads the declared wire bytes.
   `getCodebook`), `VMC_STATUS:{...}` (3 s heartbeat + instant on state change),
   `SETTINGS_JSON:{...}`, `CONFIG_JSON:{...}`, `PONG`; anything untagged is a plain log line.
 - Queue: bounded (default 1000), drop-oldest on overflow (`MqttLib.droppedMessages` counts).
-- Public broker = not private. Move to a private broker before carrying anything sensitive.
+- The stack runs on the Rabbah mosquitto (mqtt://mosquitto:1883) with username/password auth; the old public HiveMQ default is gone. The app reads broker credentials from local.properties via BuildConfig.
