@@ -1,6 +1,7 @@
 package com.ciontek.HardwareDemo
 
 import com.rabbah.mdb.HardwareLib
+import com.rabbah.mdb.MdbExchangeEvent
 import com.rabbah.mqtt.MdbLogEvent
 import com.rabbah.mqtt.MqttLib
 import com.rabbah.mqtt.RabbahLog
@@ -11,9 +12,14 @@ import com.rabbah.mqtt.RabbahLog
  * the ~30 lines of glue that puts those events on the wire in the exact format the dashboard
  * already speaks (byte-identical to when the MQTT code lived inside the library):
  *
- *  - exchangeListener  -> RabbahLog.log(codebook event, params)   [RABBAH_LOG:{...} items]
- *  - controlListener   -> MqttLib.enqueue("TAG:json")             [VMC_STATUS:/SETTINGS_JSON:/...]
- *  - MQTT commands     -> HardwareLib.handleCommand(text)         [open/close/vendApprove/...]
+ *  - addExchangeListener -> RabbahLog.log(codebook event, params)   [RABBAH_LOG:{...} items]
+ *  - addControlListener  -> MqttLib.enqueue("TAG:json")             [VMC_STATUS:/SETTINGS_JSON:/...]
+ *  - MQTT commands       -> HardwareLib.handleCommand(text)         [open/close/vendApprove/...]
+ *
+ * The bridge registers through addExchangeListener/addControlListener (multi-listener), so the
+ * single-slot convenience vars (HardwareLib.exchangeListener etc.) stay COMPLETELY FREE for the
+ * host app's own code - assigning them never disconnects the dashboard, and the bridge never
+ * overwrites the app's listener.
  *
  * An app that wants a different transport (HTTP, BLE, none) simply writes its own version of
  * this file against the same three hooks - the library itself never changes.
@@ -28,31 +34,35 @@ object MdbMqttBridge {
 
         // Outbound control plane: tag "LOG" is a plain report line (shipped bare, exactly as
         // before); every other tag is a control message the dashboard matches by its prefix.
-        HardwareLib.controlListener = { tag, payload ->
-            if (tag == "LOG") MqttLib.enqueue(payload) else MqttLib.enqueue("$tag:$payload")
-        }
+        HardwareLib.addControlListener(controlForwarder)
 
         // Outbound exchanges: the event's logEventName maps 1:1 onto the Rabbah MDB codebook,
         // and its params are already in codebook order (p[0]=rx, p[1]=tx, extras). publishRemote
         // carries the library's setMqttLogging gate, so muting works exactly as it always did.
-        HardwareLib.exchangeListener = { e ->
-            if (e.publishRemote) {
-                RabbahLog.sessionId = e.sessionId
-                val event = try {
-                    MdbLogEvent.valueOf(e.logEventName)
-                } catch (_: IllegalArgumentException) {
-                    null // a CMD newer than this mqtt-lib's codebook - ship as free text instead
-                }
-                if (event != null) RabbahLog.log(event, e.params) else RabbahLog.raw(e.message)
-            }
-        }
+        HardwareLib.addExchangeListener(exchangeForwarder)
     }
 
     fun detach() {
         MqttLib.removeCommandListener(commandForwarder)
-        HardwareLib.controlListener = null
-        HardwareLib.exchangeListener = null
+        HardwareLib.removeControlListener(controlForwarder)
+        HardwareLib.removeExchangeListener(exchangeForwarder)
     }
 
     private val commandForwarder: (String) -> Boolean = { HardwareLib.handleCommand(it) }
+
+    private val controlForwarder: (String, String) -> Unit = { tag, payload ->
+        if (tag == "LOG") MqttLib.enqueue(payload) else MqttLib.enqueue("$tag:$payload")
+    }
+
+    private val exchangeForwarder: (MdbExchangeEvent) -> Unit = { e ->
+        if (e.publishRemote) {
+            RabbahLog.sessionId = e.sessionId
+            val event = try {
+                MdbLogEvent.valueOf(e.logEventName)
+            } catch (_: IllegalArgumentException) {
+                null // a CMD newer than this mqtt-lib's codebook - ship as free text instead
+            }
+            if (event != null) RabbahLog.log(event, e.params) else RabbahLog.raw(e.message)
+        }
+    }
 }
