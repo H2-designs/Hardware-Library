@@ -207,21 +207,23 @@
 
   <pre class="code"><code>[
  {"name":"CONNECT",         "rx":"A0 04 00 03 43 4F 4E E5",             "tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"HEARTBEAT",       "rx":"A0 06 00 02 48 42 ??",                "tx":"A1 06 00 02 4F 4B D3"},
  {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"A1 02 00 07 53 55 43 43 45 53 53 E7", "amountStart":4, "amountEnd":-1},
  {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"A1 02 00 07 53 55 43 43 45 53 53 E7", "amountStart":5, "amountEnd":-1},
- {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"A1 05 00 02 4F 4B A2"},
- {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":"A1 05 00 02 4F 4B A2"},
- {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":"A1 05 00 02 4F 4B A2"}
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":""},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":""},
+ {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":""}
 ]</code></pre>
 
   <p>The payment reply hexes, precomputed (CRC included):
   <b>SUCCESS</b> = <code>A1 02 00 07 53 55 43 43 45 53 53 E7</code> ·
-  <b>FAILED</b> = <code>A1 02 00 06 46 41 49 4C 45 44 A6</code>. The protocol document defines
-  no reply for production results and CANCEL, but the table acks them with the reader's
-  <b>OK</b> frame (<code>A1 05 00 02 4F 4B A2</code>) so a machine that expects one is
-  satisfied — if the vendor confirms strict firmware that rejects undefined frames, set those
-  <code>tx</code> back to <code>""</code>. This bench table ships preloaded in the RS232 Test
-  app.</p>
+  <b>FAILED</b> = <code>A1 02 00 06 46 41 49 4C 45 44 A6</code>. Per the vendor's reference
+  implementation, the reader replies only where the protocol defines a response — connect,
+  heartbeat, and payment; production results and CANCEL are notifications (toast-only on the
+  reference reader), so their <code>tx</code> stays empty and your
+  <code>exchangeListener</code> handles them. <b>HEARTBEAT must sit above PAYMENT_TYPED</b>:
+  both start <code>A0 06</code>, and first-match-wins ordering is what keeps a heartbeat from
+  being mistaken for a payment. This bench table ships preloaded in the RS232 Test app.</p>
 
   <h2><span class="eyebrow">3 · The payment flow</span>Who sends what, when</h2>
   <div class="ladder">
@@ -238,9 +240,17 @@
     </div>
     <div class="lrow">
       <div class="who"><span class="dir rx">machine →</span></div>
+      <div class="msg"><div class="hex">A0 06 00 02 48 42 A4</div>
+        <div class="note">"HB" — heartbeat, every ~30 s. Rule <b>HEARTBEAT</b> auto-replies
+        <span class="mono">A1 06 00 02 4F 4B D3</span> ("OK" = healthy); no reply and the
+        machine marks the reader offline.</div></div>
+    </div>
+    <div class="lrow">
+      <div class="who"><span class="dir rx">machine →</span></div>
       <div class="msg"><div class="hex">A0 01 00 06 31 35 30 30 30 30 A3</div>
         <div class="note">payment request 1500.00 — <b>vendRequestListener fires with
-        price=150000</b>. Charge the customer now.</div></div>
+        price=150000</b> (amount is ASCII cents: $9.99 arrives as "999" → price=999). Charge
+        the customer now.</div></div>
     </div>
     <div class="lrow">
       <div class="who"><span class="dir tx">→ reader</span></div>
@@ -253,8 +263,8 @@
       <div class="who"><span class="dir rx">machine →</span></div>
       <div class="msg"><div class="hex">A0 03 00 07 53 55 43 43 45 53 53 E7</div>
         <div class="note">production result ("SUCCESS" / "FAILED") — the machine reports after
-        making the coffee. Rules <b>PRODUCTION_OK / PRODUCTION_FAIL</b> ack with the OK frame,
-        log it, and reach your <code>exchangeListener</code> (FAILED = refund the charge).</div></div>
+        making the coffee; no reply is defined. Rules <b>PRODUCTION_OK / PRODUCTION_FAIL</b>
+        log it and reach your <code>exchangeListener</code> (FAILED = refund the charge).</div></div>
     </div>
     <div class="lrow">
       <div class="who"><span class="dir rx">machine →</span></div>
@@ -331,8 +341,14 @@ Rs232Lib.exchangeListener = { e ->
     <p><b>Still to confirm on the real machine</b>: the CM30 vendor API's
     <code>RS232Open</code> parameter order and read-timeout behavior are inferred from the AAR
     (not documented), and <code>frameGapMs</code> = 20 ms framing should be watched on first
-    contact — if frames arrive split or merged, raise it. The document also says illegal frames
-    (bad CRC) are discarded without response; the library currently matches on bytes and does
-    not validate incoming CRC.</p>
+    contact — if frames arrive split or merged, raise it.</p>
+    <p><b>Heartbeat CRC oddity — keep <code>setCrcCheck</code> OFF for this machine until
+    verified.</b> The vendor doc's heartbeat frames don't follow their own XOR rule: the ping
+    <code>A0 06 00 02 48 42 A4</code> XORs to <code>AE</code> (not <code>A4</code>) and the
+    reply <code>A1 06 00 02 4F 4B D3</code> XORs to <code>A1</code> (not <code>D3</code>) —
+    every other documented frame checks out. That's why the HEARTBEAT rule matches the CRC byte
+    with <code>??</code> and replies with the documented <code>D3</code> frame verbatim. With
+    CRC validation on, real heartbeats carrying <code>A4</code> would be discarded. Watch the
+    first live log: it prints the CRC the machine actually sends.</p>
   </div>
 </main>
