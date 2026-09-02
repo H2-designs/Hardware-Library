@@ -83,9 +83,9 @@ class MainActivity : Activity() {
  {"name":"CONNECT","rx":"A0 04 00 03 43 4F 4E E5","tx":"A1 05 00 02 4F 4B A2"},
  {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"A1 02 00 07 53 55 43 43 45 53 53 E7","amountStart":4,"amountEnd":-1},
  {"name":"PAYMENT_TYPED","rx":"A0 06 *","tx":"A1 02 00 07 53 55 43 43 45 53 53 E7","amountStart":5,"amountEnd":-1},
- {"name":"PRODUCTION_OK","rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":""},
- {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":""},
- {"name":"CANCEL","rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":""}
+ {"name":"PRODUCTION_OK","rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"CANCEL","rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"A1 05 00 02 4F 4B A2"}
 ]"""
             )
         }
