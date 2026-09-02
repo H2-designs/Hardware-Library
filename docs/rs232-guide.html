@@ -126,7 +126,7 @@
   <h1>RS232 Card Reader Guide</h1>
   <p class="lede">How the coffee-machine ⇄ card-reader serial protocol maps onto
   <code>Rs232Lib</code> rules — every frame from the vendor document, the rule table that
-  answers it, and the functions that build replies. hardware-lib 7.12.0.</p>
+  answers it, and the functions that build replies. hardware-lib 7.13.0.</p>
   <p><span class="verified">✓ every frame below verified against the library via simulateFrame</span></p>
 
   <h2><span class="eyebrow">1 · Frame anatomy</span>The payment request, byte by byte</h2>
@@ -170,7 +170,9 @@
       is the string "150000", the price in minor units. A 35.00 payment is only 4 data bytes,
       so <b>the frame length varies with the amount</b>.</li>
     <li><b>Every frame ends in an XOR CRC</b> — Start ^ CMD ^ Length ^ each Data byte.
-      The library computes it for you on replies.</li>
+      The library computes it for you on replies, and with <code>setCrcCheck(true)</code> it
+      also validates it on every received frame: a bad-CRC frame is discarded with no reply
+      and no listeners, exactly as the document requires.</li>
   </ul>
 
   <h2><span class="eyebrow">2 · The rule table</span>Ready to paste</h2>
@@ -197,6 +199,26 @@
     <li>CONNECT auto-replies <code>OK</code> instantly from the rule itself; payment replies
       are sent by your code after the charge (next section).</li>
   </ul>
+
+  <p><b>Bench mode — complete rx → tx table.</b> For end-to-end machine testing with no app
+  code at all, give the payment rules a full reply hex too: every receive frame then gets its
+  send frame instantly. This auto-approves <em>every</em> payment (it never charges anyone),
+  so it is for the bench, not production:</p>
+
+  <pre class="code"><code>[
+ {"name":"CONNECT",         "rx":"A0 04 00 03 43 4F 4E E5",             "tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"A1 02 00 07 53 55 43 43 45 53 53 E7", "amountStart":4, "amountEnd":-1},
+ {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"A1 02 00 07 53 55 43 43 45 53 53 E7", "amountStart":5, "amountEnd":-1},
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":""},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":""},
+ {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":""}
+]</code></pre>
+
+  <p>The payment reply hexes, precomputed (CRC included):
+  <b>SUCCESS</b> = <code>A1 02 00 07 53 55 43 43 45 53 53 E7</code> ·
+  <b>FAILED</b> = <code>A1 02 00 06 46 41 49 4C 45 44 A6</code>. Production results and CANCEL
+  have no reply defined in the protocol, so their <code>tx</code> stays empty — the listener
+  still sees them. This bench table ships preloaded in the RS232 Test app.</p>
 
   <h2><span class="eyebrow">3 · The payment flow</span>Who sends what, when</h2>
   <div class="ladder">
@@ -248,6 +270,7 @@
 
   <h2><span class="eyebrow">4 · App code</span>The whole integration</h2>
   <pre class="code"><code>Rs232Lib.setRulesJson(rulesJsonAbove)          // once - persisted across restarts
+Rs232Lib.setCrcCheck(true)                     // discard bad-CRC frames (persisted)
 Rs232Lib.open(baud = 9600)                     // defaults 8-N-1
 
 Rs232Lib.vendRequestListener = { price, frame ->

@@ -305,6 +305,10 @@ Rs232Lib.vendRequestListener = { price, frame ->
   `sendXorFrame(headerHex, dataHex)` builds and sends it; `sendXorAscii(headerHex, text)`
   does the same with an ASCII payload; `asciiHex(text)` converts "SUCCESS" → `53 55 43…`.
   `Rs232Lib.sendXorAscii("A1 02", "SUCCESS")` sends `A1 02 00 07 53 55 43 43 45 53 53 E7`.
+- **Incoming CRC validation**: `setCrcCheck(true)` (persisted; read via `crcCheckEnabled`;
+  dashboard `rs232Crc:on|off`) — every received frame's last byte must equal the XOR of all
+  preceding bytes, and a frame that fails is DISCARDED with no reply and no listeners (per the
+  card-reader protocol), logging `[rs232] rx=… CRC FAIL (expected XX) - discarded`. Default off.
 - **API**: `open(baud, dataBits, stopBits, parity)` / `close()` / `isOpen`,
   `setRulesJson(json)` (null = ok, else the error text) / `rulesJson()` / `clearRules()`,
   `sendHex(hex)`, `simulateFrame(hex)` (feeds a fake machine frame through the matcher — test

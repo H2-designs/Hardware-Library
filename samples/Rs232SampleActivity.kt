@@ -44,7 +44,8 @@ class MainActivity : Activity() {
     private fun refreshStatus() = runOnUiThread {
         val port = if (Rs232Lib.isOpen) "OPEN" else "closed"
         val ruleCount = try { org.json.JSONArray(Rs232Lib.rulesJson()).length() } catch (_: Throwable) { 0 }
-        status.text = "hardware-lib ${HardwareLib.VERSION}\nport: $port | rules: $ruleCount/${Rs232Lib.MAX_RULES} | frame gap: ${Rs232Lib.frameGapMs}ms"
+        val crc = if (Rs232Lib.crcCheckEnabled) "ON" else "off"
+        status.text = "hardware-lib ${HardwareLib.VERSION}\nport: $port | rules: $ruleCount/${Rs232Lib.MAX_RULES} | frame gap: ${Rs232Lib.frameGapMs}ms | crc check: $crc"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,8 +81,8 @@ class MainActivity : Activity() {
                 if (saved != "[]") saved
                 else """[
  {"name":"CONNECT","rx":"A0 04 00 03 43 4F 4E E5","tx":"A1 05 00 02 4F 4B A2"},
- {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1},
- {"name":"PAYMENT_TYPED","rx":"A0 06 *","tx":"","amountStart":5,"amountEnd":-1},
+ {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"A1 02 00 07 53 55 43 43 45 53 53 E7","amountStart":4,"amountEnd":-1},
+ {"name":"PAYMENT_TYPED","rx":"A0 06 *","tx":"A1 02 00 07 53 55 43 43 45 53 53 E7","amountStart":5,"amountEnd":-1},
  {"name":"PRODUCTION_OK","rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":""},
  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":""},
  {"name":"CANCEL","rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":""}
@@ -128,6 +129,8 @@ class MainActivity : Activity() {
         root.addView(simField)
         root.addView(row().apply {
             button("SIMULATE RX") { thread { Rs232Lib.simulateFrame(simField.text.toString()) } }
+            button("CRC ON") { Rs232Lib.setCrcCheck(true); refreshStatus() }
+            button("CRC OFF") { Rs232Lib.setCrcCheck(false); refreshStatus() }
         })
 
         // --- manual tx ---
