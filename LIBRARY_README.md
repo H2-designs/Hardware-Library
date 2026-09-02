@@ -294,16 +294,20 @@ Rs232Lib.vendRequestListener = { price, frame ->
   rule's `tx`, later via `sendHex(hex)`, or both.
 - **API**: `open(baud, dataBits, stopBits, parity)` / `close()` / `isOpen`,
   `setRulesJson(json)` (null = ok, else the error text) / `rulesJson()` / `clearRules()`,
-  `sendHex(hex)`, `exchangeListener` (every frame: rxHex, ruleName, txHex, price),
-  `vendRequestListener(price, frameHex)`.
+  `sendHex(hex)`, `simulateFrame(hex)` (feeds a fake machine frame through the matcher — test
+  a rule table without hardware), `exchangeListener` (every frame: rxHex, ruleName, txHex,
+  price), `vendRequestListener(price, frameHex)`.
 - **Dashboard/backend commands** (via handleCommand, so they work over MQTT):
   `rs232Open` / `rs232Open:9600` / `rs232Open:9600,8,1,N`, `rs232Close`, `rs232Send:HEX`,
-  `getRs232Rules`, `clearRs232Rules`, and the rule table as JSON
+  `rs232Simulate:HEX`, `getRs232Rules`, `clearRs232Rules`, and the rule table as JSON
   `{"setRs232Rules":[{"name":"...","rx":"...","tx":"...","priceHi":2,"priceLo":3}]}` —
   so the backend can push the whole command set remotely, no rebuild.
 - Every frame reports as a `[rs232] rx=... matched=NAME tx=...` log line (`UNMATCHED` when no
   rule fits); replies are written before logging, same discipline as the MDB engine. Rules
   survive restarts (restored by `HardwareLib.init`).
+- **Test bench**: `rs232-sample-v1.0.apk` ("RS232 Test") — rule JSON editor with LOAD/GET/CLEAR,
+  baud + OPEN/CLOSE PORT, SIMULATE RX (test rules without the machine), SEND HEX, and a live
+  log of every `[rs232]` line. Source: `samples/Rs232SampleActivity.kt`.
 
 ## RabbahLog — sending logs (the compact codebook envelope)
 

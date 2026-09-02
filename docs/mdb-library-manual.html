@@ -128,14 +128,14 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;7.10.0 / mqtt-lib&nbsp;2.0.0.
+    hardware-lib&nbsp;7.11.0 / mqtt-lib&nbsp;2.0.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="split700">
     <h2><span class="eyebrow">NEW &mdash; the 7.x split</span>hardware-lib: the MDB engine, MQTT-free</h2>
-    <p><strong>mdb-lib is now <code>hardware-lib-7.10.0</code></strong> &mdash; renamed, and with the
+    <p><strong>mdb-lib is now <code>hardware-lib-7.11.0</code></strong> &mdash; renamed, and with the
     entire MQTT layer removed from inside it. The engine is pure hardware/protocol: everything it
     produces exits through listeners, everything it accepts enters through plain functions.
     The Kotlin package stays <code>com.rabbah.mdb</code> and a deprecated
@@ -275,7 +275,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.0.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-7.10.0.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-7.11.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -612,8 +612,16 @@ Rs232Lib.vendRequestListener = { price, frame -&gt; <span class="c">/* charge, t
     before logging. Manual TX any time with <code>sendHex(hex)</code>;
     <code>exchangeListener</code> gets every frame (rxHex, ruleName, txHex, price). Dashboard
     commands: <code>rs232Open[:9600[,8,1,N]]</code>, <code>rs232Close</code>,
-    <code>rs232Send:HEX</code>, <code>getRs232Rules</code>, <code>clearRs232Rules</code>, and
-    <code>{"setRs232Rules":[...]}</code> to push the whole table remotely.</p>
+    <code>rs232Send:HEX</code>, <code>rs232Simulate:HEX</code>, <code>getRs232Rules</code>,
+    <code>clearRs232Rules</code>, and <code>{"setRs232Rules":[...]}</code> to push the whole
+    table remotely.</p>
+    <p><strong>Testing without the machine</strong>: <code>Rs232Lib.simulateFrame(hex)</code>
+    feeds a fake received frame through the matcher exactly as if the machine sent it -
+    matching, price extraction and both listeners all run; the reply is really written when the
+    port is open, otherwise only logged. The <strong>RS232 Test bench APK</strong>
+    (<code>rs232-sample-v1.0.apk</code>, source <code>samples/Rs232SampleActivity.kt</code>)
+    puts the whole workflow on buttons: rule JSON editor (LOAD / GET / CLEAR), baud +
+    OPEN / CLOSE PORT, SIMULATE RX, SEND HEX, live <code>[rs232]</code> log.</p>
   </section>
 
   <section id="pulse">
@@ -791,6 +799,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 7.10.0 · mqtt-lib 2.0.0 · demo app v2.13.24
+  CM30 MDB Slave project — developer manual. hardware-lib 7.11.0 · mqtt-lib 2.0.0 · demo app v2.13.25
   (build 54). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
