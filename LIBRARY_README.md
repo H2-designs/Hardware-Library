@@ -285,13 +285,26 @@ Rs232Lib.vendRequestListener = { price, frame ->
 ```
 
 - **Matching**: rx is hex where `??` matches ANY byte (that is how a vend request whose price
-  bytes change per sale still matches one rule); frame length must equal the pattern length;
-  first matching rule wins. Frames are cut from the byte stream by silence (`frameGapMs`,
-  default 20 ms — RS232 has no frame markers).
-- **Vend request rules**: `priceHi`/`priceLo` name the byte POSITIONS (0-based) inside the
-  frame carrying the price high and low bytes — on match the price (hi × 256 + lo) is
-  extracted and `vendRequestListener(price, frameHex)` fires. Reply immediately via the
-  rule's `tx`, later via `sendHex(hex)`, or both.
+  bytes change per sale still matches one rule); a single trailing `*` matches ANY NUMBER of
+  remaining bytes for VARIABLE-LENGTH frames (`"F2 *"` matches every frame starting `F2`);
+  without `*` the frame length must equal the pattern length; first matching rule wins.
+  Frames are cut from the byte stream by silence (`frameGapMs`, default 20 ms — RS232 has no
+  frame markers).
+- **Vend request rules** — two price formats, both using positions that are 0-based from the
+  frame START or NEGATIVE to count from the frame END (`-1` = last byte):
+  - **Binary** `priceHi`/`priceLo`: two bytes, price = hi × 256 + lo.
+    `{"name":"VEND","rx":"F2 *","tx":"06","priceHi":-3,"priceLo":-2}`
+  - **ASCII** `amountStart`/`amountEnd`: the price is digit TEXT inside the frame (common on
+    card-reader protocols — `31 35 30 30 30 30` = "150000" = 1500.00). `amountEnd` is
+    EXCLUSIVE, so `-1` = everything up to but not including the last byte (skips a trailing
+    CRC): `{"name":"PAYMENT","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1}`.
+  On match the price is extracted and `vendRequestListener(price, frameHex)` fires. Reply
+  immediately via the rule's `tx`, later via `sendHex(hex)`, or both.
+- **Framed replies with computed length + CRC**: `buildXorFrame(headerHex, dataHex)` builds
+  `[header][2-byte length][data][XOR CRC]` — the classic card-reader frame;
+  `sendXorFrame(headerHex, dataHex)` builds and sends it; `sendXorAscii(headerHex, text)`
+  does the same with an ASCII payload; `asciiHex(text)` converts "SUCCESS" → `53 55 43…`.
+  `Rs232Lib.sendXorAscii("A1 02", "SUCCESS")` sends `A1 02 00 07 53 55 43 43 45 53 53 E7`.
 - **API**: `open(baud, dataBits, stopBits, parity)` / `close()` / `isOpen`,
   `setRulesJson(json)` (null = ok, else the error text) / `rulesJson()` / `clearRules()`,
   `sendHex(hex)`, `simulateFrame(hex)` (feeds a fake machine frame through the matcher — test
@@ -299,7 +312,9 @@ Rs232Lib.vendRequestListener = { price, frame ->
   price), `vendRequestListener(price, frameHex)`.
 - **Dashboard/backend commands** (via handleCommand, so they work over MQTT):
   `rs232Open` / `rs232Open:9600` / `rs232Open:9600,8,1,N`, `rs232Close`, `rs232Send:HEX`,
-  `rs232Simulate:HEX`, `getRs232Rules`, `clearRs232Rules`, and the rule table as JSON
+  `rs232SendFrame:HEADER;DATAHEX`, `rs232SendAscii:HEADER;TEXT` (e.g.
+  `rs232SendAscii:A1 02;SUCCESS`), `rs232Simulate:HEX`, `getRs232Rules`, `clearRs232Rules`,
+  and the rule table as JSON
   `{"setRs232Rules":[{"name":"...","rx":"...","tx":"...","priceHi":2,"priceLo":3}]}` —
   so the backend can push the whole command set remotely, no rebuild.
 - Every frame reports as a `[rs232] rx=... matched=NAME tx=...` log line (`UNMATCHED` when no

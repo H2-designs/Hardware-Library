@@ -128,14 +128,14 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;7.11.0 / mqtt-lib&nbsp;2.0.0.
+    hardware-lib&nbsp;7.12.0 / mqtt-lib&nbsp;2.0.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="split700">
     <h2><span class="eyebrow">NEW &mdash; the 7.x split</span>hardware-lib: the MDB engine, MQTT-free</h2>
-    <p><strong>mdb-lib is now <code>hardware-lib-7.11.0</code></strong> &mdash; renamed, and with the
+    <p><strong>mdb-lib is now <code>hardware-lib-7.12.0</code></strong> &mdash; renamed, and with the
     entire MQTT layer removed from inside it. The engine is pure hardware/protocol: everything it
     produces exits through listeners, everything it accepts enters through plain functions.
     The Kotlin package stays <code>com.rabbah.mdb</code> and a deprecated
@@ -275,7 +275,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.0.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-7.11.0.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-7.12.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -600,26 +600,39 @@ HardwareLib.setConfigHex(HardwareLib.ConfigName.READER_CONFIG_INFO_L3,
     hot-reloaded. "When rx this, tx this":</p>
     <pre class="code">Rs232Lib.setRulesJson(<span class="s">"""[
   {"name":"STATUS",       "rx":"FF FF FF FF FF", "tx":"01 00"},
-  {"name":"VEND_REQUEST", "rx":"F1 05 ?? ?? 0D", "tx":"06", "priceHi":2, "priceLo":3}
+  {"name":"VEND_REQUEST", "rx":"F1 05 ?? ?? 0D", "tx":"06", "priceHi":2,  "priceLo":3},
+  {"name":"VEND_VARLEN",  "rx":"F2 *",           "tx":"06", "priceHi":-3, "priceLo":-2}
 ]"""</span>)
 Rs232Lib.open(baud = <span class="s">9600</span>)
 Rs232Lib.vendRequestListener = { price, frame -&gt; <span class="c">/* charge, then Rs232Lib.sendHex(approvalHex) */</span> }</pre>
-    <p><code>??</code> in an rx pattern matches ANY byte - a vend request whose price bytes
-    change still matches one rule; <code>priceHi</code>/<code>priceLo</code> are the 0-based
-    byte positions of the price high/low bytes, extracted as hi&times;256+lo and delivered via
-    <code>vendRequestListener</code>. Frames are cut from the stream by silence
-    (<code>frameGapMs</code>, default 20 ms); first matching rule wins; replies are written
-    before logging. Manual TX any time with <code>sendHex(hex)</code>;
+    <p><code>??</code> in an rx pattern matches ANY ONE byte - a vend request whose price bytes
+    change still matches one rule - and a single trailing <code>*</code> matches ANY NUMBER of
+    remaining bytes, for frames whose LENGTH varies (<code>"A0 01 *"</code> matches every frame
+    starting <code>A0 01</code>). Two price formats, positions 0-based from the frame start or
+    NEGATIVE from the frame end (<code>-1</code> = last byte): <strong>binary</strong>
+    <code>priceHi</code>/<code>priceLo</code> (price = hi&times;256+lo), or
+    <strong>ASCII</strong> <code>amountStart</code>/<code>amountEnd</code> for card-reader
+    protocols where the amount is digit text (<code>31 35 30 30 30 30</code> = "150000" =
+    1500.00) - <code>amountEnd</code> is EXCLUSIVE, so <code>-1</code> stops before a trailing
+    CRC byte. Either way the price lands in <code>vendRequestListener</code>. Frames are cut
+    from the stream by silence (<code>frameGapMs</code>, default 20 ms); first matching rule
+    wins; replies are written before logging.</p>
+    <p><strong>Framed replies</strong>: <code>buildXorFrame(header, dataHex)</code> builds
+    <code>[header][2-byte length][data][XOR CRC]</code>; <code>sendXorFrame</code> /
+    <code>sendXorAscii("A1 02", "SUCCESS")</code> build and send - length and CRC computed for
+    you (&rarr; <code>A1 02 00 07 53 55 43 43 45 53 53 E7</code>); <code>asciiHex("SUCCESS")</code>
+    converts text to hex. Manual TX any time with <code>sendHex(hex)</code>;
     <code>exchangeListener</code> gets every frame (rxHex, ruleName, txHex, price). Dashboard
     commands: <code>rs232Open[:9600[,8,1,N]]</code>, <code>rs232Close</code>,
-    <code>rs232Send:HEX</code>, <code>rs232Simulate:HEX</code>, <code>getRs232Rules</code>,
-    <code>clearRs232Rules</code>, and <code>{"setRs232Rules":[...]}</code> to push the whole
-    table remotely.</p>
+    <code>rs232Send:HEX</code>, <code>rs232SendFrame:HEADER;DATAHEX</code>,
+    <code>rs232SendAscii:HEADER;TEXT</code>, <code>rs232Simulate:HEX</code>,
+    <code>getRs232Rules</code>, <code>clearRs232Rules</code>, and
+    <code>{"setRs232Rules":[...]}</code> to push the whole table remotely.</p>
     <p><strong>Testing without the machine</strong>: <code>Rs232Lib.simulateFrame(hex)</code>
     feeds a fake received frame through the matcher exactly as if the machine sent it -
     matching, price extraction and both listeners all run; the reply is really written when the
     port is open, otherwise only logged. The <strong>RS232 Test bench APK</strong>
-    (<code>rs232-sample-v1.0.apk</code>, source <code>samples/Rs232SampleActivity.kt</code>)
+    (<code>rs232-sample-v1.1.apk</code>, source <code>samples/Rs232SampleActivity.kt</code>)
     puts the whole workflow on buttons: rule JSON editor (LOAD / GET / CLEAR), baud +
     OPEN / CLOSE PORT, SIMULATE RX, SEND HEX, live <code>[rs232]</code> log.</p>
   </section>
@@ -799,6 +812,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 7.11.0 · mqtt-lib 2.0.0 · demo app v2.13.25
+  CM30 MDB Slave project — developer manual. hardware-lib 7.12.0 · mqtt-lib 2.0.0 · demo app v2.13.26
   (build 54). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>

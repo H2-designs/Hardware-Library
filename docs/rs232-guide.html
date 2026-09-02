@@ -1,0 +1,312 @@
+<title>RS232 Card Reader Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f2ec; --surface: #ffffff; --surface-2: #edeae1; --border: #dcd7c9;
+    --text: #26231e; --muted: #6f6a5e;
+    --rx: #0d7fa6; --rx-soft: rgba(13,127,166,0.10);
+    --tx: #b06210; --tx-soft: rgba(176,98,16,0.12);
+    --ok: #1f8a4c; --ok-soft: rgba(31,138,76,0.10);
+    --err: #b23b3b; --err-soft: rgba(178,59,59,0.10);
+    --chip: #efece2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151a; --surface: #191d24; --surface-2: #1f242d; --border: #2b323d;
+      --text: #d9e1ea; --muted: #92a0b0;
+      --rx: #41c3ec; --rx-soft: rgba(65,195,236,0.12);
+      --tx: #eba04d; --tx-soft: rgba(235,160,77,0.13);
+      --ok: #6fe89a; --ok-soft: rgba(111,232,154,0.10);
+      --err: #e86f6f; --err-soft: rgba(232,111,111,0.10);
+      --chip: #232935;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151a; --surface: #191d24; --surface-2: #1f242d; --border: #2b323d;
+    --text: #d9e1ea; --muted: #92a0b0;
+    --rx: #41c3ec; --rx-soft: rgba(65,195,236,0.12);
+    --tx: #eba04d; --tx-soft: rgba(235,160,77,0.13);
+    --ok: #6fe89a; --ok-soft: rgba(111,232,154,0.10);
+    --err: #e86f6f; --err-soft: rgba(232,111,111,0.10);
+    --chip: #232935;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif; line-height: 1.6;
+  }
+  code, .mono { font-family: 'IBM Plex Mono', Consolas, monospace; }
+  main { max-width: 880px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 30px; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.01em; text-wrap: balance; }
+  .lede { color: var(--muted); font-size: 16px; max-width: 66ch; margin: 0 0 8px; }
+  h2 { font-size: 21px; font-weight: 700; margin: 56px 0 10px; letter-spacing: -0.005em; }
+  h2 .eyebrow {
+    display: block; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; color: var(--muted);
+  }
+  p { margin: 0 0 14px; max-width: 72ch; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; max-width: 68ch; }
+  code {
+    background: var(--chip); padding: 1px 6px; border-radius: 4px; font-size: 0.9em;
+  }
+  pre.code {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 15px 17px; overflow-x: auto; font-size: 12.5px; line-height: 1.65;
+    font-family: 'IBM Plex Mono', monospace; margin: 12px 0 24px;
+  }
+  pre.code code { background: none; padding: 0; }
+  .verified {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--ok-soft); color: var(--ok); border-radius: 999px;
+    padding: 2px 12px; font-size: 12px; font-weight: 600;
+  }
+
+  /* direction legend + tags */
+  .dir { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
+    padding: 1px 8px; border-radius: 4px; white-space: nowrap; }
+  .dir.rx { color: var(--rx); background: var(--rx-soft); }
+  .dir.tx { color: var(--tx); background: var(--tx-soft); }
+
+  /* ---- byte anatomy ---- */
+  .frame { display: flex; gap: 6px; overflow-x: auto; padding: 18px 4px 6px; }
+  .fgroup { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .fgroup .cells { display: flex; gap: 4px; }
+  .byte {
+    font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 0; width: 44px; text-align: center;
+  }
+  .fgroup.g-start .byte { border-color: var(--rx); color: var(--rx); background: var(--rx-soft); }
+  .fgroup.g-cmd   .byte { border-color: var(--rx); color: var(--rx); }
+  .fgroup.g-data  .byte { border-color: var(--tx); color: var(--tx); background: var(--tx-soft); }
+  .fgroup.g-crc   .byte { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+  .fgroup .lbl { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); text-align: center; font-weight: 600; }
+  .fgroup .sub { font-size: 12px; color: var(--muted); text-align: center; }
+  .fgroup .sub b { color: var(--text); font-weight: 600; }
+
+  /* ---- ladder ---- */
+  .ladder { border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+    margin: 16px 0 26px; overflow: hidden; }
+  .ladder .head, .lrow { display: grid; grid-template-columns: 130px 1fr; }
+  .ladder .head div { padding: 9px 14px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted); font-weight: 600;
+    border-bottom: 1px solid var(--border); }
+  .lrow { border-bottom: 1px solid var(--border); }
+  .lrow:last-child { border-bottom: none; }
+  .lrow .who { padding: 11px 14px; display: flex; align-items: flex-start; }
+  .lrow .msg { padding: 11px 14px 11px 0; min-width: 0; }
+  .lrow .msg .hex { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; overflow-wrap: anywhere; }
+  .lrow .msg .note { font-size: 13px; color: var(--muted); }
+  .lrow .msg .note b { color: var(--text); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 14px 0 26px; }
+  .table-wrap { overflow-x: auto; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  td code { white-space: nowrap; }
+  td .wrap { white-space: normal; overflow-wrap: anywhere; }
+
+  .callout {
+    border: 1px solid var(--border); border-left: 3px solid var(--tx);
+    background: var(--surface); border-radius: 0 8px 8px 0;
+    padding: 13px 17px; margin: 18px 0; font-size: 14.5px;
+  }
+  .callout.ok { border-left-color: var(--ok); }
+  .callout p:last-child { margin-bottom: 0; }
+  a { color: var(--rx); }
+  :focus-visible { outline: 2px solid var(--rx); outline-offset: 2px; }
+</style>
+
+<main>
+  <h1>RS232 Card Reader Guide</h1>
+  <p class="lede">How the coffee-machine ⇄ card-reader serial protocol maps onto
+  <code>Rs232Lib</code> rules — every frame from the vendor document, the rule table that
+  answers it, and the functions that build replies. hardware-lib 7.12.0.</p>
+  <p><span class="verified">✓ every frame below verified against the library via simulateFrame</span></p>
+
+  <h2><span class="eyebrow">1 · Frame anatomy</span>The payment request, byte by byte</h2>
+  <p>Every frame is <code>[Start][CMD][Length][Data][CRC]</code>. This is the real payment
+  request for <b>1500.00</b> from the protocol document:</p>
+
+  <div class="frame" role="img" aria-label="Frame A0 01 00 06 31 35 30 30 30 30 A3 split into fields">
+    <div class="fgroup g-start">
+      <div class="lbl">Start</div>
+      <div class="cells"><div class="byte">A0</div></div>
+      <div class="sub">machine → reader<br>(reader → machine = <b>A1</b>)</div>
+    </div>
+    <div class="fgroup g-cmd">
+      <div class="lbl">CMD</div>
+      <div class="cells"><div class="byte">01</div></div>
+      <div class="sub">payment<br>request</div>
+    </div>
+    <div class="fgroup g-cmd">
+      <div class="lbl">Length</div>
+      <div class="cells"><div class="byte">00</div><div class="byte">06</div></div>
+      <div class="sub">data is<br><b>6 bytes</b></div>
+    </div>
+    <div class="fgroup g-data">
+      <div class="lbl">Data · ASCII</div>
+      <div class="cells">
+        <div class="byte">31</div><div class="byte">35</div><div class="byte">30</div>
+        <div class="byte">30</div><div class="byte">30</div><div class="byte">30</div>
+      </div>
+      <div class="sub">"150000" = <b>1500.00</b></div>
+    </div>
+    <div class="fgroup g-crc">
+      <div class="lbl">CRC</div>
+      <div class="cells"><div class="byte">A3</div></div>
+      <div class="sub">XOR of all<br>previous bytes</div>
+    </div>
+  </div>
+
+  <p>Two things make this protocol different from a fixed-byte protocol like MDB:</p>
+  <ul>
+    <li><b>The amount is ASCII digit text, not binary bytes</b> — <code>31 35 30 30 30 30</code>
+      is the string "150000", the price in minor units. A 35.00 payment is only 4 data bytes,
+      so <b>the frame length varies with the amount</b>.</li>
+    <li><b>Every frame ends in an XOR CRC</b> — Start ^ CMD ^ Length ^ each Data byte.
+      The library computes it for you on replies.</li>
+  </ul>
+
+  <h2><span class="eyebrow">2 · The rule table</span>Ready to paste</h2>
+  <p>This maps every command in the document. Load it with <code>setRulesJson</code>, from the
+  dashboard as <code>{"setRs232Rules":[…]}</code>, or paste it into the RS232 Test app:</p>
+
+  <pre class="code"><code>[
+ {"name":"CONNECT",         "rx":"A0 04 00 03 43 4F 4E E5",             "tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"", "amountStart":4, "amountEnd":-1},
+ {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"", "amountStart":5, "amountEnd":-1},
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":""},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":""},
+ {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":""}
+]</code></pre>
+
+  <ul>
+    <li><code>"A0 01 *"</code> — the trailing <code>*</code> matches <b>any number of remaining
+      bytes</b>, so one rule catches every amount length.</li>
+    <li><code>"amountStart":4</code> — the ASCII amount begins at byte 4 (after Start, CMD and
+      the 2-byte Length). For CMD 06 it starts at 5, because a payment-type byte comes first.</li>
+    <li><code>"amountEnd":-1</code> — end is exclusive and negative counts from the frame end,
+      so <code>-1</code> means "everything up to, but not including, the last byte" — the CRC
+      never pollutes the amount.</li>
+    <li>CONNECT auto-replies <code>OK</code> instantly from the rule itself; payment replies
+      are sent by your code after the charge (next section).</li>
+  </ul>
+
+  <h2><span class="eyebrow">3 · The payment flow</span>Who sends what, when</h2>
+  <div class="ladder">
+    <div class="head"><div>Direction</div><div>Frame</div></div>
+    <div class="lrow">
+      <div class="who"><span class="dir rx">machine →</span></div>
+      <div class="msg"><div class="hex">A0 04 00 03 43 4F 4E E5</div>
+        <div class="note">"CON" — connect. Rule <b>CONNECT</b> auto-replies below, zero code.</div></div>
+    </div>
+    <div class="lrow">
+      <div class="who"><span class="dir tx">→ reader</span></div>
+      <div class="msg"><div class="hex">A1 05 00 02 4F 4B A2</div>
+        <div class="note">"OK" — sent automatically by the rule's <code>tx</code>.</div></div>
+    </div>
+    <div class="lrow">
+      <div class="who"><span class="dir rx">machine →</span></div>
+      <div class="msg"><div class="hex">A0 01 00 06 31 35 30 30 30 30 A3</div>
+        <div class="note">payment request 1500.00 — <b>vendRequestListener fires with
+        price=150000</b>. Charge the customer now.</div></div>
+    </div>
+    <div class="lrow">
+      <div class="who"><span class="dir tx">→ reader</span></div>
+      <div class="msg"><div class="hex">A1 02 00 07 53 55 43 43 45 53 53 E7</div>
+        <div class="note">payment result — your code sends
+        <code>sendXorAscii("A1 02", "SUCCESS")</code> (or <code>"FAILED"</code> →
+        <span class="mono">A1 02 00 06 46 41 49 4C 45 44 A6</span>).</div></div>
+    </div>
+    <div class="lrow">
+      <div class="who"><span class="dir rx">machine →</span></div>
+      <div class="msg"><div class="hex">A0 03 00 07 53 55 43 43 45 53 53 E7</div>
+        <div class="note">production result ("SUCCESS" / "FAILED") — the machine reports after
+        making the coffee. Rules <b>PRODUCTION_OK / PRODUCTION_FAIL</b> log it and reach your
+        <code>exchangeListener</code>.</div></div>
+    </div>
+    <div class="lrow">
+      <div class="who"><span class="dir rx">machine →</span></div>
+      <div class="msg"><div class="hex">A0 08 00 06 43 41 4E 43 45 4C A8</div>
+        <div class="note">"CANCEL" — machine cancels the payment. Abort the charge.</div></div>
+    </div>
+  </div>
+
+  <p>Multi-payment machines use CMD <code>06</code> instead of <code>01</code>: the first data
+  byte is the payment type (<code>01</code> transfer, <code>02</code> QR, <code>03</code> NFC,
+  <code>04</code> swipe), then the ASCII amount —
+  <code>A0 06 00 07 01 31 35 30 30 30 30 A4</code>. Rule <b>PAYMENT_TYPED</b> extracts the same
+  price=150000; read the type byte from the frame in your listener. If the reader must return
+  display content (a QR code), answer with CMD <code>07</code>:
+  <code>sendXorFrame("A1 07", "02 " + Rs232Lib.asciiHex(content))</code>.</p>
+
+  <h2><span class="eyebrow">4 · App code</span>The whole integration</h2>
+  <pre class="code"><code>Rs232Lib.setRulesJson(rulesJsonAbove)          // once - persisted across restarts
+Rs232Lib.open(baud = 9600)                     // defaults 8-N-1
+
+Rs232Lib.vendRequestListener = { price, frame ->
+    // price = 150000 for 1500.00; frame tells you CMD 01 vs 06
+    thread {
+        val paid = chargeCustomer(price)       // your gateway
+        Rs232Lib.sendXorAscii("A1 02", if (paid) "SUCCESS" else "FAILED")
+    }
+}
+
+Rs232Lib.exchangeListener = { e ->
+    // every frame: e.rxHex, e.ruleName (PRODUCTION_OK, CANCEL...), e.txHex, e.price
+}</code></pre>
+
+  <div class="callout ok">
+    <p><b>Verified without hardware</b>: all frames above were fed through
+    <code>Rs232Lib.simulateFrame(hex)</code> — matching, price extraction (150000 and a
+    shorter 3500 frame), the CONNECT auto-reply, and
+    <code>buildXorFrame("A1 02", asciiHex("SUCCESS"))</code> producing byte-identical
+    <code>A1 02 00 07 53 55 43 43 45 53 53 E7</code>. The RS232 Test app's SIMULATE RX button
+    runs the same check on the CM30.</p>
+  </div>
+
+  <h2><span class="eyebrow">5 · Reference</span>Functions and dashboard commands</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Kotlin</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td><code>setRulesJson(json)</code></td><td class="wrap">load rule table — returns <code>null</code> if OK, else the error text; persisted, hot-reloaded</td></tr>
+      <tr><td><code>open(baud, dataBits, stopBits, parity)</code></td><td class="wrap">open port + start listening (defaults 9600, 8-N-1) — <code>Boolean</code></td></tr>
+      <tr><td><code>close()</code> / <code>isOpen</code></td><td class="wrap">stop / status</td></tr>
+      <tr><td><code>sendHex(hex)</code></td><td class="wrap">raw TX, exact bytes</td></tr>
+      <tr><td><code>sendXorAscii(header, text)</code></td><td class="wrap">build <code>[header][len][ascii][XOR]</code> and send — <code>("A1 02", "SUCCESS")</code></td></tr>
+      <tr><td><code>sendXorFrame(header, dataHex)</code> / <code>buildXorFrame(…)</code></td><td class="wrap">same with a hex payload / build only (returns the hex)</td></tr>
+      <tr><td><code>asciiHex(text)</code></td><td class="wrap">"SUCCESS" → <code>53 55 43 43 45 53 53</code></td></tr>
+      <tr><td><code>simulateFrame(hex)</code></td><td class="wrap">fake a received frame — test rules with no machine</td></tr>
+      <tr><td><code>vendRequestListener</code> / <code>exchangeListener</code></td><td class="wrap">price hook / every frame</td></tr>
+      <tr><td><code>frameGapMs</code></td><td class="wrap">silence that ends a frame (default 20 ms)</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Dashboard / MQTT command</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td><code>rs232Open</code> / <code>rs232Open:9600,8,1,N</code></td><td class="wrap">open the port remotely</td></tr>
+      <tr><td><code>{"setRs232Rules":[…]}</code></td><td class="wrap">push the whole rule table, no rebuild</td></tr>
+      <tr><td><code>rs232SendAscii:A1 02;SUCCESS</code></td><td class="wrap">framed reply with computed length + CRC</td></tr>
+      <tr><td><code>rs232SendFrame:A1 07;02 …</code></td><td class="wrap">framed reply, hex payload</td></tr>
+      <tr><td><code>rs232Send:HEX</code></td><td class="wrap">raw bytes</td></tr>
+      <tr><td><code>rs232Simulate:HEX</code></td><td class="wrap">remote rule test</td></tr>
+      <tr><td><code>getRs232Rules</code> / <code>clearRs232Rules</code> / <code>rs232Close</code></td><td class="wrap">inspect / wipe / close</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout">
+    <p><b>Still to confirm on the real machine</b>: the CM30 vendor API's
+    <code>RS232Open</code> parameter order and read-timeout behavior are inferred from the AAR
+    (not documented), and <code>frameGapMs</code> = 20 ms framing should be watched on first
+    contact — if frames arrive split or merged, raise it. The document also says illegal frames
+    (bad CRC) are discarded without response; the library currently matches on bytes and does
+    not validate incoming CRC.</p>
+  </div>
+</main>

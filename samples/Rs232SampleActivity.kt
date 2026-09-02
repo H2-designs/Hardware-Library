@@ -79,8 +79,12 @@ class MainActivity : Activity() {
             setText(
                 if (saved != "[]") saved
                 else """[
- {"name":"STATUS","rx":"FF FF FF FF FF","tx":"01 00"},
- {"name":"VEND_REQUEST","rx":"F1 05 ?? ?? 0D","tx":"06","priceHi":2,"priceLo":3}
+ {"name":"CONNECT","rx":"A0 04 00 03 43 4F 4E E5","tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1},
+ {"name":"PAYMENT_TYPED","rx":"A0 06 *","tx":"","amountStart":5,"amountEnd":-1},
+ {"name":"PRODUCTION_OK","rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":""},
+ {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":""},
+ {"name":"CANCEL","rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":""}
 ]"""
             )
         }
@@ -116,8 +120,8 @@ class MainActivity : Activity() {
 
         // --- simulate rx (rule test without the machine) ---
         val simField = EditText(this).apply {
-            hint = "simulate machine frame, e.g. F1 05 01 F4 0D"
-            setText("F1 05 01 F4 0D")
+            hint = "simulate machine frame"
+            setText("A0 01 00 06 31 35 30 30 30 30 A3")
             typeface = Typeface.MONOSPACE
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
@@ -128,8 +132,8 @@ class MainActivity : Activity() {
 
         // --- manual tx ---
         val txField = EditText(this).apply {
-            hint = "hex to send, e.g. 05 01 F4"
-            setText("05 01 F4")
+            hint = "raw hex to send"
+            setText("A1 02 00 07 53 55 43 43 45 53 53 E7")
             typeface = Typeface.MONOSPACE
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
@@ -139,6 +143,34 @@ class MainActivity : Activity() {
                 thread {
                     val ok = Rs232Lib.sendHex(txField.text.toString())
                     logLine("<< sendHex returned $ok")
+                }
+            }
+        })
+
+        // --- framed tx: header + ASCII payload, length + XOR CRC computed by the library ---
+        val headerField: EditText
+        val asciiField: EditText
+        val frameRow = row()
+        headerField = EditText(this).apply {
+            hint = "header"
+            setText("A1 02")
+            typeface = Typeface.MONOSPACE
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        asciiField = EditText(this).apply {
+            hint = "ascii payload"
+            setText("SUCCESS")
+            typeface = Typeface.MONOSPACE
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        frameRow.addView(headerField, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        frameRow.addView(asciiField, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        root.addView(frameRow)
+        root.addView(row().apply {
+            button("BUILD + SEND FRAME") {
+                thread {
+                    val ok = Rs232Lib.sendXorAscii(headerField.text.toString(), asciiField.text.toString())
+                    logLine("<< sendXorAscii returned $ok")
                 }
             }
         })
