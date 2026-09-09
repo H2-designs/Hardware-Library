@@ -772,6 +772,14 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
     <h2><span class="eyebrow">09</span>Dashboard command reference</h2>
     <p>Everything the dashboard can publish to <code class="cmd">…/&lt;deviceId&gt;/commands</code>.
     Plain text unless noted. Each row = one message.</p>
+    <div class="callout">
+      <p><strong>Desktop dashboard app</strong> (<code>dashboard-app/</code> in the repo,
+      packaged as <code>Hardware-Dashboard-win32-x64.zip</code>): the same log-viewer UI as an
+      Electron app that talks <em>plain MQTT TCP 1883</em> - the exact connection the device
+      uses - so the broker needs NO websocket listener. First launch asks for the MQTT
+      password once (F2 changes it later). Browsers can only speak MQTT over websockets, so
+      the HTML version still needs a ws(s) listener on the broker; the desktop app doesn't.</p>
+    </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Command</th><th>What the device does</th><th>Reply on liveLog</th></tr></thead>
       <tbody>
