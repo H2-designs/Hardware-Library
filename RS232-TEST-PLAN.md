@@ -37,8 +37,10 @@ that is intentional for this test.
 - **Machine says reader offline / keeps reconnecting** → heartbeat reply not accepted.
   Note the exact heartbeat rx line — especially its LAST byte (the doc claims `A4`,
   the XOR math says `AE`; whichever the machine really sends decides the CRC question).
-- **Frames look glued together or cut in half** (one log line holding two frames, or
-  half a frame) → the 20 ms silence framing needs tuning. Fixable remotely.
+- **Machine times out waiting for our replies** → the frame gap is 1000 ms (a reply goes
+  out 1 s after the machine's last byte). Lower it live from the dashboard: `rs232Gap:100`.
+- **Frames look glued together** (two frames in one log line) → the machine sends
+  back-to-back frames within 1 s; lower the gap the same way.
 - **Wrong amount** → screenshot the `price=` line plus what the machine display said.
 - Buttons for manual poking: **SIMULATE RX** (test a rule without the machine),
   **SEND HEX** (raw bytes), **BUILD + SEND FRAME** (header + ASCII → auto length + CRC).

@@ -126,7 +126,7 @@
   <h1>RS232 Card Reader Guide</h1>
   <p class="lede">How the coffee-machine ⇄ card-reader serial protocol maps onto
   <code>Rs232Lib</code> rules — every frame from the vendor document, the rule table that
-  answers it, and the functions that build replies. hardware-lib 7.13.0.</p>
+  answers it, and the functions that build replies. hardware-lib 7.14.0.</p>
   <p><span class="verified">✓ every frame below verified against the library via simulateFrame</span></p>
 
   <h2><span class="eyebrow">1 · Frame anatomy</span>The payment request, byte by byte</h2>
@@ -320,7 +320,7 @@ Rs232Lib.exchangeListener = { e ->
       <tr><td><code>asciiHex(text)</code></td><td class="wrap">"SUCCESS" → <code>53 55 43 43 45 53 53</code></td></tr>
       <tr><td><code>simulateFrame(hex)</code></td><td class="wrap">fake a received frame — test rules with no machine</td></tr>
       <tr><td><code>vendRequestListener</code> / <code>exchangeListener</code></td><td class="wrap">price hook / every frame</td></tr>
-      <tr><td><code>frameGapMs</code></td><td class="wrap">silence that ends a frame (default 20 ms)</td></tr>
+      <tr><td><code>frameGapMs</code></td><td class="wrap">silence that ends a frame — the reply goes out this long after the machine's last byte (default 1000 ms; remote: <code>rs232Gap:MS</code>)</td></tr>
     </tbody>
   </table></div>
 
@@ -340,8 +340,11 @@ Rs232Lib.exchangeListener = { e ->
   <div class="callout">
     <p><b>Still to confirm on the real machine</b>: the CM30 vendor API's
     <code>RS232Open</code> parameter order and read-timeout behavior are inferred from the AAR
-    (not documented), and <code>frameGapMs</code> = 20 ms framing should be watched on first
-    contact — if frames arrive split or merged, raise it.</p>
+    (not documented), and <code>frameGapMs</code> framing should be watched on first contact —
+    the default is 1000 ms (one second of silence ends a frame, so every auto-reply goes out
+    ~1 s after the machine's last byte). If the machine times out waiting for replies, LOWER it
+    (<code>rs232Gap:100</code> from the dashboard, no rebuild); if frames log merged together,
+    it's already generous.</p>
     <p><b>Heartbeat CRC oddity — keep <code>setCrcCheck</code> OFF for this machine until
     verified.</b> The vendor doc's heartbeat frames don't follow their own XOR rule: the ping
     <code>A0 06 00 02 48 42 A4</code> XORs to <code>AE</code> (not <code>A4</code>) and the

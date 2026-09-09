@@ -288,8 +288,9 @@ Rs232Lib.vendRequestListener = { price, frame ->
   bytes change per sale still matches one rule); a single trailing `*` matches ANY NUMBER of
   remaining bytes for VARIABLE-LENGTH frames (`"F2 *"` matches every frame starting `F2`);
   without `*` the frame length must equal the pattern length; first matching rule wins.
-  Frames are cut from the byte stream by silence (`frameGapMs`, default 20 ms — RS232 has no
-  frame markers).
+  Frames are cut from the byte stream by silence (`frameGapMs`, default 1000 ms — RS232 has
+  no frame markers; the reply goes out this long after the machine's last byte. Tune live via
+  `rs232Gap:MS`, or lower `Rs232Lib.frameGapMs` for machines with a tight response window).
 - **Vend request rules** — two price formats, both using positions that are 0-based from the
   frame START or NEGATIVE to count from the frame END (`-1` = last byte):
   - **Binary** `priceHi`/`priceLo`: two bytes, price = hi × 256 + lo.
