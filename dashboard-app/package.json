@@ -1,0 +1,22 @@
+{
+  "name": "hardware-dashboard",
+  "productName": "Hardware Dashboard",
+  "version": "1.0.0",
+  "description": "CM30 hardware dashboard - live logs and remote commands over plain MQTT TCP (no websockets needed on the broker)",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-packager . \"Hardware Dashboard\" --platform=win32 --arch=x64 --out=dist --overwrite"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-packager": "^17.1.2"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.1"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}

@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>CM30 MDB Live Log</title>
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<title>Hardware Dashboard</title>
+<script>
+  // Electron desktop build: MQTT over plain TCP via Node's mqtt package - the whole reason
+  // this app exists is that a browser tab can only do websockets, and the broker has none.
+  window.mqtt = require('mqtt');
+  window.APP_CONFIG = (() => {
+    try { return require(require('path').join(__dirname, 'config.json')); } catch (_) { return {}; }
+  })();
+</script>
 <style>
   :root { color-scheme: dark; }
   body {
@@ -397,9 +404,44 @@
     if (v !== null) { localStorage.setItem('cm30-' + key, v); return v; }
     return localStorage.getItem('cm30-' + key) || def;
   }
-  const BROKER_URL = setting('broker', 'ws://mosquitto:9001'); // rabbah mosquitto websocket listener
-  const MQTT_USER = setting('user', 'rabbah');
-  const MQTT_PASS = setting('pass', '');
+  // Desktop build: plain TCP mqtt://, credentials from an optional config.json placed next
+  // to the app ({"broker","username","password"}) or typed once into the first-run panel
+  // below (persisted on this computer; F2 reopens it any time).
+  const APP_CFG = window.APP_CONFIG || {};
+  const BROKER_URL = setting('broker', APP_CFG.broker || 'mqtt://uat-api.rabbah.sa:1883');
+  const MQTT_USER = setting('user', APP_CFG.username || 'rabbah');
+  const MQTT_PASS = setting('pass', APP_CFG.password || '');
+
+  function showConnectOverlay() {
+    if (document.getElementById('connOverlay')) return;
+    const ov = document.createElement('div');
+    ov.id = 'connOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    const inp = 'width:100%;margin-bottom:10px;padding:8px;background:#12161c;border:1px solid #333;border-radius:6px;color:#dfe7f0;box-sizing:border-box';
+    const lbl = 'display:block;font-size:11px;color:#93a2b4;margin-bottom:3px;letter-spacing:0.05em';
+    ov.innerHTML =
+      '<div style="background:#1c222b;border:1px solid #333;border-radius:12px;padding:26px 30px;width:430px;color:#dfe7f0;font:14px system-ui">' +
+      '<h2 style="margin:0 0 6px;font-size:17px">Connect to MQTT broker</h2>' +
+      '<p style="margin:0 0 16px;color:#93a2b4;font-size:12.5px">Plain TCP (mqtt://), the same port the device uses - no websockets. Saved on this computer; press F2 any time to change.</p>' +
+      '<label style="' + lbl + '">BROKER URL</label><input id="ovBroker" style="' + inp + '">' +
+      '<label style="' + lbl + '">USERNAME</label><input id="ovUser" style="' + inp + '">' +
+      '<label style="' + lbl + '">PASSWORD</label><input id="ovPass" type="password" style="' + inp + ';margin-bottom:18px">' +
+      '<button id="ovGo" style="width:100%;padding:10px;background:#2f81f7;border:0;border-radius:6px;color:#fff;font-weight:600;cursor:pointer">Save &amp; connect</button></div>';
+    document.body.appendChild(ov);
+    document.getElementById('ovBroker').value = BROKER_URL;
+    document.getElementById('ovUser').value = MQTT_USER;
+    const go = () => {
+      localStorage.setItem('cm30-broker', document.getElementById('ovBroker').value.trim());
+      localStorage.setItem('cm30-user', document.getElementById('ovUser').value.trim());
+      localStorage.setItem('cm30-pass', document.getElementById('ovPass').value);
+      location.reload();
+    };
+    document.getElementById('ovGo').addEventListener('click', go);
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    document.getElementById('ovPass').focus();
+  }
+  window.addEventListener('keydown', (e) => { if (e.key === 'F2') showConnectOverlay(); });
+  if (!MQTT_PASS) showConnectOverlay();
   // Channel suffixes - override for backend-contract devices: ?logTopic=logs&cmdTopic=cmd
   const LOG_SUFFIX = setting('logTopic', 'liveLog');
   const CMD_SUFFIX = setting('cmdTopic', 'commands');
