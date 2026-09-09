@@ -29,9 +29,17 @@ import kotlin.concurrent.thread
  */
 class MainActivity : Activity() {
 
+    companion object {
+        // Reader -> machine payment results, CRC precomputed (XOR) - verified against the doc.
+        const val TX_PAYMENT_SUCCESS = "A1 02 00 07 53 55 43 43 45 53 53 E7"
+        const val TX_PAYMENT_FAILED = "A1 02 00 06 46 41 49 4C 45 44 A6"
+    }
+
     private lateinit var status: TextView
     private lateinit var logView: TextView
+    private lateinit var payStatus: TextView
     private val log = StringBuilder()
+    @Volatile private var pendingPrice: Int = -1
 
     private fun logLine(line: String) {
         runOnUiThread {
@@ -61,6 +69,15 @@ class MainActivity : Activity() {
         status = TextView(this).apply { typeface = Typeface.MONOSPACE; textSize = 13f }
         root.addView(status)
 
+        // --- payment approval panel: a VEND REQUEST parks here until APPROVE/DECLINE ---
+        payStatus = TextView(this).apply {
+            typeface = Typeface.MONOSPACE
+            textSize = 14f
+            text = "no payment pending"
+            setPadding(0, pad, 0, 0)
+        }
+        root.addView(payStatus)
+
         fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         fun LinearLayout.button(label: String, onClick: () -> Unit) {
             addView(Button(this@MainActivity).apply {
@@ -68,6 +85,25 @@ class MainActivity : Activity() {
                 setOnClickListener { onClick() }
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         }
+
+        // APPROVE sends the SUCCESS frame, DECLINE the FAILED frame - both with correct XOR CRC.
+        fun answerPayment(approve: Boolean) {
+            val price = pendingPrice
+            if (price < 0) { logLine("-- no payment pending --"); return }
+            val frame = if (approve) TX_PAYMENT_SUCCESS else TX_PAYMENT_FAILED
+            thread {
+                val ok = Rs232Lib.sendHex(frame)
+                logLine("<< ${if (approve) "APPROVED" else "DECLINED"} price=$price sent=$ok")
+                runOnUiThread {
+                    pendingPrice = -1
+                    payStatus.text = "last: ${if (approve) "APPROVED" else "DECLINED"} price=$price"
+                }
+            }
+        }
+        root.addView(row().apply {
+            button("APPROVE") { answerPayment(true) }
+            button("DECLINE") { answerPayment(false) }
+        })
 
         // --- rule table ---
         val rulesField = EditText(this).apply {
@@ -82,8 +118,8 @@ class MainActivity : Activity() {
                 else """[
  {"name":"CONNECT","rx":"A0 04 00 03 43 4F 4E E5","tx":"A1 05 00 02 4F 4B A2"},
  {"name":"HEARTBEAT","rx":"A0 06 00 02 48 42 ??","tx":"A1 06 00 02 4F 4B A1"},
- {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"A1 02 00 07 53 55 43 43 45 53 53 E7","amountStart":4,"amountEnd":-1},
- {"name":"PAYMENT_TYPED","rx":"A0 06 *","tx":"A1 02 00 07 53 55 43 43 45 53 53 E7","amountStart":5,"amountEnd":-1},
+ {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1},
+ {"name":"PAYMENT_TYPED","rx":"A0 06 *","tx":"","amountStart":5,"amountEnd":-1},
  {"name":"PRODUCTION_OK","rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":""},
  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":""},
  {"name":"CANCEL","rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":""}
@@ -192,6 +228,10 @@ class MainActivity : Activity() {
         HardwareLib.addLogListener { line, _ -> logLine(line) }
         Rs232Lib.vendRequestListener = { price, frameHex ->
             logLine(">> VEND REQUEST price=$price frame=$frameHex")
+            runOnUiThread {
+                pendingPrice = price
+                payStatus.text = "PAYMENT PENDING: $price  ->  APPROVE or DECLINE"
+            }
         }
 
         logLine("-- rs232 test bench | hardware-lib ${HardwareLib.VERSION} --")
