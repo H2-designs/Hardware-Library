@@ -116,6 +116,8 @@
     <a href="#state">State</a>
     <a href="#settings">Settings</a>
     <a href="#hex">Hex configs</a>
+    <a href="#rs232">RS232</a>
+    <a href="#pulse">Pulse</a>
     <a href="#mqtt">MqttLib</a>
     <a href="#remote">Dashboard commands</a>
     <a href="#tagged">Tagged messages</a>
@@ -274,6 +276,14 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <tr><td>134</td><td>EXPANSION, other subcommand</td><td>(varies)</td><td>&mdash;</td></tr>
     <tr><td>135</td><td>other peripheral (outside 10&ndash;17)</td><td>(ignored)</td><td>&mdash;</td></tr>
     <tr><td>136</td><td>unrecognized in current state</td><td>(none)</td><td>&mdash;</td></tr>
+    <tr><td colspan="4" style="font-weight:600; color:var(--accent);">RS232 schema (7.17.0) &mdash; log events, continue the same numbering (params in [brackets])</td></tr>
+    <tr><td>137</td><td colspan="3">RS232_RX_MATCHED &mdash; frame matched a rule [ruleName, rxHex, txHex or "-", price or "-1"]</td></tr>
+    <tr><td>138</td><td colspan="3">RS232_RX_UNMATCHED &mdash; frame matched no rule [rxHex]</td></tr>
+    <tr><td>139</td><td colspan="3">RS232_CRC_DISCARDED &mdash; bad XOR CRC, frame dropped [rxHex, expectedCrc]</td></tr>
+    <tr><td>140</td><td colspan="3">RS232_TX &mdash; manual write went out (sendHex / sendXor*) [txHex]</td></tr>
+    <tr><td>141</td><td colspan="3">RS232_PORT_OPEN [portParams, ruleCount]</td></tr>
+    <tr><td>142</td><td colspan="3">RS232_PORT_CLOSED []</td></tr>
+    <tr><td>143</td><td colspan="3">RS232_RULES_LOADED [ruleCount]</td></tr>
   </tbody>
 </table>
   </section>
