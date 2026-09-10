@@ -368,6 +368,15 @@
     background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px;
     padding: 5px 8px; font-size: 12px; font-family: inherit; width: 110px;
   }
+
+  /* protocol groups: display:contents keeps children flowing in the header's flex layout,
+     .off hides the whole group when another protocol is selected */
+  .pgroup { display: contents; }
+  .pgroup.off { display: none; }
+  .hin {
+    background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px;
+    padding: 5px 8px; font-size: 12px; font-family: inherit; width: 64px;
+  }
 </style>
 </head>
 <body>
@@ -382,6 +391,15 @@
       <option value="" disabled selected>(none seen yet)</option>
     </select>
     <span class="divider"></span>
+    <span class="label">protocol:</span>
+    <select id="protoMode" title="Which hardware protocol's controls to show. All commands go to the selected device's passthrough topic either way.">
+      <option value="mdb">MDB</option>
+      <option value="rs232">RS232</option>
+      <option value="pulse">PULSE</option>
+    </select>
+    <span class="divider"></span>
+
+    <span class="pgroup mode-mdb">
     <button id="openBtn">Open</button>
     <button id="closeBtn">Close</button>
     <span class="divider"></span>
@@ -415,17 +433,47 @@
     </select>
     <span class="divider"></span>
     <button id="configBtn">Config</button>
+    </span>
+
+    <span class="pgroup mode-rs232">
+    <button id="rsOpenBtn" title="rs232Open - opens the serial port (9600 8-N-1)">Open Port</button>
+    <button id="rsCloseBtn" title="rs232Close">Close Port</button>
+    <span class="divider"></span>
+    <button id="rsCrcOnBtn" title="rs232Crc:on - discard bad-CRC frames">CRC On</button>
+    <button id="rsCrcOffBtn" title="rs232Crc:off">CRC Off</button>
+    <span class="divider"></span>
+    <span class="label">gap ms:</span>
+    <input id="rsGapMs" class="hin" value="1000" title="Silence that ends a frame - the reply goes out this long after the machine's last byte">
+    <button id="rsGapBtn" title="rs232Gap:MS">Set Gap</button>
+    <span class="divider"></span>
+    <button id="rsRulesBtn" title="getRs232Rules - the device reports its rule table">Get Rules</button>
+    </span>
+
+    <span class="pgroup mode-pulse">
+    <button id="plHighBtn" title="initPulse:true - HIGH pulses, idle LOW">Init High</button>
+    <button id="plLowBtn" title="initPulse:false - LOW pulses, idle HIGH">Init Low</button>
+    <span class="divider"></span>
+    <span class="label">w/p/c:</span>
+    <input id="plW" class="hin" value="50" title="pulse width ms">
+    <input id="plP" class="hin" value="100" title="pulse period ms">
+    <input id="plC" class="hin" value="3" title="pulse count">
+    <button id="plSendBtn" title="sendPulse:width,period,count">Send Pulse</button>
+    <span class="divider"></span>
+    <button id="plReadyBtn" title="checkMachineReady - digital-in ready feedback check">Check Ready</button>
+    </span>
     <button id="explorerBtn" title="Live tree of EVERY topic on the broker, with raw publish to any topic">Topics</button>
     <button id="clearBtn">Clear</button>
     <span id="count">0 lines</span>
   </header>
   <div id="subheader">
+    <span class="pgroup mode-mdb">
     <span id="vmcStatus" class="vmc-nodata"><span class="dot"></span><span id="vmcStatusText">no VMC data yet</span></span>
     <span class="divider"></span>
     <label class="checkbox-label"><input type="checkbox" id="pollVisibilityCheck"> Show POLL/ACK traffic</label>
     <label class="checkbox-label"><input type="checkbox" id="unhandledVisibilityCheck"> Show unhandled commands</label>
-    <label class="checkbox-label" title="Client-side filter: hides bus traffic addressed to other peripherals (coin changer, bill validator - anything outside 0x10-0x17). Applies to the view only, so it works with any device build; the device also has its own setPeripheralVisibility switch to stop sending them at all."><input type="checkbox" id="cashlessOnlyCheck" checked> Cashless only (hide other peripherals)</label>
+    <label class="checkbox-label" title="Checked = hide other peripherals AND tell the device to stop sending them (setPeripheralVisibility:off). Uncheck to make the device publish coin changer / bill validator traffic."><input type="checkbox" id="cashlessOnlyCheck" checked> Cashless only (hide other peripherals)</label>
     <span class="divider"></span>
+    </span>
     <span class="label">passthrough:</span>
     <input id="ptCmd" placeholder="any command to the selected device - try: help" spellcheck="false"
            title="Publishes exactly what you type to the selected device's cmd topic. Examples: help, getRs232Rules, rs232Gap:500, rs232Simulate:A0 01 00 03 30 30 36 94">
@@ -1421,6 +1469,43 @@
   ptCmdEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('ptSendBtn').onclick();
   });
+
+  // ---------------- protocol selector: MDB / RS232 / PULSE toolbars ----------------
+  const protoModeEl = document.getElementById('protoMode');
+  protoModeEl.value = localStorage.getItem('cm30-protoMode') || 'mdb';
+  function applyProtoMode() {
+    const m = protoModeEl.value;
+    document.querySelectorAll('.pgroup').forEach((el) => {
+      el.classList.toggle('off', !el.classList.contains('mode-' + m));
+    });
+    localStorage.setItem('cm30-protoMode', m);
+  }
+  protoModeEl.onchange = applyProtoMode;
+  applyProtoMode();
+
+  // RS232 toolbar - each is one passthrough command; results come back as [rs232] log lines.
+  document.getElementById('rsOpenBtn').onclick = () => sendCommand('rs232Open', 'RS232 Open Port');
+  document.getElementById('rsCloseBtn').onclick = () => sendCommand('rs232Close', 'RS232 Close Port');
+  document.getElementById('rsCrcOnBtn').onclick = () => sendCommand('rs232Crc:on', 'RS232 CRC check ON');
+  document.getElementById('rsCrcOffBtn').onclick = () => sendCommand('rs232Crc:off', 'RS232 CRC check OFF');
+  document.getElementById('rsGapBtn').onclick = () => {
+    const v = parseInt(document.getElementById('rsGapMs').value, 10);
+    if (!v || v < 1) { addLine('-- gap ms must be a positive number --'); return; }
+    sendCommand('rs232Gap:' + v, 'RS232 frame gap = ' + v + 'ms');
+  };
+  document.getElementById('rsRulesBtn').onclick = () => sendCommand('getRs232Rules', 'Get RS232 rules');
+
+  // PULSE toolbar.
+  document.getElementById('plHighBtn').onclick = () => sendCommand('initPulse:true', 'Pulse init HIGH (idle LOW)');
+  document.getElementById('plLowBtn').onclick = () => sendCommand('initPulse:false', 'Pulse init LOW (idle HIGH)');
+  document.getElementById('plSendBtn').onclick = () => {
+    const w = parseInt(document.getElementById('plW').value, 10);
+    const p = parseInt(document.getElementById('plP').value, 10);
+    const c = parseInt(document.getElementById('plC').value, 10);
+    if (!w || !p || !c) { addLine('-- width/period/count must all be positive numbers --'); return; }
+    sendCommand('sendPulse:' + w + ',' + p + ',' + c, 'Send pulse ' + w + '/' + p + ' x' + c);
+  };
+  document.getElementById('plReadyBtn').onclick = () => sendCommand('checkMachineReady', 'Check machine ready');
 
   // ---------------- TOPIC EXPLORER: every topic on the broker + raw passthrough publish ----------------
   const topicMap = new Map();            // topic -> { n, last }
