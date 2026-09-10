@@ -603,6 +603,7 @@
   addScheme('devices/', 'logs', 'cmd', 'passthrough');        // production fleet, always on
   addScheme('cm30-mdb/hamdan-rabbah/', 'liveLog', 'commands', 'passthrough'); // demo, always on
   const deviceScheme = {}; // deviceId -> the scheme it was first heard on
+  const devicePresence = {}; // deviceId -> true (online) / false (offline), from retained status
   function ptTopicFor(id) {
     const s = deviceScheme[id] || SCHEMES[0];
     return s.prefix + id + '/' + s.pt;
@@ -640,7 +641,8 @@
       if (f && id.toUpperCase().indexOf(f) === -1 && id !== currentDeviceId) continue;
       const opt = document.createElement('option');
       opt.value = id;
-      opt.textContent = id;
+      opt.textContent = id +
+        (devicePresence[id] === true ? '  · online' : devicePresence[id] === false ? '  · offline' : '');
       deviceSelectEl.appendChild(opt);
       shown++;
     }
@@ -1367,7 +1369,14 @@
   });
 
   client.on('connect', () => {
-    for (const s of SCHEMES) client.subscribe(s.prefix + '+/' + s.log);
+    for (const s of SCHEMES) {
+      client.subscribe(s.prefix + '+/' + s.log);
+      // Retained presence registers EVERY device that ever connected - even ones that are
+      // quiet right now or only publish batched logs - the moment we subscribe.
+      client.subscribe(s.prefix + '+/status');
+      // Batched device logs ({"logs":[item,item,...]}) - "+" does not span the extra level.
+      client.subscribe(s.prefix + '+/' + s.log + '/bulk');
+    }
     pingDevice();
   });
   client.on('reconnect', () => {
@@ -1385,8 +1394,46 @@
     // Topic shape: cm30-mdb/hamdan-rabbah/<deviceId>/liveLog — every device we hear from gets
     // registered (so it shows up in the dropdown) even if it's not the one currently selected.
     recordTopic(topic, payload); // topic explorer sees everything, including '#' traffic
-    // Only log streams drive the device list / decoders - with the explorer's '#'
-    // subscription live, every other topic on the broker also lands in this handler.
+    const text = payload.toString();
+
+    // Presence: a retained online/offline on <prefix><id>/status registers the device even if
+    // it never sends a live log line - so the WHOLE fleet shows in the dropdown immediately.
+    const stScheme = SCHEMES.find((s) => topic.startsWith(s.prefix) && topic.endsWith('/status'));
+    if (stScheme && topic.split('/').length === stScheme.seg + 2) {
+      const id = topic.split('/')[stScheme.seg];
+      if (id) {
+        devicePresence[id] = (text.trim() === 'online');
+        if (!deviceScheme[id]) deviceScheme[id] = stScheme;
+        registerDevice(id);
+        rebuildDeviceOptions(); // presence label may have changed for an existing device
+      }
+      return;
+    }
+
+    // Batched logs: devices/<id>/logs/bulk carries {"logs":[item,item,...]} - unpack each
+    // item through the same codebook decoder as live lines.
+    const bulkScheme = SCHEMES.find((s) => topic.startsWith(s.prefix) && topic.endsWith('/' + s.log + '/bulk'));
+    if (bulkScheme) {
+      const id = topic.split('/')[bulkScheme.seg];
+      if (id) {
+        if (!deviceScheme[id]) deviceScheme[id] = bulkScheme;
+        registerDevice(id);
+        if (id === currentDeviceId) {
+          markDeviceLinked();
+          try {
+            const items = JSON.parse(text).logs || [];
+            addLine('-- bulk upload: ' + items.length + ' item(s) --');
+            for (const item of items) addCompactLine(JSON.stringify(item));
+          } catch (e) {
+            addLine('-- bulk parse error: ' + e.message + ' --');
+          }
+        }
+      }
+      return;
+    }
+
+    // Live log streams drive the decoders - with the explorer's '#' subscription live,
+    // every other topic on the broker also lands in this handler, so filter strictly.
     const scheme = SCHEMES.find((s) => topic.startsWith(s.prefix) && topic.endsWith('/' + s.log));
     if (!scheme) return;
     const fromDevice = topic.split('/')[scheme.seg];
@@ -1395,7 +1442,6 @@
     registerDevice(fromDevice);
     if (fromDevice !== currentDeviceId) return; // presence noted, but not who we're watching
 
-    const text = payload.toString();
     markDeviceLinked(); // any real message at all proves the selected device is alive
     if (text === 'PONG') {
       return; // just a heartbeat reply, nothing to show
