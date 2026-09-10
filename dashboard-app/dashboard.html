@@ -392,7 +392,7 @@
   // under its own <deviceId> segment (its ANDROID_ID, shown on its screen and in its version
   // label) — this page subscribes to the wildcard so it can see every machine that's online,
   // then scopes all UI/commands to whichever one is selected in the device dropdown.
-  const TOPIC_PREFIX = 'cm30-mdb/hamdan-rabbah/';
+  // TOPIC_PREFIX is defined below, after setting() - it is configurable now.
   // Broker override without editing this file: open the page once as
   //   log-viewer.html?broker=ws://YOUR-SERVER:9001&user=rabbah&pass=SECRET
   // and the values persist in localStorage for every later visit (query wins over stored).
@@ -425,15 +425,24 @@
       '<p style="margin:0 0 16px;color:#93a2b4;font-size:12.5px">Plain TCP (mqtt://), the same port the device uses - no websockets. Saved on this computer; press F2 any time to change.</p>' +
       '<label style="' + lbl + '">BROKER URL</label><input id="ovBroker" style="' + inp + '">' +
       '<label style="' + lbl + '">USERNAME</label><input id="ovUser" style="' + inp + '">' +
-      '<label style="' + lbl + '">PASSWORD</label><input id="ovPass" type="password" style="' + inp + ';margin-bottom:18px">' +
-      '<button id="ovGo" style="width:100%;padding:10px;background:#2f81f7;border:0;border-radius:6px;color:#fff;font-weight:600;cursor:pointer">Save &amp; connect</button></div>';
+      '<label style="' + lbl + '">PASSWORD</label><input id="ovPass" type="password" style="' + inp + '">' +
+      '<label style="' + lbl + '">TOPIC PREFIX &nbsp;(demo: cm30-mdb/hamdan-rabbah/ &nbsp;&middot;&nbsp; production fleet: devices/)</label><input id="ovPrefix" style="' + inp + '">' +
+      '<div style="display:flex;gap:8px"><div style="flex:1"><label style="' + lbl + '">LOG TOPIC (liveLog / logs)</label><input id="ovLog" style="' + inp + '"></div>' +
+      '<div style="flex:1"><label style="' + lbl + '">CMD TOPIC (commands / cmd)</label><input id="ovCmd" style="' + inp + '"></div></div>' +
+      '<button id="ovGo" style="width:100%;margin-top:8px;padding:10px;background:#2f81f7;border:0;border-radius:6px;color:#fff;font-weight:600;cursor:pointer">Save &amp; connect</button></div>';
     document.body.appendChild(ov);
     document.getElementById('ovBroker').value = BROKER_URL;
     document.getElementById('ovUser').value = MQTT_USER;
+    document.getElementById('ovPrefix').value = TOPIC_PREFIX;
+    document.getElementById('ovLog').value = LOG_SUFFIX;
+    document.getElementById('ovCmd').value = CMD_SUFFIX;
     const go = () => {
       localStorage.setItem('cm30-broker', document.getElementById('ovBroker').value.trim());
       localStorage.setItem('cm30-user', document.getElementById('ovUser').value.trim());
       localStorage.setItem('cm30-pass', document.getElementById('ovPass').value);
+      localStorage.setItem('cm30-prefix', document.getElementById('ovPrefix').value.trim());
+      localStorage.setItem('cm30-logTopic', document.getElementById('ovLog').value.trim());
+      localStorage.setItem('cm30-cmdTopic', document.getElementById('ovCmd').value.trim());
       location.reload();
     };
     document.getElementById('ovGo').addEventListener('click', go);
@@ -441,11 +450,18 @@
     document.getElementById('ovPass').focus();
   }
   window.addEventListener('keydown', (e) => { if (e.key === 'F2') showConnectOverlay(); });
-  if (!MQTT_PASS) showConnectOverlay();
   // Channel suffixes - override for backend-contract devices: ?logTopic=logs&cmdTopic=cmd
-  const LOG_SUFFIX = setting('logTopic', 'liveLog');
-  const CMD_SUFFIX = setting('cmdTopic', 'commands');
+  const LOG_SUFFIX = setting('logTopic', APP_CFG.logTopic || 'liveLog');
+  const CMD_SUFFIX = setting('cmdTopic', APP_CFG.cmdTopic || 'commands');
+  // Two real schemes exist: the demo app publishes under "cm30-mdb/hamdan-rabbah/<id>/liveLog"
+  // + "/commands"; the production app follows the backend contract "devices/<code>/logs" +
+  // "/cmd". Prefix "devices/" with topics "logs"/"cmd" watches the production fleet.
+  const TOPIC_PREFIX = (function () {
+    const p = setting('prefix', APP_CFG.prefix || 'cm30-mdb/hamdan-rabbah/');
+    return p.endsWith('/') ? p : p + '/';
+  })();
   const LOG_TOPIC_FILTER = TOPIC_PREFIX + '+/' + LOG_SUFFIX;
+  if (!MQTT_PASS) showConnectOverlay(); // first run: nothing saved yet
   const LAST_DEVICE_KEY = 'cm30-last-device-id';
 
   const deviceSelectEl = document.getElementById('deviceSelect');
@@ -1219,6 +1235,12 @@
     if (text.startsWith('RABBAH_LOG:')) {
       addCompactLine(text.slice('RABBAH_LOG:'.length));
       return; // decoded into a sentence by the codebook
+    }
+    // The production app publishes the compact envelope as BARE JSON (no RABBAH_LOG: prefix)
+    // on devices/<code>/logs - same decoder, different framing.
+    if (text.startsWith('{') && text.includes('"m"') && text.includes('"s"')) {
+      addCompactLine(text);
+      return;
     }
     handleConfigAck(text);
     addLine(text);

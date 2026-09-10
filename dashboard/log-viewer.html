@@ -385,7 +385,7 @@
   // under its own <deviceId> segment (its ANDROID_ID, shown on its screen and in its version
   // label) — this page subscribes to the wildcard so it can see every machine that's online,
   // then scopes all UI/commands to whichever one is selected in the device dropdown.
-  const TOPIC_PREFIX = 'cm30-mdb/hamdan-rabbah/';
+  // TOPIC_PREFIX is defined below, after setting() - configurable via ?prefix=devices/
   // Broker override without editing this file: open the page once as
   //   log-viewer.html?broker=ws://YOUR-SERVER:9001&user=rabbah&pass=SECRET
   // and the values persist in localStorage for every later visit (query wins over stored).
@@ -403,6 +403,12 @@
   // Channel suffixes - override for backend-contract devices: ?logTopic=logs&cmdTopic=cmd
   const LOG_SUFFIX = setting('logTopic', 'liveLog');
   const CMD_SUFFIX = setting('cmdTopic', 'commands');
+  // Demo app: prefix cm30-mdb/hamdan-rabbah/ + liveLog/commands. Production fleet (backend
+  // contract): open once as ?prefix=devices/&logTopic=logs&cmdTopic=cmd - persisted after that.
+  const TOPIC_PREFIX = (function () {
+    const p = setting('prefix', 'cm30-mdb/hamdan-rabbah/');
+    return p.endsWith('/') ? p : p + '/';
+  })();
   const LOG_TOPIC_FILTER = TOPIC_PREFIX + '+/' + LOG_SUFFIX;
   const LAST_DEVICE_KEY = 'cm30-last-device-id';
 
@@ -1177,6 +1183,12 @@
     if (text.startsWith('RABBAH_LOG:')) {
       addCompactLine(text.slice('RABBAH_LOG:'.length));
       return; // decoded into a sentence by the codebook
+    }
+    // The production app publishes the compact envelope as BARE JSON (no RABBAH_LOG: prefix)
+    // on devices/<code>/logs - same decoder, different framing.
+    if (text.startsWith('{') && text.includes('"m"') && text.includes('"s"')) {
+      addCompactLine(text);
+      return;
     }
     handleConfigAck(text);
     addLine(text);
