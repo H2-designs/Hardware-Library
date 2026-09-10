@@ -318,7 +318,43 @@
   }
   .level-badge.active { color: #6fe89a; background: rgba(111, 232, 154, 0.12); }
   .level-badge.inactive { color: #6a7684; background: rgba(106, 118, 132, 0.12); }
-</style>
+
+  /* ---- topic explorer (raw passthrough) ---- */
+  #explorerOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    align-items: center; justify-content: center; z-index: 11;
+  }
+  #explorerOverlay.open { display: flex; }
+  #explorerPanel {
+    background: #12161c; border: 1px solid #2c3440; border-radius: 10px;
+    width: min(900px, 94vw); height: 86vh; display: flex; flex-direction: column;
+  }
+  #explorerPanel header { background: transparent; border-bottom: 1px solid #232a33; }
+  #explorerPanel header h1 { color: #6fb3e8; }
+  #explorerTree {
+    flex: 1; overflow: auto; padding: 10px 16px; font-size: 12.5px; line-height: 1.7;
+  }
+  #explorerTree details { padding-left: 14px; }
+  #explorerTree summary { cursor: pointer; color: #9fb3c8; user-select: none; }
+  #explorerTree summary:hover { color: #d7e0ea; }
+  #explorerTree .t-count { color: #56657a; font-size: 11px; }
+  #explorerTree .t-leaf {
+    padding-left: 14px; cursor: pointer; color: #6fb3e8; word-break: break-all;
+  }
+  #explorerTree .t-leaf:hover { background: #1a2029; }
+  #explorerTree .t-leaf.sel { background: #1d2a3a; }
+  #explorerTree .t-payload { color: #8ea0b5; }
+  #explorerPub {
+    display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid #232a33;
+    align-items: center; flex-wrap: wrap;
+  }
+  #explorerPub input {
+    background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px;
+    padding: 7px 9px; font-size: 12.5px; font-family: inherit;
+  }
+  #pubTopic { flex: 2; min-width: 220px; }
+  #pubPayload { flex: 3; min-width: 260px; }
+  #pubSend { border-color: #2a5a3a; color: #6fe89a; }
 </head>
 <body>
   <header>
@@ -363,6 +399,7 @@
     </select>
     <span class="divider"></span>
     <button id="configBtn">Config</button>
+    <button id="explorerBtn" title="Live tree of EVERY topic on the broker, with raw publish to any topic">Topics</button>
     <button id="clearBtn">Clear</button>
     <span id="count">0 lines</span>
   </header>
@@ -374,6 +411,23 @@
     <label class="checkbox-label" title="Client-side filter: hides bus traffic addressed to other peripherals (coin changer, bill validator - anything outside 0x10-0x17). Applies to the view only, so it works with any device build; the device also has its own setPeripheralVisibility switch to stop sending them at all."><input type="checkbox" id="cashlessOnlyCheck" checked> Cashless only (hide other peripherals)</label>
   </div>
   <div id="log"></div>
+
+  <div id="explorerOverlay">
+    <div id="explorerPanel">
+      <header>
+        <h1>TOPIC EXPLORER</h1>
+        <span class="label">Every topic on the broker, live. Click a topic to select it; publish anything to any topic below.</span>
+        <span id="explorerCount" class="label" style="margin-left:auto"></span>
+        <button id="explorerCloseBtn">Close</button>
+      </header>
+      <div id="explorerTree">(waiting for messages…)</div>
+      <div id="explorerPub">
+        <input id="pubTopic" placeholder="topic, e.g. devices/D-0430/cmd" spellcheck="false">
+        <input id="pubPayload" placeholder="payload, e.g. ping" spellcheck="false">
+        <button id="pubSend">PUBLISH</button>
+      </div>
+    </div>
+  </div>
 
   <div id="configOverlay">
     <div id="configPanel">
@@ -461,6 +515,10 @@
     return p.endsWith('/') ? p : p + '/';
   })();
   const LOG_TOPIC_FILTER = TOPIC_PREFIX + '+/' + LOG_SUFFIX;
+  // Which topic segment carries the device id depends on how many segments the prefix has:
+  // "cm30-mdb/hamdan-rabbah/<id>/liveLog" -> 2, "devices/<id>/logs" -> 1. Hardcoding [2] here
+  // was a bug that made the devices/ prefix register "logs" as a device.
+  const DEVICE_SEG = TOPIC_PREFIX.split('/').filter(Boolean).length;
   if (!MQTT_PASS) showConnectOverlay(); // first run: nothing saved yet
   const LAST_DEVICE_KEY = 'cm30-last-device-id';
 
@@ -1207,7 +1265,11 @@
   client.on('message', (topic, payload) => {
     // Topic shape: cm30-mdb/hamdan-rabbah/<deviceId>/liveLog — every device we hear from gets
     // registered (so it shows up in the dropdown) even if it's not the one currently selected.
-    const fromDevice = topic.split('/')[2];
+    recordTopic(topic, payload); // topic explorer sees everything, including '#' traffic
+    // Only the log stream drives the device list / decoders - with the explorer's '#'
+    // subscription live, every other topic on the broker also lands in this handler.
+    if (!topic.startsWith(TOPIC_PREFIX) || !topic.endsWith('/' + LOG_SUFFIX)) return;
+    const fromDevice = topic.split('/')[DEVICE_SEG];
     registerDevice(fromDevice);
     if (fromDevice !== currentDeviceId) return; // presence noted, but not who we're watching
 
@@ -1266,6 +1328,118 @@
     updateSessionBeginActiveBadges(); // reflect immediately; getSettings/SETTINGS_JSON will confirm
   };
   document.getElementById('vendBtn').onclick = () => sendCommand('vendApprove', 'Vend Approve');
+
+  // ---------------- TOPIC EXPLORER: every topic on the broker + raw passthrough publish ----------------
+  const topicMap = new Map();            // topic -> { n, last }
+  const explorerOpenPaths = new Set();   // which tree branches the user expanded
+  let explorerSubscribed = false;
+  let explorerDirty = false;
+  let selectedTopic = null;
+  const explorerOverlay = document.getElementById('explorerOverlay');
+  const explorerTree = document.getElementById('explorerTree');
+  const explorerCountEl = document.getElementById('explorerCount');
+  const pubTopicEl = document.getElementById('pubTopic');
+  const pubPayloadEl = document.getElementById('pubPayload');
+
+  function recordTopic(topic, payload) {
+    const e = topicMap.get(topic) || { n: 0, last: '' };
+    e.n++;
+    e.last = payload.toString();
+    topicMap.set(topic, e);
+    explorerDirty = true;
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderExplorer() {
+    if (!explorerOverlay.classList.contains('open') || !explorerDirty) return;
+    explorerDirty = false;
+    explorerCountEl.textContent = topicMap.size + ' topics';
+    // Build the nested tree: node = { kids: Map, topic: full topic when messages landed here }
+    const root = { kids: new Map(), topic: null };
+    for (const t of [...topicMap.keys()].sort()) {
+      let node = root;
+      for (const part of t.split('/')) {
+        if (!node.kids.has(part)) node.kids.set(part, { kids: new Map(), topic: null });
+        node = node.kids.get(part);
+      }
+      node.topic = t;
+    }
+    function html(node, path) {
+      let out = '';
+      for (const [name, kid] of node.kids) {
+        const p = path ? path + '/' + name : name;
+        if (kid.topic !== null && kid.kids.size === 0) {
+          const info = topicMap.get(kid.topic);
+          out += '<div class="t-leaf' + (kid.topic === selectedTopic ? ' sel' : '') + '" data-topic="' + esc(kid.topic) + '">' +
+            esc(name) + ' <span class="t-count">(' + info.n + ' msgs)</span> ' +
+            '<span class="t-payload">= ' + esc(info.last.slice(0, 110)) + '</span></div>';
+        } else {
+          const selfLine = kid.topic !== null
+            ? '<div class="t-leaf' + (kid.topic === selectedTopic ? ' sel' : '') + '" data-topic="' + esc(kid.topic) + '">(this topic) ' +
+              '<span class="t-count">(' + topicMap.get(kid.topic).n + ' msgs)</span> ' +
+              '<span class="t-payload">= ' + esc(topicMap.get(kid.topic).last.slice(0, 110)) + '</span></div>'
+            : '';
+          out += '<details data-path="' + esc(p) + '"' + (explorerOpenPaths.has(p) ? ' open' : '') + '>' +
+            '<summary>' + esc(name) + ' <span class="t-count">(' + countTopics(kid) + ')</span></summary>' +
+            selfLine + html(kid, p) + '</details>';
+        }
+      }
+      return out;
+    }
+    function countTopics(node) {
+      let n = node.topic !== null ? 1 : 0;
+      for (const kid of node.kids.values()) n += countTopics(kid);
+      return n;
+    }
+    explorerTree.innerHTML = html(root, '') || '(waiting for messages…)';
+  }
+  setInterval(renderExplorer, 800);
+
+  explorerTree.addEventListener('click', (e) => {
+    const leaf = e.target.closest('.t-leaf');
+    if (!leaf) return;
+    selectedTopic = leaf.dataset.topic;
+    pubTopicEl.value = selectedTopic;
+    // Watching a fleet device? Its cmd topic is the natural publish target, not the log topic.
+    if (selectedTopic.endsWith('/' + LOG_SUFFIX)) {
+      pubTopicEl.value = selectedTopic.slice(0, -LOG_SUFFIX.length) + CMD_SUFFIX;
+    }
+    explorerDirty = true;
+  });
+  explorerTree.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (!d.dataset || !d.dataset.path) return;
+    if (d.open) explorerOpenPaths.add(d.dataset.path); else explorerOpenPaths.delete(d.dataset.path);
+  }, true);
+
+  document.getElementById('explorerBtn').onclick = () => {
+    explorerOverlay.classList.add('open');
+    explorerDirty = true;
+    if (!explorerSubscribed && client.connected) {
+      client.subscribe('#');
+      explorerSubscribed = true;
+      addLine('-- topic explorer: subscribed to # (everything) --');
+    }
+  };
+  document.getElementById('explorerCloseBtn').onclick = () => {
+    explorerOverlay.classList.remove('open');
+    if (explorerSubscribed) {
+      client.unsubscribe('#'); // the log-stream subscription stays untouched
+      explorerSubscribed = false;
+      addLine('-- topic explorer: unsubscribed from # --');
+    }
+  };
+  document.getElementById('pubSend').onclick = () => {
+    const t = pubTopicEl.value.trim();
+    if (!t) { addLine('-- publish: no topic --'); return; }
+    if (!client.connected) { addLine('-- publish: not connected --'); return; }
+    client.publish(t, pubPayloadEl.value);
+    addLine('[pub] ' + t + '  <-  ' + pubPayloadEl.value, 'cmd');
+  };
+  pubPayloadEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('pubSend').onclick(); });
 
   // Which response Vend Cancel sends is a pure page preference (there's no device-side "current
   // setting" for it — every press states its own choice), so it's remembered in localStorage

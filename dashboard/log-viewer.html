@@ -410,6 +410,9 @@
     return p.endsWith('/') ? p : p + '/';
   })();
   const LOG_TOPIC_FILTER = TOPIC_PREFIX + '+/' + LOG_SUFFIX;
+  // Which topic segment carries the device id depends on the prefix depth:
+  // "cm30-mdb/hamdan-rabbah/<id>/liveLog" -> 2, "devices/<id>/logs" -> 1.
+  const DEVICE_SEG = TOPIC_PREFIX.split('/').filter(Boolean).length;
   const LAST_DEVICE_KEY = 'cm30-last-device-id';
 
   const deviceSelectEl = document.getElementById('deviceSelect');
@@ -1155,7 +1158,8 @@
   client.on('message', (topic, payload) => {
     // Topic shape: cm30-mdb/hamdan-rabbah/<deviceId>/liveLog — every device we hear from gets
     // registered (so it shows up in the dropdown) even if it's not the one currently selected.
-    const fromDevice = topic.split('/')[2];
+    if (!topic.startsWith(TOPIC_PREFIX) || !topic.endsWith('/' + LOG_SUFFIX)) return;
+    const fromDevice = topic.split('/')[DEVICE_SEG];
     registerDevice(fromDevice);
     if (fromDevice !== currentDeviceId) return; // presence noted, but not who we're watching
 
