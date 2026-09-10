@@ -521,8 +521,8 @@
   }
   window.addEventListener('keydown', (e) => { if (e.key === 'F2') showConnectOverlay(); });
   // Channel suffixes - override for backend-contract devices: ?logTopic=logs&cmdTopic=cmd
-  const LOG_SUFFIX = setting('logTopic', APP_CFG.logTopic || 'liveLog');
-  const CMD_SUFFIX = setting('cmdTopic', APP_CFG.cmdTopic || 'commands');
+  const LOG_SUFFIX = setting('logTopic', APP_CFG.logTopic || 'logs');
+  const CMD_SUFFIX = setting('cmdTopic', APP_CFG.cmdTopic || 'cmd');
   // The passthrough bar publishes to its OWN topic ("devices/<code>/passthrough"), never to the
   // cmd topic - that one belongs to the backend's command/ack flow.
   const PT_SUFFIX = setting('ptTopic', APP_CFG.ptTopic || 'passthrough');
@@ -530,14 +530,27 @@
   // + "/commands"; the production app follows the backend contract "devices/<code>/logs" +
   // "/cmd". Prefix "devices/" with topics "logs"/"cmd" watches the production fleet.
   const TOPIC_PREFIX = (function () {
-    const p = setting('prefix', APP_CFG.prefix || 'cm30-mdb/hamdan-rabbah/');
+    const p = setting('prefix', APP_CFG.prefix || 'devices/');
     return p.endsWith('/') ? p : p + '/';
   })();
-  const LOG_TOPIC_FILTER = TOPIC_PREFIX + '+/' + LOG_SUFFIX;
-  // Which topic segment carries the device id depends on how many segments the prefix has:
-  // "cm30-mdb/hamdan-rabbah/<id>/liveLog" -> 2, "devices/<id>/logs" -> 1. Hardcoding [2] here
-  // was a bug that made the devices/ prefix register "logs" as a device.
-  const DEVICE_SEG = TOPIC_PREFIX.split('/').filter(Boolean).length;
+  // The viewer watches EVERY known topic scheme at once, so demo devices (85E5F7 on
+  // cm30-mdb/...) and the production fleet (D-xxxx on devices/...) all land in one dropdown.
+  // Each device remembers which scheme it arrived on; every command the dashboard sends goes
+  // to that scheme's PASSTHROUGH topic - never to cmd, which the backend owns.
+  const SCHEMES = [];
+  function addScheme(prefix, log, cmd, pt) {
+    const p = prefix.endsWith('/') ? prefix : prefix + '/';
+    if (SCHEMES.some((s) => s.prefix === p)) return;
+    SCHEMES.push({ prefix: p, log, cmd, pt, seg: p.split('/').filter(Boolean).length });
+  }
+  addScheme(TOPIC_PREFIX, LOG_SUFFIX, CMD_SUFFIX, PT_SUFFIX); // whatever F2 says, first
+  addScheme('devices/', 'logs', 'cmd', 'passthrough');        // production fleet, always on
+  addScheme('cm30-mdb/hamdan-rabbah/', 'liveLog', 'commands', 'passthrough'); // demo, always on
+  const deviceScheme = {}; // deviceId -> the scheme it was first heard on
+  function ptTopicFor(id) {
+    const s = deviceScheme[id] || SCHEMES[0];
+    return s.prefix + id + '/' + s.pt;
+  }
   if (!MQTT_PASS) showConnectOverlay(); // first run: nothing saved yet
   const LAST_DEVICE_KEY = 'cm30-last-device-id';
 
@@ -1080,7 +1093,7 @@
     if (deviceLinked) return;
     if (currentDeviceId) {
       setStatus('linking', 'linking to device ' + currentDeviceId + '…');
-      client.publish(TOPIC_PREFIX + currentDeviceId + '/' + CMD_SUFFIX, 'ping');
+      client.publish(ptTopicFor(currentDeviceId), 'ping');
     } else {
       setStatus('linking', 'waiting for a device…');
     }
@@ -1107,7 +1120,7 @@
     // Fetch this build's log codebook (silently — it's plumbing, not a user action) so
     // RABBAH_LOG items decode into sentences. Answered with CODEBOOK_JSON:{...}.
     if (client.connected && !codebooks[currentDeviceId]) {
-      client.publish(TOPIC_PREFIX + currentDeviceId + '/' + CMD_SUFFIX, 'getCodebook');
+      client.publish(ptTopicFor(currentDeviceId), 'getCodebook');
     }
   }
 
@@ -1146,7 +1159,7 @@
     } else {
       text = '[' + item.s + '/' + item.m + '] ' + p.join(' | ');
       if (client.connected && currentDeviceId && !book) {
-        client.publish(TOPIC_PREFIX + currentDeviceId + '/' + CMD_SUFFIX, 'getCodebook');
+        client.publish(ptTopicFor(currentDeviceId), 'getCodebook');
       }
     }
     if (item.i) text += '   #' + item.i; // session id — same tag across one whole vend
@@ -1267,7 +1280,7 @@
   });
 
   client.on('connect', () => {
-    client.subscribe(LOG_TOPIC_FILTER);
+    for (const s of SCHEMES) client.subscribe(s.prefix + '+/' + s.log);
     pingDevice();
   });
   client.on('reconnect', () => {
@@ -1285,10 +1298,13 @@
     // Topic shape: cm30-mdb/hamdan-rabbah/<deviceId>/liveLog — every device we hear from gets
     // registered (so it shows up in the dropdown) even if it's not the one currently selected.
     recordTopic(topic, payload); // topic explorer sees everything, including '#' traffic
-    // Only the log stream drives the device list / decoders - with the explorer's '#'
+    // Only log streams drive the device list / decoders - with the explorer's '#'
     // subscription live, every other topic on the broker also lands in this handler.
-    if (!topic.startsWith(TOPIC_PREFIX) || !topic.endsWith('/' + LOG_SUFFIX)) return;
-    const fromDevice = topic.split('/')[DEVICE_SEG];
+    const scheme = SCHEMES.find((s) => topic.startsWith(s.prefix) && topic.endsWith('/' + s.log));
+    if (!scheme) return;
+    const fromDevice = topic.split('/')[scheme.seg];
+    if (!fromDevice) return;
+    if (!deviceScheme[fromDevice]) deviceScheme[fromDevice] = scheme;
     registerDevice(fromDevice);
     if (fromDevice !== currentDeviceId) return; // presence noted, but not who we're watching
 
@@ -1327,10 +1343,12 @@
     addLine(text);
   });
 
+  // EVERY dashboard command - buttons, config panel, passthrough bar - goes to the selected
+  // device's PASSTHROUGH topic. The cmd topic belongs to the backend and is never written.
   function sendCommand(cmd, label) {
     if (!client.connected) { addLine('-- not connected, command not sent: ' + cmd + ' --'); return; }
     if (!currentDeviceId) { addLine('-- no device selected, command not sent: ' + cmd + ' --'); return; }
-    client.publish(TOPIC_PREFIX + currentDeviceId + '/' + CMD_SUFFIX, cmd);
+    client.publish(ptTopicFor(currentDeviceId), cmd);
     addLine('[sent] ' + label, 'cmd');
   }
 
@@ -1357,8 +1375,8 @@
     if (!c) return;
     if (!client.connected) { addLine('-- not connected, passthrough not sent: ' + c + ' --'); return; }
     if (!currentDeviceId) { addLine('-- no device selected, passthrough not sent: ' + c + ' --'); return; }
-    client.publish(TOPIC_PREFIX + currentDeviceId + '/' + PT_SUFFIX, c);
-    addLine('[passthrough -> ' + PT_SUFFIX + '] ' + c, 'cmd');
+    client.publish(ptTopicFor(currentDeviceId), c);
+    addLine('[passthrough -> ' + ptTopicFor(currentDeviceId) + '] ' + c, 'cmd');
     ptCmdEl.value = '';
   };
   ptCmdEl.addEventListener('keydown', (e) => {
@@ -1439,9 +1457,12 @@
     if (!leaf) return;
     selectedTopic = leaf.dataset.topic;
     pubTopicEl.value = selectedTopic;
-    // Watching a fleet device? Its cmd topic is the natural publish target, not the log topic.
-    if (selectedTopic.endsWith('/' + LOG_SUFFIX)) {
-      pubTopicEl.value = selectedTopic.slice(0, -LOG_SUFFIX.length) + CMD_SUFFIX;
+    // Clicking a device's log topic pre-fills its PASSTHROUGH topic - that's where commands go.
+    for (const s of SCHEMES) {
+      if (selectedTopic.startsWith(s.prefix) && selectedTopic.endsWith('/' + s.log)) {
+        pubTopicEl.value = selectedTopic.slice(0, -s.log.length) + s.pt;
+        break;
+      }
     }
     explorerDirty = true;
   });
