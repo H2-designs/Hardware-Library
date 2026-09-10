@@ -355,6 +355,13 @@
   #pubTopic { flex: 2; min-width: 220px; }
   #pubPayload { flex: 3; min-width: 260px; }
   #pubSend { border-color: #2a5a3a; color: #6fe89a; }
+
+  /* passthrough command bar (subheader) */
+  #ptCmd {
+    background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px;
+    padding: 5px 9px; font-size: 12px; font-family: inherit; width: 340px;
+  }
+  #ptSendBtn { border-color: #2a3f5a; color: #6fb3e8; }
 </style>
 </head>
 <body>
@@ -410,6 +417,11 @@
     <label class="checkbox-label"><input type="checkbox" id="pollVisibilityCheck"> Show POLL/ACK traffic</label>
     <label class="checkbox-label"><input type="checkbox" id="unhandledVisibilityCheck"> Show unhandled commands</label>
     <label class="checkbox-label" title="Client-side filter: hides bus traffic addressed to other peripherals (coin changer, bill validator - anything outside 0x10-0x17). Applies to the view only, so it works with any device build; the device also has its own setPeripheralVisibility switch to stop sending them at all."><input type="checkbox" id="cashlessOnlyCheck" checked> Cashless only (hide other peripherals)</label>
+    <span class="divider"></span>
+    <span class="label">passthrough:</span>
+    <input id="ptCmd" placeholder="any command to the selected device - try: help" spellcheck="false"
+           title="Publishes exactly what you type to the selected device's cmd topic. Examples: help, getRs232Rules, rs232Gap:500, rs232Simulate:A0 01 00 03 30 30 36 94">
+    <button id="ptSendBtn">Send</button>
   </div>
   <div id="log"></div>
 
@@ -483,7 +495,8 @@
       '<label style="' + lbl + '">PASSWORD</label><input id="ovPass" type="password" style="' + inp + '">' +
       '<label style="' + lbl + '">TOPIC PREFIX &nbsp;(demo: cm30-mdb/hamdan-rabbah/ &nbsp;&middot;&nbsp; production fleet: devices/)</label><input id="ovPrefix" style="' + inp + '">' +
       '<div style="display:flex;gap:8px"><div style="flex:1"><label style="' + lbl + '">LOG TOPIC (liveLog / logs)</label><input id="ovLog" style="' + inp + '"></div>' +
-      '<div style="flex:1"><label style="' + lbl + '">CMD TOPIC (commands / cmd)</label><input id="ovCmd" style="' + inp + '"></div></div>' +
+      '<div style="flex:1"><label style="' + lbl + '">CMD TOPIC (commands / cmd)</label><input id="ovCmd" style="' + inp + '"></div>' +
+      '<div style="flex:1"><label style="' + lbl + '">PASSTHROUGH TOPIC</label><input id="ovPt" style="' + inp + '"></div></div>' +
       '<button id="ovGo" style="width:100%;margin-top:8px;padding:10px;background:#2f81f7;border:0;border-radius:6px;color:#fff;font-weight:600;cursor:pointer">Save &amp; connect</button></div>';
     document.body.appendChild(ov);
     document.getElementById('ovBroker').value = BROKER_URL;
@@ -491,6 +504,7 @@
     document.getElementById('ovPrefix').value = TOPIC_PREFIX;
     document.getElementById('ovLog').value = LOG_SUFFIX;
     document.getElementById('ovCmd').value = CMD_SUFFIX;
+    document.getElementById('ovPt').value = PT_SUFFIX;
     const go = () => {
       localStorage.setItem('cm30-broker', document.getElementById('ovBroker').value.trim());
       localStorage.setItem('cm30-user', document.getElementById('ovUser').value.trim());
@@ -498,6 +512,7 @@
       localStorage.setItem('cm30-prefix', document.getElementById('ovPrefix').value.trim());
       localStorage.setItem('cm30-logTopic', document.getElementById('ovLog').value.trim());
       localStorage.setItem('cm30-cmdTopic', document.getElementById('ovCmd').value.trim());
+      localStorage.setItem('cm30-ptTopic', document.getElementById('ovPt').value.trim());
       location.reload();
     };
     document.getElementById('ovGo').addEventListener('click', go);
@@ -508,6 +523,9 @@
   // Channel suffixes - override for backend-contract devices: ?logTopic=logs&cmdTopic=cmd
   const LOG_SUFFIX = setting('logTopic', APP_CFG.logTopic || 'liveLog');
   const CMD_SUFFIX = setting('cmdTopic', APP_CFG.cmdTopic || 'commands');
+  // The passthrough bar publishes to its OWN topic ("devices/<code>/passthrough"), never to the
+  // cmd topic - that one belongs to the backend's command/ack flow.
+  const PT_SUFFIX = setting('ptTopic', APP_CFG.ptTopic || 'passthrough');
   // Two real schemes exist: the demo app publishes under "cm30-mdb/hamdan-rabbah/<id>/liveLog"
   // + "/commands"; the production app follows the backend contract "devices/<code>/logs" +
   // "/cmd". Prefix "devices/" with topics "logs"/"cmd" watches the production fleet.
@@ -1329,6 +1347,23 @@
     updateSessionBeginActiveBadges(); // reflect immediately; getSettings/SETTINGS_JSON will confirm
   };
   document.getElementById('vendBtn').onclick = () => sendCommand('vendApprove', 'Vend Approve');
+
+  // ---------------- passthrough bar: any command straight to the SELECTED device ----------------
+  // Publishes to devices/<code>/passthrough (PT_SUFFIX) - NOT the cmd topic, which belongs to
+  // the backend's command/ack flow. The library device answers both identically.
+  const ptCmdEl = document.getElementById('ptCmd');
+  document.getElementById('ptSendBtn').onclick = () => {
+    const c = ptCmdEl.value.trim();
+    if (!c) return;
+    if (!client.connected) { addLine('-- not connected, passthrough not sent: ' + c + ' --'); return; }
+    if (!currentDeviceId) { addLine('-- no device selected, passthrough not sent: ' + c + ' --'); return; }
+    client.publish(TOPIC_PREFIX + currentDeviceId + '/' + PT_SUFFIX, c);
+    addLine('[passthrough -> ' + PT_SUFFIX + '] ' + c, 'cmd');
+    ptCmdEl.value = '';
+  };
+  ptCmdEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('ptSendBtn').onclick();
+  });
 
   // ---------------- TOPIC EXPLORER: every topic on the broker + raw passthrough publish ----------------
   const topicMap = new Map();            // topic -> { n, last }
