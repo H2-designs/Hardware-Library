@@ -128,14 +128,14 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;7.16.0 / mqtt-lib&nbsp;2.1.0.
+    hardware-lib&nbsp;7.17.0 / mqtt-lib&nbsp;2.2.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="split700">
     <h2><span class="eyebrow">NEW &mdash; the 7.x split</span>hardware-lib: the MDB engine, MQTT-free</h2>
-    <p><strong>mdb-lib is now <code>hardware-lib-7.16.0</code></strong> &mdash; renamed, and with the
+    <p><strong>mdb-lib is now <code>hardware-lib-7.17.0</code></strong> &mdash; renamed, and with the
     entire MQTT layer removed from inside it. The engine is pure hardware/protocol: everything it
     produces exits through listeners, everything it accepts enters through plain functions.
     The Kotlin package stays <code>com.rabbah.mdb</code> and a deprecated
@@ -283,8 +283,8 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <h2><span class="eyebrow">01</span>Getting started</h2>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
-implementation files(<span class="s">'libs/mqtt-lib-2.1.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-7.16.0.aar'</span>)
+implementation files(<span class="s">'libs/mqtt-lib-2.2.0.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-7.17.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -653,11 +653,22 @@ Rs232Lib.vendRequestListener = { price, frame -&gt; <span class="c">/* charge, t
     <code>rs232SendAscii:HEADER;TEXT</code>, <code>rs232Simulate:HEX</code>,
     <code>rs232Crc:on|off</code>, <code>getRs232Rules</code>, <code>clearRs232Rules</code>, and
     <code>{"setRs232Rules":[...]}</code> to push the whole table remotely.</p>
+    <p><strong>The RS232 codebook schema (7.17.0 / mqtt-lib 2.2.0)</strong>: serial exchanges
+    ship as coded RABBAH_LOG items, schema <code>"RS232"</code> - parseable exactly like MDB
+    instead of raw text. Codes: 0 <code>RS232_RX_MATCHED</code> [rule, rx, tx|-, price],
+    1 <code>RS232_RX_UNMATCHED</code> [rx], 2 <code>RS232_CRC_DISCARDED</code> [rx, expected],
+    3 <code>RS232_TX</code> [tx], 4 <code>RS232_PORT_OPEN</code> [params, ruleCount],
+    5 <code>RS232_PORT_CLOSED</code>, 6 <code>RS232_RULES_LOADED</code> [count]. Wire it with
+    <code>HardwareLib.addRs232EventListener { name, p -&gt; RabbahLog.rs232(name, p) }</code> -
+    the demo bridge and <code>attachRabbahMqtt()</code> do this automatically. With a listener
+    wired, the plain <code>[rs232] ...</code> twin stays LOCAL-only (each exchange crosses the
+    wire exactly once); with none, plain lines ship as before. <code>getCodebook</code> now
+    serves the RS232 schema, so dashboards decode it with zero changes.</p>
     <p><strong>Testing without the machine</strong>: <code>Rs232Lib.simulateFrame(hex)</code>
     feeds a fake received frame through the matcher exactly as if the machine sent it -
     matching, price extraction and both listeners all run; the reply is really written when the
     port is open, otherwise only logged. The <strong>RS232 Test bench APK</strong>
-    (<code>rs232-sample-v1.9.apk</code>, source <code>samples/Rs232SampleActivity.kt</code>)
+    (<code>rs232-sample-v2.0.apk</code>, source <code>samples/Rs232SampleActivity.kt</code>)
     puts the whole workflow on buttons: rule JSON editor (LOAD / GET / CLEAR), baud +
     OPEN / CLOSE PORT, SIMULATE RX, SEND HEX, live <code>[rs232]</code> log.</p>
   </section>
@@ -855,5 +866,5 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 7.16.0 · mqtt-lib 2.1.0 · demo app v2.13.32 (build 80). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 7.17.0 · mqtt-lib 2.2.0 · demo app v2.13.33 (build 81). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>

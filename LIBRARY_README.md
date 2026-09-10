@@ -324,6 +324,16 @@ Rs232Lib.vendRequestListener = { price, frame ->
   `sendHex(hex)`, `simulateFrame(hex)` (feeds a fake machine frame through the matcher — test
   a rule table without hardware), `exchangeListener` (every frame: rxHex, ruleName, txHex,
   price), `vendRequestListener(price, frameHex)`.
+- **RS232 codebook schema** (7.17.0 / mqtt-lib 2.2.0): serial exchanges ship as coded
+  RABBAH_LOG items (schema `"RS232"`) instead of raw text — parseable by the backend exactly
+  like MDB. Codes: 0 `RS232_RX_MATCHED` [rule, rx, tx|-, price], 1 `RS232_RX_UNMATCHED` [rx],
+  2 `RS232_CRC_DISCARDED` [rx, expected], 3 `RS232_TX` [tx], 4 `RS232_PORT_OPEN`
+  [params, ruleCount], 5 `RS232_PORT_CLOSED`, 6 `RS232_RULES_LOADED` [count]. Wiring:
+  `HardwareLib.addRs232EventListener { name, p -> RabbahLog.rs232(name, p) }` (the demo
+  bridge and `attachRabbahMqtt()` do this automatically). With a listener wired the plain
+  `[rs232] …` twin stays LOCAL-only, so the wire carries each exchange exactly once; with no
+  listener everything behaves as before (plain lines). Dashboards decode via the codebook
+  (`getCodebook` now includes the RS232 schema).
 - **Remote everything in one call** (7.16.0): `HardwareLib.attachLogSink { line -> send(line) }`
   pipes every library line AND every control snapshot (CONFIG_JSON:, RS232_RULES_JSON:, …) into
   whatever transport the host app already has — pair it with feeding the app's command channel
