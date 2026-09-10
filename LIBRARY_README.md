@@ -4,8 +4,8 @@ Two fully decoupled Android libraries extracted from the proven MDB Slave app:
 
 | Artifact | What it is |
 |---|---|
-| `hardware-lib-7.10.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
-| `mqtt-lib-2.0.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
+| `hardware-lib-7.16.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
+| `mqtt-lib-2.1.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
 | `CM30-HardwareLibrary-1.0.9.aar` | The CM30 vendor serial driver (hardware-lib needs it at runtime; AARs do not nest). |
 
 ## Architecture — who talks to whom
@@ -54,7 +54,7 @@ fully offline.
 
 > Migration note: the Kotlin package is still `com.rabbah.mdb` and a deprecated
 > `typealias MdbLib = HardwareLib` keeps old code compiling — the only hard change is the
-> gradle dependency (`project(':hardware-lib')` / `hardware-lib-7.10.0.aar`) and that MQTT
+> gradle dependency (`project(':hardware-lib')` / `hardware-lib-7.16.0.aar`) and that MQTT
 > forwarding now needs the bridge attached.
 
 ## The CMD code schema
@@ -214,15 +214,24 @@ otherwise.
 ## Integration — the whole thing
 
 ```kotlin
-// once, at startup (Application or first Activity):
-MqttLib.init(MqttConfig(topicPrefix = "cm30-mdb/hamdan-rabbah", deviceId = myDeviceId,
-                        brokerHost = "YOUR-SERVER", username = "rabbah", password = "…"))
+// once, at startup (Application or first Activity) - backend-contract topics:
+// devices/<id>/logs out, devices/<id>/passthrough in (operator commands; the backend owns
+// devices/<id>/cmd), retained online/offline presence on devices/<id>/status.
+MqttLib.init(MqttConfig(topicPrefix = "devices", deviceId = myDeviceId,
+                        brokerHost = "YOUR-SERVER", username = "rabbah", password = "…",
+                        logTopicSuffix = "logs", commandTopicSuffix = "cmd",
+                        statusTopicSuffix = "status"))   // passthrough subscribed automatically
 MqttLib.start()
 MdbMqttBridge.attach()                 // the glue (copy MdbMqttBridge.kt from app/)
 HardwareLib.init(applicationContext)
 HardwareLib.start()
 // Done. All MDB data flows to the dashboard; all remote commands work.
 ```
+
+Since mqtt-lib **2.1.0** every device also subscribes to a second command channel,
+`<prefix>/<deviceId>/passthrough` (`MqttConfig.passthroughTopicSuffix`, same listener chain) —
+that is where the dashboard sends ALL its commands, so operator traffic never mixes into the
+backend-owned `cmd` topic with its ack/progress flow.
 
 ## Pulse output — PulseLib (7.5.0)
 
@@ -439,7 +448,7 @@ status line, and an `inbox` subscription you can hit with `mosquitto_pub`.
 Preferred: consume the modules directly (`implementation project(':hardware-lib')`,
 `project(':mqtt-lib')`) — see the demo `app/`.
 
-If consuming raw AARs instead: add `hardware-lib-7.10.0.aar`, `mqtt-lib-2.0.0.aar`, **and**
+If consuming raw AARs instead: add `hardware-lib-7.16.0.aar`, `mqtt-lib-2.1.0.aar`, **and**
 `CM30-HardwareLibrary-1.0.9.aar` (hardware-lib needs it at runtime; AARs do not nest). If you
 skip MQTT entirely, `hardware-lib` + the CM30 AAR alone are enough.
 
@@ -554,9 +563,12 @@ flag; the engine reads the declared wire bytes.
 
 Unchanged by the split — the bridge reproduces it byte-identically:
 
-- Topics: `<prefix>/<deviceId>/liveLog` (out) and `<prefix>/<deviceId>/commands` (in);
-  suffixes configurable (`logTopicSuffix`/`commandTopicSuffix`/`statusTopicSuffix` for the
-  `devices/{deviceCode}/logs|cmd|status` backend contract).
+- Topics (the demo app now ships on the backend contract): `devices/<deviceId>/logs` (out),
+  `devices/<deviceId>/passthrough` (operator commands in — subscribed automatically since
+  mqtt-lib 2.1.0), `devices/<deviceId>/cmd` (backend commands in), retained
+  online/offline on `devices/<deviceId>/status`. All four suffixes configurable
+  (`logTopicSuffix`/`commandTopicSuffix`/`passthroughTopicSuffix`/`statusTopicSuffix`);
+  the legacy `<prefix>/<deviceId>/liveLog|commands` scheme still works via config.
 - Tagged messages out: `RABBAH_LOG:{…}` (compact log items), `CODEBOOK_JSON:{…}` (reply to
   `getCodebook`), `VMC_STATUS:{...}` (event-driven: instant on state change, on
   recentActivity flips, and on start/stop — no periodic heartbeat),

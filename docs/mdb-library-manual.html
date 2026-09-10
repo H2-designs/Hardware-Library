@@ -128,7 +128,7 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;7.16.0 / mqtt-lib&nbsp;2.0.0.
+    hardware-lib&nbsp;7.16.0 / mqtt-lib&nbsp;2.1.0.
   </p>
 
 
@@ -161,6 +161,15 @@ HardwareLib.addExchangeListener { e -&gt;                             <span clas
     plus the existing <code>vendListener</code> / <code>logListener</code> / <code>statusListener</code>.
     <strong>New input:</strong> <code>HardwareLib.handleCommand(text): Boolean</code> &mdash; feed it
     whatever any transport receives; it consumes what it recognizes.</p>
+    <p><strong>Remote everything in one call (7.16.0):</strong>
+    <code>HardwareLib.attachLogSink { line -&gt; send(line) }</code> pipes every library line AND
+    every control snapshot (<code>CONFIG_JSON:</code>, <code>RS232_RULES_JSON:</code>, ...) into
+    whatever transport the host app already has &mdash; pair it with feeding the app's command
+    channel into <code>handleCommand</code> and a dashboard sees and controls the whole library.
+    Apps on our mqtt-lib need exactly one call instead:
+    <code>HardwareLib.attachRabbahMqtt()</code> (reflection &mdash; no compile dependency).
+    Send <code>help</code> as a remote command to get the full command list back as a log
+    line.</p>
     <p><strong>New in 7.1.0 / mqtt-lib 2.0.0:</strong>
     (1) <em>MQTT connection status, event-driven</em> &mdash;
     <code>RabbahMqtt.onConnection { connected -&gt; ... }</code> (or
@@ -274,7 +283,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <h2><span class="eyebrow">01</span>Getting started</h2>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
-implementation files(<span class="s">'libs/mqtt-lib-2.0.0.aar'</span>)
+implementation files(<span class="s">'libs/mqtt-lib-2.1.0.aar'</span>)
 implementation files(<span class="s">'libs/hardware-lib-7.16.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
@@ -282,7 +291,10 @@ implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span
 <span class="k">val</span> deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
     .takeLast(<span class="s">6</span>).uppercase()          <span class="c">// stable per device, no permission needed</span>
 
-MqttLib.init(MqttConfig(topicPrefix = <span class="s">"cm30-mdb/hamdan-rabbah"</span>, deviceId = deviceId))
+MqttLib.init(MqttConfig(topicPrefix = <span class="s">"devices"</span>, deviceId = deviceId,
+    logTopicSuffix = <span class="s">"logs"</span>, commandTopicSuffix = <span class="s">"cmd"</span>, statusTopicSuffix = <span class="s">"status"</span>))
+    <span class="c">// backend contract: devices/&lt;id&gt;/logs out, devices/&lt;id&gt;/passthrough in (auto-subscribed</span>
+    <span class="c">// since 2.1.0 - where the dashboard sends ALL commands), retained presence on .../status</span>
 MqttLib.start()                          <span class="c">// connect + reconnect loop + publisher thread</span>
 MdbMqttBridge.attach()                   <span class="c">// the ~30-line glue (see the split section above)</span>
 HardwareLib.init(applicationContext)          <span class="c">// persistence + settings restore (no networking inside)</span>
@@ -296,9 +308,13 @@ HardwareLib.start()                           <span class="c">// open the MDB po
       <li><strong><code class="cmd">applicationContext</code></strong> is the app-lifetime Android
       Context — the library needs it only for SharedPreferences. Passing an Activity works too
       (the library unwraps it), but the application context is the clean form.</li>
-      <li><strong><code class="cmd">topicPrefix</code> must match the dashboard's</strong>
-      (log-viewer.html uses <code class="cmd">cm30-mdb/hamdan-rabbah</code>), or the dashboard
-      sees nothing.</li>
+      <li><strong>Topics follow the backend contract</strong>:
+      <code class="cmd">devices/&lt;id&gt;/logs</code> out,
+      <code class="cmd">devices/&lt;id&gt;/passthrough</code> in (operator/dashboard commands —
+      the backend owns <code class="cmd">devices/&lt;id&gt;/cmd</code> with its ack/progress
+      flow), retained presence on <code class="cmd">devices/&lt;id&gt;/status</code>. The
+      desktop dashboard watches both this scheme and the legacy
+      <code class="cmd">cm30-mdb/hamdan-rabbah/&lt;id&gt;/liveLog</code> world at once.</li>
     </ul>
   </section>
 
@@ -335,9 +351,13 @@ HardwareLib.start()                           <span class="c">// open the MDB po
     <h2><span class="eyebrow">03</span>Lifecycle functions</h2>
 
     <h3><code>MqttLib.init(config: MqttConfig)</code></h3>
-    <p>Stores the config and derives the two topics:
-    <code class="cmd">&lt;prefix&gt;/&lt;deviceId&gt;/liveLog</code> (out) and
-    <code class="cmd">…/commands</code> (in). No network yet.</p>
+    <p>Stores the config and derives the topics: the log stream out
+    (<code class="cmd">&lt;prefix&gt;/&lt;deviceId&gt;/&lt;logTopicSuffix&gt;</code>), TWO command
+    channels in (<code class="cmd">…/&lt;commandTopicSuffix&gt;</code> and, since 2.1.0,
+    <code class="cmd">…/&lt;passthroughTopicSuffix&gt;</code>, default
+    <code class="cmd">passthrough</code> — same listener chain, kept separate so operator
+    commands never mix into a backend-owned cmd topic), and optional retained presence. No
+    network yet.</p>
 
     <h3><code>MqttLib.start()</code> / <code>MqttLib.stop()</code></h3>
     <p><code class="cmd">start()</code> launches two threads: the connect/reconnect loop (retries
@@ -734,12 +754,13 @@ RABBAH_LOG:{"t":"1787743651002","s":"MDB","m":"13","a":"vending-app","v":"2.13.5
 
     <h3>Broker auth (private mosquitto etc.)</h3>
     <pre class="code">MqttLib.init(MqttConfig(
-    topicPrefix = <span class="s">"cm30-mdb/hamdan-rabbah"</span>, deviceId = myDeviceId,
+    topicPrefix = <span class="s">"devices"</span>, deviceId = myDeviceId,
     brokerHost = <span class="s">"YOUR-SERVER-IP"</span>, brokerPort = 1883,
     username = <span class="s">"rabbah"</span>, password = <span class="s">"..."</span>,
     logTopicSuffix     = <span class="s">"logs"</span>,     <span class="c">// default "liveLog" - the automatic log stream's channel</span>
-    commandTopicSuffix = <span class="s">"cmd"</span>,      <span class="c">// default "commands" - where commands arrive</span>
+    commandTopicSuffix = <span class="s">"cmd"</span>,      <span class="c">// default "commands" - backend commands arrive here</span>
     statusTopicSuffix  = <span class="s">"status"</span>    <span class="c">// default null - retained online/offline presence (birth + LWT)</span>
+    <span class="c">// passthroughTopicSuffix defaults to "passthrough" (2.1.0) - the dashboard command channel</span>
 ))</pre>
     <p>With <code class="cmd">statusTopicSuffix</code> set, a retained <code class="cmd">online</code>
     is published on every connect, the broker publishes a retained <code class="cmd">offline</code>
@@ -770,15 +791,24 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
   <!-- ============================================================ -->
   <section id="remote">
     <h2><span class="eyebrow">09</span>Dashboard command reference</h2>
-    <p>Everything the dashboard can publish to <code class="cmd">…/&lt;deviceId&gt;/commands</code>.
+    <p>Everything the dashboard publishes to the device's PASSTHROUGH topic
+    (<code class="cmd">devices/&lt;deviceId&gt;/passthrough</code>; the legacy
+    <code class="cmd">…/commands</code> channel still accepts the same commands).
     Plain text unless noted. Each row = one message.</p>
     <div class="callout">
       <p><strong>Desktop dashboard app</strong> (<code>dashboard-app/</code> in the repo,
-      packaged as <code>Hardware-Dashboard-win32-x64.zip</code>): the same log-viewer UI as an
+      packaged as <code>Hardware-Dashboard-win32-x64.zip</code>): the log-viewer UI as an
       Electron app that talks <em>plain MQTT TCP 1883</em> - the exact connection the device
-      uses - so the broker needs NO websocket listener. First launch asks for the MQTT
-      password once (F2 changes it later). Browsers can only speak MQTT over websockets, so
-      the HTML version still needs a ws(s) listener on the broker; the desktop app doesn't.</p>
+      uses - so the broker needs NO websocket listener. First launch asks for the MQTT password
+      once (F2 opens the settings any time). It watches EVERY topic scheme at once
+      (<code>devices/+/logs</code> AND the legacy <code>cm30-mdb/.../+/liveLog</code>) so demo
+      devices and the production fleet share one dropdown, with a SEARCH box that filters
+      thousands of device ids; a <strong>protocol selector</strong> swaps the toolbar between
+      MDB, RS232 (port/CRC/gap/rules) and PULSE (init/train/ready) controls; a
+      <strong>passthrough bar</strong> free-types any command to the selected device; and the
+      <strong>Topics</strong> button opens a live tree of every topic on the broker with raw
+      publish to any of them. ALL commands go to the selected device's passthrough topic -
+      the backend-owned <code>cmd</code> topic is never written.</p>
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Command</th><th>What the device does</th><th>Reply on liveLog</th></tr></thead>
@@ -825,6 +855,5 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 7.16.0 · mqtt-lib 2.0.0 · demo app v2.13.30
-  (build 54). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 7.16.0 · mqtt-lib 2.1.0 · demo app v2.13.32 (build 80). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
