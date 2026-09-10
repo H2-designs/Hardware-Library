@@ -362,6 +362,12 @@
     padding: 5px 9px; font-size: 12px; font-family: inherit; width: 340px;
   }
   #ptSendBtn { border-color: #2a3f5a; color: #6fb3e8; }
+
+  /* device search box (scales the dropdown to fleets of thousands) */
+  #deviceFilter {
+    background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px;
+    padding: 5px 8px; font-size: 12px; font-family: inherit; width: 110px;
+  }
 </style>
 </head>
 <body>
@@ -370,7 +376,9 @@
     <span id="status" class="connecting"><span class="dot"></span><span id="statusText">connecting to MQTT…</span></span>
     <span class="divider"></span>
     <span class="label">device:</span>
-    <select id="deviceSelect" title="Every machine running this app announces its own device ID — pick which one to watch and control.">
+    <input id="deviceFilter" placeholder="search…" spellcheck="false"
+           title="Type part of a device id to filter the dropdown (works with thousands of devices). Enter selects the first match.">
+    <select id="deviceSelect" title="Every machine that publishes announces its own device ID — pick which one to watch and control.">
       <option value="" disabled selected>(none seen yet)</option>
     </select>
     <span class="divider"></span>
@@ -568,13 +576,42 @@
    * fallback, a remembered device that's no longer running (renamed, replaced, or just a
    * different machine than last time) would leave the page stuck on "(none seen yet)" forever
    * even with a perfectly good device sitting right there in the list. */
+  // The dropdown is rebuilt from this set through the search box's filter, so it stays usable
+  // at fleet scale (thousands of ids) - type a few characters, Enter picks the first match.
+  const deviceFilterEl = document.getElementById('deviceFilter');
+  function rebuildDeviceOptions() {
+    const f = (deviceFilterEl.value || '').trim().toUpperCase();
+    const ids = [...knownDeviceIds].sort();
+    deviceSelectEl.innerHTML = '';
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.disabled = true;
+    deviceSelectEl.appendChild(ph);
+    let shown = 0;
+    for (const id of ids) {
+      if (f && id.toUpperCase().indexOf(f) === -1 && id !== currentDeviceId) continue;
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = id;
+      deviceSelectEl.appendChild(opt);
+      shown++;
+    }
+    ph.textContent = ids.length === 0 ? '(none seen yet)'
+      : (f ? shown + '/' + ids.length + ' match' : '(' + ids.length + ' devices)');
+    deviceSelectEl.value = currentDeviceId || '';
+    if (!deviceSelectEl.value) ph.selected = true;
+  }
+  deviceFilterEl.addEventListener('input', rebuildDeviceOptions);
+  deviceFilterEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const first = deviceSelectEl.querySelector('option:not([disabled])');
+    if (first) selectDevice(first.value);
+  });
+
   function registerDevice(id) {
     if (knownDeviceIds.has(id)) return;
     knownDeviceIds.add(id);
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = id;
-    deviceSelectEl.appendChild(opt);
+    rebuildDeviceOptions();
 
     if (currentDeviceId) return;
     const remembered = localStorage.getItem(LAST_DEVICE_KEY);
@@ -1181,6 +1218,8 @@
     if (data.vmcCancelMode) document.getElementById('cancelModeSelect').value = data.vmcCancelMode;
     if (typeof data.showPollTraffic === 'boolean') document.getElementById('pollVisibilityCheck').checked = data.showPollTraffic;
     if (typeof data.showUnhandledCmd === 'boolean') document.getElementById('unhandledVisibilityCheck').checked = data.showUnhandledCmd;
+    // Checked = HIDE other peripherals, so it mirrors the inverse of the device flag.
+    if (typeof data.showOtherPeripheral === 'boolean') document.getElementById('cashlessOnlyCheck').checked = !data.showOtherPeripheral;
     if (data.mdbLevel) document.getElementById('mdbLevelSelect').value = String(data.mdbLevel);
     updateSessionBeginActiveBadges();
   }
@@ -1521,6 +1560,14 @@
   };
   document.getElementById('unhandledVisibilityCheck').onchange = (e) => {
     sendCommand('setUnhandledVisibility:' + (e.target.checked ? 'on' : 'off'), 'Show unhandled: ' + e.target.checked);
+  };
+  // This box is BOTH the client-side view filter (addLine) and the device-side switch: the
+  // engine does not even SEND other-peripheral lines unless setPeripheralVisibility is on,
+  // so unchecking "Cashless only" must tell the device to start sending them.
+  cashlessOnlyEl.onchange = (e) => {
+    sendCommand('setPeripheralVisibility:' + (e.target.checked ? 'off' : 'on'),
+      e.target.checked ? 'Other peripherals: hidden (device stops sending them)'
+                       : 'Other peripherals: SHOWN (device now sends them)');
   };
 </script>
 </body>
