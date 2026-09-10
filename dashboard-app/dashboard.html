@@ -461,6 +461,8 @@
     <span class="divider"></span>
     <button id="plReadyBtn" title="checkMachineReady - digital-in ready feedback check">Check Ready</button>
     </span>
+    <button id="attachHwBtn" title="attachHardware - mqtt-lib wires hardware-lib's commands + logs remotely; the rescue for devices where the app forgot HardwareLib.attachRabbahMqtt() (needs mqtt-lib 2.3.0+ on the device)">Attach HW</button>
+    <button id="versionBtn" title="version - the device reports its mqtt-lib and hardware-lib versions (mqtt-lib 2.3.0+)">Version</button>
     <button id="explorerBtn" title="Live tree of EVERY topic on the broker, with raw publish to any topic">Topics</button>
     <button id="clearBtn">Clear</button>
     <span id="count">0 lines</span>
@@ -1485,6 +1487,8 @@
     addLine('[sent] ' + label, 'cmd');
   }
 
+  document.getElementById('attachHwBtn').onclick = () => sendCommand('attachHardware', 'Attach hardware-lib bridge');
+  document.getElementById('versionBtn').onclick = () => sendCommand('version', 'Version check');
   document.getElementById('openBtn').onclick = () => sendCommand('open', 'Open');
   document.getElementById('closeBtn').onclick = () => sendCommand('close', 'Close');
   document.getElementById('beginSessionBtn').onclick = () => sendCommand('beginSession', 'Begin Session');
