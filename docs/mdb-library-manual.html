@@ -655,10 +655,12 @@ Rs232Lib.vendRequestListener = { price, frame -&gt; <span class="c">/* charge, t
     <code>{"setRs232Rules":[...]}</code> to push the whole table remotely.</p>
     <p><strong>The RS232 codebook schema (7.17.0 / mqtt-lib 2.2.0)</strong>: serial exchanges
     ship as coded RABBAH_LOG items, schema <code>"RS232"</code> - parseable exactly like MDB
-    instead of raw text. Codes: 0 <code>RS232_RX_MATCHED</code> [rule, rx, tx|-, price],
-    1 <code>RS232_RX_UNMATCHED</code> [rx], 2 <code>RS232_CRC_DISCARDED</code> [rx, expected],
-    3 <code>RS232_TX</code> [tx], 4 <code>RS232_PORT_OPEN</code> [params, ruleCount],
-    5 <code>RS232_PORT_CLOSED</code>, 6 <code>RS232_RULES_LOADED</code> [count]. Wire it with
+    instead of raw text. Codes continue after the MDB CMD schema (110-136), so an RS232 code
+    can never be confused with an MDB one:
+    137 <code>RS232_RX_MATCHED</code> [rule, rx, tx|-, price],
+    138 <code>RS232_RX_UNMATCHED</code> [rx], 139 <code>RS232_CRC_DISCARDED</code> [rx, expected],
+    140 <code>RS232_TX</code> [tx], 141 <code>RS232_PORT_OPEN</code> [params, ruleCount],
+    142 <code>RS232_PORT_CLOSED</code>, 143 <code>RS232_RULES_LOADED</code> [count]. Wire it with
     <code>HardwareLib.addRs232EventListener { name, p -&gt; RabbahLog.rs232(name, p) }</code> -
     the demo bridge and <code>attachRabbahMqtt()</code> do this automatically. With a listener
     wired, the plain <code>[rs232] ...</code> twin stays LOCAL-only (each exchange crosses the
