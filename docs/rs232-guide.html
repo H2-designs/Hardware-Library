@@ -241,8 +241,9 @@
     <div class="lrow">
       <div class="who"><span class="dir rx">machine →</span></div>
       <div class="msg"><div class="hex">A0 06 00 02 48 42 A4</div>
-        <div class="note">"HB" — heartbeat, every ~30 s. Rule <b>HEARTBEAT</b> auto-replies
-        <span class="mono">A1 06 00 02 4F 4B D3</span> ("OK" = healthy); no reply and the
+        <div class="note">"HB" — heartbeat, every ~30 s (real machine sends CRC <b>AE</b>,
+        XOR-correct). Rule <b>HEARTBEAT</b> auto-replies
+        <span class="mono">A1 06 00 02 4F 4B A1</span> ("OK" = healthy); no reply and the
         machine marks the reader offline.</div></div>
     </div>
     <div class="lrow">
