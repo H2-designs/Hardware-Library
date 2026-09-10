@@ -126,7 +126,7 @@
   <h1>RS232 Card Reader Guide</h1>
   <p class="lede">How the coffee-machine ⇄ card-reader serial protocol maps onto
   <code>Rs232Lib</code> rules — every frame from the vendor document, the rule table that
-  answers it, and the functions that build replies. hardware-lib 7.16.0.</p>
+  answers it, and the functions that build replies. hardware-lib 7.17.0.</p>
   <p><span class="verified">✓ every frame below verified against the library via simulateFrame</span></p>
 
   <h2><span class="eyebrow">1 · Frame anatomy</span>The payment request, byte by byte</h2>
@@ -322,6 +322,7 @@ Rs232Lib.exchangeListener = { e ->
       <tr><td><code>simulateFrame(hex)</code></td><td class="wrap">fake a received frame — test rules with no machine</td></tr>
       <tr><td><code>vendRequestListener</code> / <code>exchangeListener</code></td><td class="wrap">price hook / every frame</td></tr>
       <tr><td><code>frameGapMs</code></td><td class="wrap">silence that ends a frame — the reply goes out this long after the machine's last byte (default 1000 ms; remote: <code>rs232Gap:MS</code>)</td></tr>
+      <tr><td><code>HardwareLib.addRs232EventListener</code></td><td class="wrap">coded log schema (7.17.0): every exchange as (eventName, params) — codes 137 RX_MATCHED, 138 RX_UNMATCHED, 139 CRC_DISCARDED, 140 TX, 141 PORT_OPEN, 142 PORT_CLOSED, 143 RULES_LOADED, continuing the MDB CMD schema (110–136); forward to your log envelope (or <code>RabbahLog.rs232(name, p)</code> on mqtt-lib)</td></tr>
     </tbody>
   </table></div>
 
