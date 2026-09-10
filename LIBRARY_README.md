@@ -315,6 +315,13 @@ Rs232Lib.vendRequestListener = { price, frame ->
   `sendHex(hex)`, `simulateFrame(hex)` (feeds a fake machine frame through the matcher — test
   a rule table without hardware), `exchangeListener` (every frame: rxHex, ruleName, txHex,
   price), `vendRequestListener(price, frameHex)`.
+- **Remote everything in one call** (7.16.0): `HardwareLib.attachLogSink { line -> send(line) }`
+  pipes every library line AND every control snapshot (CONFIG_JSON:, RS232_RULES_JSON:, …) into
+  whatever transport the host app already has — pair it with feeding the app's command channel
+  into `HardwareLib.handleCommand(cmd)` and a dashboard sees and controls the whole library.
+  Apps using our mqtt-lib need exactly one call instead: `HardwareLib.attachRabbahMqtt()`
+  (reflection — no compile dependency). Send `help` as a remote command to get the full
+  command list back as a log line.
 - **Dashboard/backend commands** (via handleCommand, so they work over MQTT):
   `rs232Open` / `rs232Open:9600` / `rs232Open:9600,8,1,N`, `rs232Close`, `rs232Send:HEX`,
   `rs232SendFrame:HEADER;DATAHEX`, `rs232SendAscii:HEADER;TEXT` (e.g.
