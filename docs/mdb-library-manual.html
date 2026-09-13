@@ -131,14 +131,14 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;7.20.0 / mqtt-lib&nbsp;2.5.0.
+    hardware-lib&nbsp;7.21.0 / mqtt-lib&nbsp;2.5.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="split700">
     <h2><span class="eyebrow">NEW &mdash; the 7.x split</span>hardware-lib: the MDB engine, MQTT-free</h2>
-    <p><strong>mdb-lib is now <code>hardware-lib-7.20.0</code></strong> &mdash; renamed, and with the
+    <p><strong>mdb-lib is now <code>hardware-lib-7.21.0</code></strong> &mdash; renamed, and with the
     entire MQTT layer removed from inside it. The engine is pure hardware/protocol: everything it
     produces exits through listeners, everything it accepts enters through plain functions.
     The Kotlin package stays <code>com.rabbah.mdb</code> and a deprecated
@@ -311,7 +311,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.5.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-7.20.0.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-7.21.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -704,6 +704,20 @@ Rs232Lib.vendRequestListener = { price, frame -&gt; <span class="c">/* charge, t
     wired, the plain <code>[rs232] ...</code> twin stays LOCAL-only (each exchange crosses the
     wire exactly once); with none, plain lines ship as before. <code>getCodebook</code> now
     serves the RS232 schema, so dashboards decode it with zero changes.</p>
+    <p><strong>Numeric codes on the Android side (<code>Rs232Cmd</code>, 7.21.0)</strong> &mdash;
+    the RS232 twin of <code>MdbCmd</code>, so an app pipeline that consumes
+    <code>e.code</code> for MDB (110&ndash;136) gets the same for RS232 (137&ndash;143). The
+    listener delivers event NAMES; <code>Rs232Cmd</code> maps name &harr; code &harr; template:</p>
+    <pre class="code">HardwareLib.addRs232EventListener { name, params -&gt;
+    <span class="k">val</span> cmd = Rs232Cmd.fromEventName(name) ?: <span class="k">return</span>@addRs232EventListener
+    myLogger.emit(
+        messageCode  = cmd.code.toString(),   <span class="c">// "137".."143" - same numbers as the wire</span>
+        paramsCount  = params.size,
+        params       = params,                <span class="c">// positional, exactly the wire p[] arrays</span>
+        localMessage = cmd.format(params),    <span class="c">// the human sentence, dashboard-identical</span>
+    )
+}
+<span class="c">// Rs232Cmd.fromCode(137) / .eventName / .template / .paramCount also public</span></pre>
     <p><strong>Testing without the machine</strong>: <code>Rs232Lib.simulateFrame(hex)</code>
     feeds a fake received frame through the matcher exactly as if the machine sent it -
     matching, price extraction and both listeners all run; the reply is really written when the
@@ -922,9 +936,9 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
         <tr><td><code>setPeripheralVisibility:on|off</code></td><td>log-debug: show traffic addressed to OTHER peripherals (coin changer, bill validator) - independent of the unhandled toggle</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>getCodebook</code></td><td>answered by mqtt-lib's log layer</td><td>CODEBOOK_JSON snapshot (decode dictionary)</td></tr>
         <tr><td><code>ping</code></td><td>answered by mqtt-lib itself</td><td><code>PONG</code></td></tr>
-        <tr><td><code>version</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — reports the library versions actually bundled in the running app</td><td><code>[remote] mqtt-lib 2.5.0, hardware-lib 7.20.0</code></td></tr>
+        <tr><td><code>version</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — reports the library versions actually bundled in the running app</td><td><code>[remote] mqtt-lib 2.5.0, hardware-lib 7.21.0</code></td></tr>
         <tr><td><code>attachHardware</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — wires hardware-lib's remote commands + log stream on demand (the rescue for an app that never called <code>attachRabbahMqtt()</code>; auto-runs on connect by default)</td><td><code>[remote] hardware-lib attached …</code> or the reason it can't (absent / older than 7.16.0)</td></tr>
-        <tr><td><code>detachHardware</code> <em>(mqtt-lib 2.5.0 / hardware-lib 7.20.0)</em></td><td>the true disconnect — removes every listener attach wired (hardware logs stop, hardware commands stop answering; ping/version/attachHardware still work). <code>attachHardware</code> re-wires; an app restart auto-attaches again. The dashboard's HW toggle switch drives this pair; the Logs toggle drives <code>setMqttLogging:on|off</code></td><td><code>[remote] hardware-lib DETACHED …</code></td></tr>
+        <tr><td><code>detachHardware</code> <em>(mqtt-lib 2.5.0 / hardware-lib 7.21.0)</em></td><td>the true disconnect — removes every listener attach wired (hardware logs stop, hardware commands stop answering; ping/version/attachHardware still work). <code>attachHardware</code> re-wires; an app restart auto-attaches again. The dashboard's HW toggle switch drives this pair; the Logs toggle drives <code>setMqttLogging:on|off</code></td><td><code>[remote] hardware-lib DETACHED …</code></td></tr>
         <tr><td><em>anything else</em></td><td>offered to the app's own listeners first</td><td><code>[remote] unknown command: …</code> if nobody consumed it</td></tr>
       </tbody>
     </table></div>
@@ -949,6 +963,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 7.20.0 · mqtt-lib 2.5.0 · demo app v2.13.39 (build 87). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 7.21.0 · mqtt-lib 2.5.0 · demo app v2.13.40 (build 88). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 
