@@ -336,8 +336,20 @@ Rs232Lib.exchangeListener = { e ->
       <tr><td><code>rs232Send:HEX</code></td><td class="wrap">raw bytes</td></tr>
       <tr><td><code>rs232Simulate:HEX</code></td><td class="wrap">remote rule test</td></tr>
       <tr><td><code>getRs232Rules</code> / <code>clearRs232Rules</code> / <code>rs232Close</code></td><td class="wrap">inspect / wipe / close</td></tr>
+      <tr><td><code>version</code></td><td class="wrap">mqtt-lib 2.3.0 built-in — reports the mqtt-lib and hardware-lib versions actually running on the device (answers even when hardware-lib isn't attached)</td></tr>
+      <tr><td><code>attachHardware</code></td><td class="wrap">mqtt-lib 2.3.0 built-in — wires hardware-lib's remote commands + log stream on demand (also a dashboard toolbar button, <b>Attach HW</b>)</td></tr>
     </tbody>
   </table></div>
+
+  <div class="callout ok">
+    <p><b>Prerequisite for ALL rs232* remote commands — hardware-lib must be attached.</b>
+    A device that answers <code>ping</code> with <code>PONG</code> but returns
+    <code>[remote] unknown command</code> for everything else has mqtt-lib alive and
+    hardware-lib unwired — no RS232 commands, no RS232/MDB logs. Since mqtt-lib 2.3.0 the
+    attach happens <b>automatically on the first broker connection</b>; on demand, press
+    <b>Attach HW</b> in the dashboard (or send <code>attachHardware</code>). Diagnose any
+    device with <code>version</code> first.</p>
+  </div>
 
   <div class="callout">
     <p><b>Still to confirm on the real machine</b>: the CM30 vendor API's
