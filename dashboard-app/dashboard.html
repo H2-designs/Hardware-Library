@@ -141,6 +141,19 @@
   #vendBtn { border-color: #2a3f5a; color: #6fb3e8; }
   #cancelVendBtn { border-color: #5a4a2a; color: #e8c766; }
   #clearBtn { font-weight: 400; }
+  .tswitch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .tswitch input { display: none; }
+  .tswitch .slider {
+    width: 34px; height: 18px; border-radius: 999px; background: #2c3440;
+    border: 1px solid #3a4553; position: relative; transition: background 0.15s; flex-shrink: 0;
+  }
+  .tswitch .slider::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+    border-radius: 50%; background: #8ea0b5; transition: left 0.15s, background 0.15s;
+  }
+  .tswitch input:checked + .slider { background: #1d3a26; border-color: #2a5a3a; }
+  .tswitch input:checked + .slider::after { left: 18px; background: #6fe89a; }
+  .tswitch .tlabel { font-size: 12px; color: #9fb3c8; font-weight: 600; }
   .btn-group {
     display: flex;
     flex-direction: column;
@@ -461,9 +474,12 @@
     <span class="divider"></span>
     <button id="plReadyBtn" title="checkMachineReady - digital-in ready feedback check">Check Ready</button>
     </span>
-    <button id="attachHwBtn" title="attachHardware - mqtt-lib wires hardware-lib's commands + logs remotely; the rescue for devices where the app forgot HardwareLib.attachRabbahMqtt() (needs mqtt-lib 2.3.0+ on the device)">Attach HW</button>
-    <button id="logsOnBtn" title="setMqttLogging:on - device streams all logs (MDB/RS232/Pulse) to the broker">Logs On</button>
-    <button id="logsOffBtn" title="setMqttLogging:off - MUTE the device's remote log stream after debugging (persisted). Commands, PONG, status and settings keep working - send Logs On to resume. Full mute needs hardware-lib 7.18.0+">Logs Off</button>
+    <label class="tswitch" title="Hardware bridge toggle. ON = attachHardware (all hardware logs + commands wired to this dashboard). OFF = detachHardware (fully unwired; ping/version still answer; re-attach any time - an app restart also auto-attaches). Needs mqtt-lib 2.5.0+ / hardware-lib 7.19.0+ on the device.">
+      <input type="checkbox" id="hwToggle" checked><span class="slider"></span><span class="tlabel">HW</span>
+    </label>
+    <label class="tswitch" title="Remote hardware log stream toggle. ON = setMqttLogging:on (full MDB/RS232/Pulse stream). OFF = setMqttLogging:off (silence after debugging - commands, PONG, status and settings keep working). Persisted on the device; synced from SETTINGS_JSON.">
+      <input type="checkbox" id="logsToggle" checked><span class="slider"></span><span class="tlabel">Logs</span>
+    </label>
     <button id="versionBtn" title="version - the device reports its mqtt-lib and hardware-lib versions (mqtt-lib 2.3.0+)">Version</button>
     <button id="explorerBtn" title="Live tree of EVERY topic on the broker, with raw publish to any topic">Topics</button>
     <button id="clearBtn">Clear</button>
@@ -1275,7 +1291,19 @@
     // Checked = HIDE other peripherals, so it mirrors the inverse of the device flag.
     if (typeof data.showOtherPeripheral === 'boolean') document.getElementById('cashlessOnlyCheck').checked = !data.showOtherPeripheral;
     if (data.mdbLevel) document.getElementById('mdbLevelSelect').value = String(data.mdbLevel);
+    // Logs toggle mirrors the device's persisted mute state, never an assumed default.
+    if (typeof data.mqttLogsEnabled === 'boolean') document.getElementById('logsToggle').checked = data.mqttLogsEnabled;
     updateSessionBeginActiveBadges();
+  }
+
+  /** The HW toggle can't be read from a snapshot - sync it from the device's own attach/detach
+   * confirmation lines, so the switch always ends up showing what the device confirmed. */
+  function syncHwToggleFrom(text) {
+    if (text.indexOf('hardware-lib attached') !== -1 || text.indexOf('attached to mqtt-lib') !== -1) {
+      document.getElementById('hwToggle').checked = true;
+    } else if (text.indexOf('hardware-lib DETACHED') !== -1 || text.indexOf('detached from mqtt-lib') !== -1) {
+      document.getElementById('hwToggle').checked = false;
+    }
   }
 
   // The VMC status bar can't just react to traffic — POLL/ACK is hidden by default, so long
@@ -1447,6 +1475,7 @@
     if (fromDevice !== currentDeviceId) return; // presence noted, but not who we're watching
 
     markDeviceLinked(); // any real message at all proves the selected device is alive
+    syncHwToggleFrom(text); // attach/detach confirmations flip the HW switch to device truth
     if (text === 'PONG') {
       return; // just a heartbeat reply, nothing to show
     }
@@ -1489,9 +1518,12 @@
     addLine('[sent] ' + label, 'cmd');
   }
 
-  document.getElementById('attachHwBtn').onclick = () => sendCommand('attachHardware', 'Attach hardware-lib bridge');
-  document.getElementById('logsOnBtn').onclick = () => sendCommand('setMqttLogging:on', 'Logs ON (unmute remote log stream)');
-  document.getElementById('logsOffBtn').onclick = () => sendCommand('setMqttLogging:off', 'Logs OFF (mute remote log stream - commands stay alive)');
+  document.getElementById('hwToggle').onchange = (e) => sendCommand(
+    e.target.checked ? 'attachHardware' : 'detachHardware',
+    e.target.checked ? 'HW bridge ON (attach)' : 'HW bridge OFF (detach - full disconnect)');
+  document.getElementById('logsToggle').onchange = (e) => sendCommand(
+    e.target.checked ? 'setMqttLogging:on' : 'setMqttLogging:off',
+    e.target.checked ? 'Logs ON (stream resumed)' : 'Logs OFF (muted - commands stay alive)');
   document.getElementById('versionBtn').onclick = () => sendCommand('version', 'Version check');
   document.getElementById('openBtn').onclick = () => sendCommand('open', 'Open');
   document.getElementById('closeBtn').onclick = () => sendCommand('close', 'Close');

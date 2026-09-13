@@ -4,8 +4,8 @@ Two fully decoupled Android libraries extracted from the proven MDB Slave app:
 
 | Artifact | What it is |
 |---|---|
-| `hardware-lib-7.18.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
-| `mqtt-lib-2.4.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
+| `hardware-lib-7.19.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
+| `mqtt-lib-2.5.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
 | `CM30-HardwareLibrary-1.0.9.aar` | The CM30 vendor serial driver (hardware-lib needs it at runtime; AARs do not nest). |
 
 ## Architecture — who talks to whom
@@ -54,7 +54,7 @@ fully offline.
 
 > Migration note: the Kotlin package is still `com.rabbah.mdb` and a deprecated
 > `typealias MdbLib = HardwareLib` keeps old code compiling — the only hard change is the
-> gradle dependency (`project(':hardware-lib')` / `hardware-lib-7.18.0.aar`) and that MQTT
+> gradle dependency (`project(':hardware-lib')` / `hardware-lib-7.19.0.aar`) and that MQTT
 > forwarding now needs the bridge attached.
 
 ## The CMD code schema
@@ -353,7 +353,7 @@ Rs232Lib.vendRequestListener = { price, frame ->
   `attachHardware` — wires the bridge on demand and reports success or the reason it can't
   (hardware-lib absent / older than 7.16.0); `version` — reports the mqtt-lib and hardware-lib
   versions actually bundled in the running app, e.g. `[remote] mqtt-lib 2.3.0, hardware-lib
-  7.18.0`. Field diagnosis rule of thumb: `ping`→`PONG` but everything else "unknown command"
+  7.19.0`. Field diagnosis rule of thumb: `ping`→`PONG` but everything else "unknown command"
   means mqtt-lib is alive and hardware-lib is not attached — send `version`, then
   `attachHardware`.
 - **Dashboard/backend commands** (via handleCommand, so they work over MQTT):
@@ -473,7 +473,7 @@ status line, and an `inbox` subscription you can hit with `mosquitto_pub`.
 Preferred: consume the modules directly (`implementation project(':hardware-lib')`,
 `project(':mqtt-lib')`) — see the demo `app/`.
 
-If consuming raw AARs instead: add `hardware-lib-7.18.0.aar`, `mqtt-lib-2.4.0.aar`, **and**
+If consuming raw AARs instead: add `hardware-lib-7.19.0.aar`, `mqtt-lib-2.5.0.aar`, **and**
 `CM30-HardwareLibrary-1.0.9.aar` (hardware-lib needs it at runtime; AARs do not nest). If you
 skip MQTT entirely, `hardware-lib` + the CM30 AAR alone are enough.
 
