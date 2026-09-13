@@ -1,14 +1,14 @@
-# AAR update — mqtt-lib 2.5.0 + hardware-lib 7.19.0
+# AAR update — mqtt-lib 2.5.0 + hardware-lib 7.20.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.5.0.aar` (replaces 2.2.0)
-   - `hardware-lib-7.19.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-7.20.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.5.0.aar')
-   implementation files('libs/hardware-lib-7.19.0.aar')
+   implementation files('libs/hardware-lib-7.20.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -33,7 +33,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.5.0, hardware-lib 7.19.0` |
+| `version` | `[remote] mqtt-lib 2.5.0, hardware-lib 7.20.0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 

@@ -1,7 +1,7 @@
 # RS232 + MDB Log Schema — backend integration spec
 
 Schema id: `"RS232"` · codes **137–143** (continue the MDB schema 110–136, no collisions)
-Emitted by: hardware-lib 7.19.0 + mqtt-lib 2.2.0+ (mqtt-lib 2.3.0+ wires it automatically)
+Emitted by: hardware-lib 7.20.0 + mqtt-lib 2.2.0+ (mqtt-lib 2.3.0+ wires it automatically)
 
 ## MDB codes — unified at 110–136 (mqtt-lib 2.4.0)
 
