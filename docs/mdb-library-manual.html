@@ -131,7 +131,7 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;7.17.0 / mqtt-lib&nbsp;2.3.0.
+    hardware-lib&nbsp;7.17.0 / mqtt-lib&nbsp;2.4.0.
   </p>
 
 
@@ -254,7 +254,12 @@ HardwareLib.addControlListener / removeControlListener</pre>
     chain in order. Toggle with <code>setEmptySessionVisibility:on|off</code> (or
     <code>HardwareLib.setEmptySessionVisibility(true)</code>) to see every cycle again.</p>
     <p><strong>The CMD code schema.</strong> Every exchange carries one stable integer code
-    (<code>MdbCmd</code>, append-only). Edit a reply by number with
+    (<code>MdbCmd</code>, append-only). <strong>Since mqtt-lib 2.4.0 these SAME codes are the
+    log-envelope codes</strong>: a <code>RABBAH_LOG</code> item with <code>"s":"MDB"</code>
+    carries <code>"m":"110".."136"</code> exactly as tabled below (older builds emitted
+    0&ndash;26 for the same events; <code>getCodebook</code> always serves what the running
+    build emits). One code space end to end &mdash; MDB 110&ndash;136, RS232 137&ndash;143.
+    Edit a reply by number with
     <code>setReplyHex(code, hex)</code> / read it with <code>getReplyHex(code)</code>; the last
     frame the VMC sent per code is saved &mdash; <code>lastReceivedHex(code)</code> /
     <code>lastReceivedJson()</code>; <code>replyWireHex(code)</code> returns the LIVE wire bytes a code is answered with, CHK included ("00" = bare ACK, null = sends nothing), and <code>MdbCmd.fromCode(code)!!.rxShowsHex</code> says whether that code logs raw hex or the command name in {0} (7.9.2 - both live in the schema code itself):</p>
@@ -305,7 +310,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <h2><span class="eyebrow">01</span>Getting started</h2>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
-implementation files(<span class="s">'libs/mqtt-lib-2.3.0.aar'</span>)
+implementation files(<span class="s">'libs/mqtt-lib-2.4.0.aar'</span>)
 implementation files(<span class="s">'libs/hardware-lib-7.17.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
@@ -908,7 +913,7 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
         <tr><td><code>setPeripheralVisibility:on|off</code></td><td>log-debug: show traffic addressed to OTHER peripherals (coin changer, bill validator) - independent of the unhandled toggle</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>getCodebook</code></td><td>answered by mqtt-lib's log layer</td><td>CODEBOOK_JSON snapshot (decode dictionary)</td></tr>
         <tr><td><code>ping</code></td><td>answered by mqtt-lib itself</td><td><code>PONG</code></td></tr>
-        <tr><td><code>version</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — reports the library versions actually bundled in the running app</td><td><code>[remote] mqtt-lib 2.3.0, hardware-lib 7.17.0</code></td></tr>
+        <tr><td><code>version</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — reports the library versions actually bundled in the running app</td><td><code>[remote] mqtt-lib 2.4.0, hardware-lib 7.17.0</code></td></tr>
         <tr><td><code>attachHardware</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — wires hardware-lib's remote commands + log stream on demand (the rescue for an app that never called <code>attachRabbahMqtt()</code>; auto-runs on connect by default)</td><td><code>[remote] hardware-lib attached …</code> or the reason it can't (absent / older than 7.16.0)</td></tr>
         <tr><td><em>anything else</em></td><td>offered to the app's own listeners first</td><td><code>[remote] unknown command: …</code> if nobody consumed it</td></tr>
       </tbody>
@@ -934,6 +939,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 7.17.0 · mqtt-lib 2.3.0 · demo app v2.13.35 (build 83). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 7.17.0 · mqtt-lib 2.4.0 · demo app v2.13.36 (build 84). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

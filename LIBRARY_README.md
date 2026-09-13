@@ -5,7 +5,7 @@ Two fully decoupled Android libraries extracted from the proven MDB Slave app:
 | Artifact | What it is |
 |---|---|
 | `hardware-lib-7.17.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
-| `mqtt-lib-2.3.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
+| `mqtt-lib-2.4.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
 | `CM30-HardwareLibrary-1.0.9.aar` | The CM30 vendor serial driver (hardware-lib needs it at runtime; AARs do not nest). |
 
 ## Architecture — who talks to whom
@@ -61,7 +61,10 @@ fully offline.
 
 Every exchange the engine handles has ONE stable integer code (`MdbCmd`, append-only — codes
 are never renumbered). `exchangeListener` delivers them live; the hex APIs address them by
-number.
+number. **Since mqtt-lib 2.4.0 these same codes are the log-envelope codes**: a RABBAH_LOG
+item with `"s":"MDB"` carries `"m":"110".."136"` exactly as tabled below (older builds emitted
+0–26 for the same events; `getCodebook` always serves what the running build emits). One code
+space end to end — MDB 110–136, RS232 137–143.
 
 | Code | VMC sends | We reply | Reply hex editable? | RX captured |
 |---|---|---|---|---|
@@ -470,7 +473,7 @@ status line, and an `inbox` subscription you can hit with `mosquitto_pub`.
 Preferred: consume the modules directly (`implementation project(':hardware-lib')`,
 `project(':mqtt-lib')`) — see the demo `app/`.
 
-If consuming raw AARs instead: add `hardware-lib-7.17.0.aar`, `mqtt-lib-2.3.0.aar`, **and**
+If consuming raw AARs instead: add `hardware-lib-7.17.0.aar`, `mqtt-lib-2.4.0.aar`, **and**
 `CM30-HardwareLibrary-1.0.9.aar` (hardware-lib needs it at runtime; AARs do not nest). If you
 skip MQTT entirely, `hardware-lib` + the CM30 AAR alone are enough.
 

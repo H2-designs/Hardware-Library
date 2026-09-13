@@ -1,7 +1,21 @@
-# RS232 Log Schema — backend integration spec
+# RS232 + MDB Log Schema — backend integration spec
 
-Schema id: `"RS232"` · codes **137–143** (continue the MDB CMD schema 110–136, no collisions)
-Emitted by: hardware-lib 7.17.0 + mqtt-lib 2.2.0+ (mqtt-lib 2.3.0 wires it automatically)
+Schema id: `"RS232"` · codes **137–143** (continue the MDB schema 110–136, no collisions)
+Emitted by: hardware-lib 7.17.0 + mqtt-lib 2.2.0+ (mqtt-lib 2.3.0+ wires it automatically)
+
+## MDB codes — unified at 110–136 (mqtt-lib 2.4.0)
+
+Since **mqtt-lib 2.4.0**, MDB log envelopes (`"s":"MDB"`) carry message codes **110–136** —
+the SAME numbers as the command/exchange table, so one code space covers everything:
+MDB 110–136, RS232 137–143. The backend `MdbLogSchema` enum keyed 110–136 works as-is
+(110 EXCHANGE, 111 RESET, 113 SETUP CONFIG [3 params], 121 VEND REQUEST [4 params:
+rx, tx, price, item — THE money event], 124 VEND SUCCESS [3 params], 132 CASH SALE
+[4 params], 133 idle POLL, 135 OTHER PERIPHERAL, 136 UNHANDLED). Severity: 136 UNHANDLED
+and 125 VEND FAILURE arrive with `k:"e"`; 133 POLL and 135 OTHER PERIPHERAL with `k:"d"`.
+
+Builds on mqtt-lib <= 2.3.0 emitted codes 0–26 for the same MDB events. `getCodebook`
+always returns exactly the codes the running build emits — build decode tables from it
+and version skew becomes a non-issue.
 
 ## Transport
 
