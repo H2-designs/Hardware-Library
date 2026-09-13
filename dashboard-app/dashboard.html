@@ -462,6 +462,8 @@
     <button id="plReadyBtn" title="checkMachineReady - digital-in ready feedback check">Check Ready</button>
     </span>
     <button id="attachHwBtn" title="attachHardware - mqtt-lib wires hardware-lib's commands + logs remotely; the rescue for devices where the app forgot HardwareLib.attachRabbahMqtt() (needs mqtt-lib 2.3.0+ on the device)">Attach HW</button>
+    <button id="logsOnBtn" title="setMqttLogging:on - device streams all logs (MDB/RS232/Pulse) to the broker">Logs On</button>
+    <button id="logsOffBtn" title="setMqttLogging:off - MUTE the device's remote log stream after debugging (persisted). Commands, PONG, status and settings keep working - send Logs On to resume. Full mute needs hardware-lib 7.18.0+">Logs Off</button>
     <button id="versionBtn" title="version - the device reports its mqtt-lib and hardware-lib versions (mqtt-lib 2.3.0+)">Version</button>
     <button id="explorerBtn" title="Live tree of EVERY topic on the broker, with raw publish to any topic">Topics</button>
     <button id="clearBtn">Clear</button>
@@ -1488,6 +1490,8 @@
   }
 
   document.getElementById('attachHwBtn').onclick = () => sendCommand('attachHardware', 'Attach hardware-lib bridge');
+  document.getElementById('logsOnBtn').onclick = () => sendCommand('setMqttLogging:on', 'Logs ON (unmute remote log stream)');
+  document.getElementById('logsOffBtn').onclick = () => sendCommand('setMqttLogging:off', 'Logs OFF (mute remote log stream - commands stay alive)');
   document.getElementById('versionBtn').onclick = () => sendCommand('version', 'Version check');
   document.getElementById('openBtn').onclick = () => sendCommand('open', 'Open');
   document.getElementById('closeBtn').onclick = () => sendCommand('close', 'Close');
