@@ -68,6 +68,63 @@ between backend and device build.
 {"s":"RS232","m":"143","p":["6"]}
 ```
 
+## Drop-in Kotlin enum (matches the MdbLogSchema style)
+
+Templates verbatim from the device library (`RabbahLogEvent.kt`) — renders identical text to
+what `getCodebook` serves. Route on the envelope's `s` field first: `"MDB"` -> MdbLogSchema,
+`"RS232"` -> this enum.
+
+```kotlin
+enum class Rs232LogSchema(
+    val messageCode: String,
+    val template: String,
+    val paramCount: Int
+) {
+    RS232_RX_MATCHED(
+        messageCode = "137",
+        // {0}=ruleName {1}=rxHex {2}=txHex or "-" {3}=price minor units or "-1"
+        // THE MONEY EVENT: payment = this code with {3} != "-1" ("150000" = 1500.00)
+        template = "RS232 {0} rx={1} tx={2} price={3}",
+        paramCount = 4
+    ),
+    RS232_RX_UNMATCHED(
+        messageCode = "138",
+        // {0}=rxHex - matched no rule, nothing replied (arrives with k:"e")
+        template = "RS232 UNMATCHED rx={0}",
+        paramCount = 1
+    ),
+    RS232_CRC_DISCARDED(
+        messageCode = "139",
+        // {0}=rxHex {1}=expected CRC - frame dropped (arrives with k:"e")
+        template = "RS232 CRC FAIL rx={0} expected={1} - discarded",
+        paramCount = 2
+    ),
+    RS232_TX(
+        messageCode = "140",
+        // {0}=txHex - manual/remote transmit only; rule auto-replies ride RX_MATCHED's {2}
+        template = "RS232 TX {0}",
+        paramCount = 1
+    ),
+    RS232_PORT_OPEN(
+        messageCode = "141",
+        // {0}=port params e.g. "baud=9600 8N1"  {1}=active rule count
+        template = "RS232 port open {0}, {1} rule(s) active",
+        paramCount = 2
+    ),
+    RS232_PORT_CLOSED(
+        messageCode = "142",
+        template = "RS232 port closed",
+        paramCount = 0
+    ),
+    RS232_RULES_LOADED(
+        messageCode = "143",
+        // {0}=rule count
+        template = "RS232 {0} rule(s) loaded",
+        paramCount = 1
+    );
+}
+```
+
 ## Backend heuristics
 
 - **Money**: code 137 with `p[3] != "-1"` → amount = `parseInt(p[3])` minor units (150000 = 1500.00).
