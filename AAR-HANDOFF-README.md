@@ -1,6 +1,6 @@
 # AAR update — mqtt-lib 2.5.1 + hardware-lib 7.22.0
 
-## What to do (2 steps, no code changes)
+## What to do (3 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.5.1.aar` (replaces 2.2.0)
@@ -12,7 +12,19 @@
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
-2. Build and deploy. That's it — **do NOT write any wiring code.**
+2. Add these to `proguard-rules.pro` — REQUIRED for minified (release/uat) builds.
+   mqtt-lib finds hardware-lib via reflection, so without them R8 deletes hardware-lib
+   from the APK and the dashboard reports
+   `attachHardware FAILED: hardware-lib absent ... (bundled: absent)` — seen live on D-0416:
+
+   ```proguard
+   -keep class com.rabbah.mdb.** { *; }
+   -keep class com.rabbah.mqtt.** { *; }
+   ```
+
+3. Build and deploy. That's it — **do NOT write any wiring code.**
+   Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
+   `com.rabbah.mdb` — HardwareLib must be present in the dex.
 
 ## Why no code is needed
 
