@@ -616,7 +616,10 @@
   const SCHEMES = [];
   function addScheme(prefix, log, cmd, pt) {
     const p = prefix.endsWith('/') ? prefix : prefix + '/';
-    if (SCHEMES.some((s) => s.prefix === p)) return;
+    // Dedupe on prefix + log suffix, NOT prefix alone: an F2 setting of "devices/" + "liveLog"
+    // used to shadow the built-in "devices/" + "logs" scheme, so the dashboard showed the fleet
+    // as online (status topic matched) but never received a single log line or command reply.
+    if (SCHEMES.some((s) => s.prefix === p && s.log === log)) return;
     SCHEMES.push({ prefix: p, log, cmd, pt, seg: p.split('/').filter(Boolean).length });
   }
   addScheme(TOPIC_PREFIX, LOG_SUFFIX, CMD_SUFFIX, PT_SUFFIX); // whatever F2 says, first
