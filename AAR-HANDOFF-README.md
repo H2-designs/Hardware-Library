@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.5.3 + hardware-lib 7.22.1
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.23.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
-   - `mqtt-lib-2.5.3.aar` (replaces 2.2.0)
-   - `hardware-lib-7.22.1.aar` (replace whatever version you bundle now)
+   - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
+   - `hardware-lib-7.23.0.aar` (replace whatever version you bundle now)
 
    ```gradle
-   implementation files('libs/mqtt-lib-2.5.3.aar')
-   implementation files('libs/hardware-lib-7.22.1.aar')
+   implementation files('libs/mqtt-lib-2.6.0.aar')
+   implementation files('libs/hardware-lib-7.23.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.22.1 / 2.5.3) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.23.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -27,7 +27,7 @@
 
 ## Why no code is needed
 
-mqtt-lib 2.3.0+ auto-attaches hardware-lib on the first successful broker
+mqtt-lib 2.3.0+ CAN auto-attach hardware-lib on the first successful broker
 connection (`MqttConfig.autoAttachHardware`, default true). That one step wires:
 
 - every hardware-lib log line (MDB exchanges, RS232 events) -> `devices/<id>/logs`
@@ -44,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.5.3, hardware-lib 7.22.1` |
+| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.23.0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
@@ -66,3 +66,15 @@ The dashboard has toggle switches for both: **HW** (attachHardware / detachHardw
 fully unwire hardware-lib remotely) and **Logs** (setMqttLogging:on|off - stream or mute the
 hardware logs; commands and status stay alive while muted). All remote, no builds needed once
 these AARs are deployed.
+
+## Defaults changed in 7.23.0 / 2.6.0 - nothing turns on by itself
+
+- `autoAttachHardware` now defaults to **false**: a device boots UNATTACHED. Attach on demand
+  with the dashboard HW toggle (`attachHardware`); a restart drops it again.
+- `mqttLogsEnabled` now defaults to **false**: no remote log stream until the dashboard Logs
+  toggle (`setMqttLogging:on`) turns it on - persisted per device once `HardwareLib.init()`
+  has been called.
+- Settings commands (`getSettings`, `setMqttLogging`, ...) now work even if the app never calls
+  `HardwareLib.init(context)` (previously they threw and showed as "unknown command"); the
+  device warns once that such settings are in-memory only. CALL `HardwareLib.init(context)`
+  AT APP START in every mode (MDB and RS232) so the switches persist across restarts.

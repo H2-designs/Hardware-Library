@@ -475,10 +475,10 @@
     <button id="plReadyBtn" title="checkMachineReady - digital-in ready feedback check">Check Ready</button>
     </span>
     <label class="tswitch" title="Hardware bridge toggle. ON = attachHardware (all hardware logs + commands wired to this dashboard). OFF = detachHardware (fully unwired; ping/version still answer; re-attach any time - an app restart also auto-attaches). Needs mqtt-lib 2.5.0+ / hardware-lib 7.19.0+ on the device.">
-      <input type="checkbox" id="hwToggle" checked><span class="slider"></span><span class="tlabel">HW</span>
+      <input type="checkbox" id="hwToggle"><span class="slider"></span><span class="tlabel">HW</span>
     </label>
     <label class="tswitch" title="Remote hardware log stream toggle. ON = setMqttLogging:on (full MDB/RS232/Pulse stream). OFF = setMqttLogging:off (silence after debugging - commands, PONG, status and settings keep working). Persisted on the device; synced from SETTINGS_JSON.">
-      <input type="checkbox" id="logsToggle" checked><span class="slider"></span><span class="tlabel">Logs</span>
+      <input type="checkbox" id="logsToggle"><span class="slider"></span><span class="tlabel">Logs</span>
     </label>
     <button id="versionBtn" title="version - the device reports its mqtt-lib and hardware-lib versions (mqtt-lib 2.3.0+)">Version</button>
     <button id="explorerBtn" title="Live tree of EVERY topic on the broker, with raw publish to any topic">Topics</button>

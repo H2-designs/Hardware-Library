@@ -1,4 +1,4 @@
-// Watch D-5007 until the mqtt-lib 2.5.2 build is deployed, then verify the full loop.
+// Watch D-5007 until the mqtt-lib 2.5.3 build is deployed, then verify the full loop.
 // Probes 'version' every 10 min (one log line per probe); exits on success or after maxHours.
 const fs = require('fs');
 const props = fs.readFileSync('C:/Users/Hamdan/Desktop/MVP/MdbSlaveApp/local.properties', 'utf8');
@@ -11,7 +11,7 @@ const c = mqtt.connect('mqtt://' + get('mqttHost') + ':' + get('mqttPort'),
 const log = (s) => console.log(new Date().toISOString() + ' ' + s);
 let phase = 'watch'; // watch -> verify -> done
 c.on('connect', () => {
-  log('connected, watching ' + dev + ' for mqtt-lib 2.5.2');
+  log('connected, watching ' + dev + ' for mqtt-lib 2.5.3');
   c.subscribe('devices/' + dev + '/logs');
   probe();
   setInterval(probe, 10 * 60 * 1000);
@@ -24,7 +24,7 @@ function probe() {
 }
 c.on('message', (t, p) => {
   const s = p.toString();
-  if (phase === 'watch' && s.includes('mqtt-lib 2.5.2')) {
+  if (phase === 'watch' && s.includes('mqtt-lib 2.5.3')) {
     phase = 'verify';
     log('NEW BUILD DETECTED: ' + s);
     log('verifying: help ...');
