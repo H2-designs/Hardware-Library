@@ -1,23 +1,29 @@
-# AAR update — mqtt-lib 2.5.2 + hardware-lib 7.22.1
+# AAR update — mqtt-lib 2.5.3 + hardware-lib 7.22.1
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
-   - `mqtt-lib-2.5.2.aar` (replaces 2.2.0)
+   - `mqtt-lib-2.5.3.aar` (replaces 2.2.0)
    - `hardware-lib-7.22.1.aar` (replace whatever version you bundle now)
 
    ```gradle
-   implementation files('libs/mqtt-lib-2.5.2.aar')
+   implementation files('libs/mqtt-lib-2.5.3.aar')
    implementation files('libs/hardware-lib-7.22.1.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.22.1 / 2.5.2) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.22.1 / 2.5.3) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
    `com.rabbah.mdb` — HardwareLib must be present in the dex.
+
+> Build 1.0.235 shipped mqtt-lib 2.5.2 but kept the OLD hardware-lib file — the device
+> still said "hardware-lib absent" (R8 renamed the unprotected old AAR). mqtt-lib 2.5.3
+> now also keeps `com.rabbah.mdb.**` from its own embedded rules, so even that mistake
+> recovers the bridge — but REPLACE BOTH FILES anyway: the old hardware-lib predates the
+> vend-cancel callback, RS232 codes, detach, and the log-mute fix.
 
 ## Why no code is needed
 
@@ -38,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.5.2, hardware-lib 7.22.1` |
+| `version` | `[remote] mqtt-lib 2.5.3, hardware-lib 7.22.1` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
