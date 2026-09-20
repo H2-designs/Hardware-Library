@@ -4,7 +4,7 @@ Two fully decoupled Android libraries extracted from the proven MDB Slave app:
 
 | Artifact | What it is |
 |---|---|
-| `hardware-lib-7.26.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
+| `hardware-lib-7.27.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
 | `mqtt-lib-2.6.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
 | `CM30-HardwareLibrary-1.0.9.aar` | The CM30 vendor serial driver (hardware-lib needs it at runtime; AARs do not nest). |
 
@@ -54,7 +54,7 @@ fully offline.
 
 > Migration note: the Kotlin package is still `com.rabbah.mdb` and a deprecated
 > `typealias MdbLib = HardwareLib` keeps old code compiling — the only hard change is the
-> gradle dependency (`project(':hardware-lib')` / `hardware-lib-7.26.0.aar`) and that MQTT
+> gradle dependency (`project(':hardware-lib')` / `hardware-lib-7.27.0.aar`) and that MQTT
 > forwarding now needs the bridge attached.
 
 ## The CMD code schema
@@ -473,7 +473,7 @@ status line, and an `inbox` subscription you can hit with `mosquitto_pub`.
 Preferred: consume the modules directly (`implementation project(':hardware-lib')`,
 `project(':mqtt-lib')`) — see the demo `app/`.
 
-If consuming raw AARs instead: add `hardware-lib-7.26.0.aar`, `mqtt-lib-2.6.0.aar`, **and**
+If consuming raw AARs instead: add `hardware-lib-7.27.0.aar`, `mqtt-lib-2.6.0.aar`, **and**
 `CM30-HardwareLibrary-1.0.9.aar` (hardware-lib needs it at runtime; AARs do not nest). If you
 skip MQTT entirely, `hardware-lib` + the CM30 AAR alone are enough.
 
@@ -527,6 +527,7 @@ is reported back in `SETTINGS_JSON:` so a watching dashboard always shows the re
 | `HardwareLib.cancelVend(): Boolean` | `cancelVend` | The simple cancel — sends the standing response set above |
 | `HardwareLib.cancelVend(CancelResponse): Boolean` | `cancelVend:sessionCancel` / `cancelVend:vendDenied` | One-time override without touching the standing mode |
 | `HardwareLib.setAutoSession(Boolean)` / `isAutoSession` | `setSessionMode:auto` / `setSessionMode:manual` | true = sessions begin by themselves, false = manual |
+| `PulseLib.initPulse(high: Boolean)` *(persisted 7.27.0)* | `initPulse:true` / `initPulse:false` | pulse polarity; remembered as `pulseMode` and re-applied at HardwareLib.init(); dashboard Init High / Init Low + mode label |
 | `PulseLib.setReadyFeedback(value, channel)` / `setReadyFeedback(null)` *(persisted 7.26.0)* | `setReadyFeedback:[yes,]value[,channel]` / `:on` / `:off` | digital-in gate before every pulse train; survives restarts; dashboard **Ready FB** toggle |
 | `HardwareLib.setAutoBeginCooldown(Int)` / `autoBeginCooldown` *(7.25.0)* | `setAutoBeginCooldown:0-50` | idle POLLs after END SESSION before auto SESSION BEGIN (default 3; 0 = next POLL). Dashboard: the **cooldown** field beside the mode selector |
 | `HardwareLib.setMdbLevel(1..3)` | `setMdbLevel:1\|2\|3` | MDB feature level (handshake + payloads) |

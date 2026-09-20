@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.26.0
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.27.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
-   - `hardware-lib-7.26.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-7.27.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.6.0.aar')
-   implementation files('libs/hardware-lib-7.26.0.aar')
+   implementation files('libs/hardware-lib-7.27.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.26.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.27.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -44,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.26.0` |
+| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.27.0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
@@ -88,6 +88,15 @@ the machine never gets VEND APPROVED, this line tells you whether the engine eve
 ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
 gateway callback threads, read on the bus thread).
 
+## 7.27.0 - pulse polarity persisted
+
+A successful `PulseLib.initPulse(true|false)` (or remote `initPulse:true|false`) is now remembered
+(`pulseMode` = high | low | unset in SETTINGS_JSON). `HardwareLib.init(context)` re-drives the same idle
+level at the next app start, so `sendPulse` no longer answers "call initPulse first" after a restart.
+A device that was never initialised stays "unset" and still refuses to pulse - nothing is driven that an
+operator or the app did not choose once. Dashboard: a "mode: HIGH / LOW / unset" label next to Init High /
+Init Low. Pulse test bench: `pulse-sample-v1.5.apk`; demo/test APK build 98.
+
 ## 7.26.0 - persisted ready-feedback gate, no more doubled log lines
 
 - **Ready feedback is persisted.** `PulseLib.setReadyFeedback(...)` (Kotlin) and
@@ -101,7 +110,7 @@ gateway callback threads, read on the bus thread).
   direct dispatch is gone. Side effect: with empty-session suppression on (the default) an empty
   BEGIN -> COMPLETE -> END cycle now logs nothing at all, as documented; send
   `setEmptySessionVisibility:on` to see them.
-- Pulse test bench `pulse-sample-v1.4.apk` rebuilt on this library (calls HardwareLib.init so the
+- Pulse test bench `pulse-sample-v1.5.apk` rebuilt on this library (calls HardwareLib.init so the
   gate persists). Demo/test APK is now build 97.
 
 ## 7.25.0 - auto session mode no longer deadlocks after a denied vend (field case D-0222, 2026-09-20)
@@ -128,7 +137,7 @@ Fixes (both in the engine, no app code needed):
    as outside a session plus the session is cancelled per the configured cancel mode (and
    `onVendCancelled` fires if a VEND REQUEST was pending).
 
-Test APK for this scenario: `MDB-Slave-2-v2.13.49-build97-debug.apk` (demo app on 7.26.0 / 2.6.0).
+Test APK for this scenario: `MDB-Slave-2-v2.13.50-build98-debug.apk` (demo app on 7.27.0 / 2.6.0).
 
 ## 7.24.0 - blocked VendListener callbacks no longer freeze the pipeline
 
