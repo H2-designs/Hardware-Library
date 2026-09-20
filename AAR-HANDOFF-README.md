@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.24.0
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.25.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
-   - `hardware-lib-7.24.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-7.25.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.6.0.aar')
-   implementation files('libs/hardware-lib-7.24.0.aar')
+   implementation files('libs/hardware-lib-7.25.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.24.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.25.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -44,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.24.0` |
+| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.25.0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
@@ -87,6 +87,32 @@ these AARs are deployed.
 the machine never gets VEND APPROVED, this line tells you whether the engine ever saw the call.
 ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
 gateway callback threads, read on the bus thread).
+
+## 7.25.0 - auto session mode no longer deadlocks after a denied vend (field case D-0222, 2026-09-20)
+
+Symptom: in auto session mode, after `VEND REQUEST -> VEND DENIED / SESSION CANCEL REQUEST ->
+SESSION COMPLETE -> END SESSION` the log filled with `UNHANDLED rx=14 01 15` forever and the
+machine was dead until Close/Open. Manual mode worked.
+
+Cause: auto mode re-armed SESSION BEGIN on the very first POLL after END SESSION. Some VMCs
+(Sielaff) send their post-session READER ENABLE (`14 01`) *after* that POLL, so it landed while
+the engine was already in the session state, which had no READER handler -> no ACK -> the VMC
+retried READER ENABLE forever and never POLLed again.
+
+Fixes (both in the engine, no app code needed):
+
+1. **Auto-begin cooldown.** After END SESSION, auto mode waits N idle POLLs (default 3, ~300-600 ms)
+   before arming SESSION BEGIN. A READER ENABLE arriving during the cooldown arms immediately, as
+   before. Configurable and persisted: dashboard field **cooldown: [N] polls** next to the session
+   mode selector, remote command `setAutoBeginCooldown:0-50`, Kotlin
+   `HardwareLib.setAutoBeginCooldown(polls)` / `HardwareLib.autoBeginCooldown`, reported in
+   SETTINGS_JSON as `autoBeginCooldownPolls`. `0` restores the old next-POLL behavior.
+2. **READER ENABLE / DISABLE / CANCEL are now answered inside a session** (VEND_STATE): ENABLE -> ACK;
+   DISABLE -> ACK and the session is closed with END SESSION on the next POLL; CANCEL -> same reply
+   as outside a session plus the session is cancelled per the configured cancel mode (and
+   `onVendCancelled` fires if a VEND REQUEST was pending).
+
+Test APK for this scenario: `MDB-Slave-2-v2.13.48-build96-debug.apk` (demo app on 7.25.0 / 2.6.0).
 
 ## 7.24.0 - blocked VendListener callbacks no longer freeze the pipeline
 

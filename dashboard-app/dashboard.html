@@ -422,6 +422,9 @@
       <option value="auto">Auto</option>
       <option value="manual">Manual</option>
     </select>
+    <span class="label mode-mdb" title="Auto mode only (hardware-lib 7.25.0+): idle POLLs the engine waits after END SESSION before it re-arms SESSION BEGIN, so the VMC can send its READER ENABLE first. 3 is the default (~300-600 ms). 0 = old behavior: SESSION BEGIN on the very next POLL (this is what deadlocked D-0222 with UNHANDLED 14 01 15).">cooldown:</span>
+    <input id="cooldownInput" type="number" min="0" max="50" step="1" value="3" style="width:3.5em" title="Idle POLLs after END SESSION before auto SESSION BEGIN (0-50). Press Enter or leave the field to send setAutoBeginCooldown:N.">
+    <span class="label">polls</span>
     <span class="divider"></span>
     <span class="label">MDB level:</span>
     <select id="mdbLevelSelect" title="Level 1: 3-byte Begin Session, no REVALUE, no EXPANSION. Level 2: 11-byte Begin Session, adds REVALUE and EXPANSION REQUEST ID / Peripheral ID. Level 3: adds EXPANSION ENABLE OPTIONS and extra Peripheral ID bytes (all declared unsupported). Affects the feature level this device reports in Reader Config Data too.">
@@ -1288,6 +1291,7 @@
       return;
     }
     if (data.sessionBeginMode) document.getElementById('sessionModeSelect').value = data.sessionBeginMode;
+    if (typeof data.autoBeginCooldownPolls === 'number') document.getElementById('cooldownInput').value = String(data.autoBeginCooldownPolls);
     if (data.vmcCancelMode) document.getElementById('cancelModeSelect').value = data.vmcCancelMode;
     if (typeof data.showPollTraffic === 'boolean') document.getElementById('pollVisibilityCheck').checked = data.showPollTraffic;
     if (typeof data.showUnhandledCmd === 'boolean') document.getElementById('unhandledVisibilityCheck').checked = data.showUnhandledCmd;
@@ -1535,6 +1539,20 @@
     const mode = e.target.value; // 'auto' | 'manual'
     sendCommand('setSessionMode:' + mode, 'Set session begin mode: ' + mode);
   };
+  // Auto-begin cooldown (7.25.0). Sent on Enter or blur, never per keystroke.
+  const cooldownInput = document.getElementById('cooldownInput');
+  let lastSentCooldown = null;
+  const sendCooldown = () => {
+    let n = parseInt(cooldownInput.value, 10);
+    if (isNaN(n)) return;
+    n = Math.max(0, Math.min(50, n));
+    cooldownInput.value = String(n);
+    if (n === lastSentCooldown) return;
+    lastSentCooldown = n;
+    sendCommand('setAutoBeginCooldown:' + n, 'Set auto-begin cooldown: ' + n + ' polls');
+  };
+  cooldownInput.addEventListener('change', sendCooldown);
+  cooldownInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendCooldown(); } });
   document.getElementById('mdbLevelSelect').onchange = (e) => {
     const level = e.target.value; // '1' | '2' | '3'
     sendCommand('setMdbLevel:' + level, 'Set MDB level: ' + level);
