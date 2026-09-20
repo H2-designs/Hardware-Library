@@ -476,6 +476,13 @@
     <button id="plSendBtn" title="sendPulse:width,period,count">Send Pulse</button>
     <span class="divider"></span>
     <button id="plReadyBtn" title="checkMachineReady - digital-in ready feedback check">Check Ready</button>
+    <span class="divider"></span>
+    <label class="tswitch" title="Ready-feedback gate (hardware-lib 7.26.0+, persisted on the device). ON = setReadyFeedback:yes,value,channel - digital_in(channel) must equal value before every pulse train. OFF = setReadyFeedback:off - pulses always allowed. Synced from SETTINGS_JSON.">
+      <input type="checkbox" id="readyFbToggle"><span class="slider"></span><span class="tlabel">Ready FB</span>
+    </label>
+    <span class="label">val/ch:</span>
+    <input id="rfValue" class="hin" value="1" title="digital-in value that means READY (sent with the toggle ON)">
+    <input id="rfChannel" class="hin" value="0" title="digital-in channel to read (sent with the toggle ON)">
     </span>
     <label class="tswitch" title="Hardware bridge toggle. ON = attachHardware (all hardware logs + commands wired to this dashboard). OFF = detachHardware (fully unwired; ping/version still answer; re-attach any time - an app restart also auto-attaches). Needs mqtt-lib 2.5.0+ / hardware-lib 7.19.0+ on the device.">
       <input type="checkbox" id="hwToggle"><span class="slider"></span><span class="tlabel">HW</span>
@@ -1292,6 +1299,9 @@
     }
     if (data.sessionBeginMode) document.getElementById('sessionModeSelect').value = data.sessionBeginMode;
     if (typeof data.autoBeginCooldownPolls === 'number') document.getElementById('cooldownInput').value = String(data.autoBeginCooldownPolls);
+    if (typeof data.readyFeedbackEnabled === 'boolean') document.getElementById('readyFbToggle').checked = data.readyFeedbackEnabled;
+    if (typeof data.readyFeedbackValue === 'number') document.getElementById('rfValue').value = String(data.readyFeedbackValue);
+    if (typeof data.readyFeedbackChannel === 'number') document.getElementById('rfChannel').value = String(data.readyFeedbackChannel);
     if (data.vmcCancelMode) document.getElementById('cancelModeSelect').value = data.vmcCancelMode;
     if (typeof data.showPollTraffic === 'boolean') document.getElementById('pollVisibilityCheck').checked = data.showPollTraffic;
     if (typeof data.showUnhandledCmd === 'boolean') document.getElementById('unhandledVisibilityCheck').checked = data.showUnhandledCmd;
@@ -1613,6 +1623,14 @@
     sendCommand('sendPulse:' + w + ',' + p + ',' + c, 'Send pulse ' + w + '/' + p + ' x' + c);
   };
   document.getElementById('plReadyBtn').onclick = () => sendCommand('checkMachineReady', 'Check machine ready');
+  document.getElementById('readyFbToggle').onchange = (e) => {
+    if (!e.target.checked) { sendCommand('setReadyFeedback:off', 'Ready feedback OFF (pulses always allowed)'); return; }
+    const v = parseInt(document.getElementById('rfValue').value, 10);
+    const ch = parseInt(document.getElementById('rfChannel').value, 10);
+    if (isNaN(v)) { addLine('-- ready feedback value must be a number --'); e.target.checked = false; return; }
+    const chOk = isNaN(ch) ? 0 : ch;
+    sendCommand('setReadyFeedback:yes,' + v + ',' + chOk, 'Ready feedback ON (digital_in(' + chOk + ') must equal ' + v + ')');
+  };
 
   // ---------------- TOPIC EXPLORER: every topic on the broker + raw passthrough publish ----------------
   const topicMap = new Map();            // topic -> { n, last }
