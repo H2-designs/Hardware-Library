@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.23.0
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.23.1
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
-   - `hardware-lib-7.23.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-7.23.1.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.6.0.aar')
-   implementation files('libs/hardware-lib-7.23.0.aar')
+   implementation files('libs/hardware-lib-7.23.1.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.23.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.23.1 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -44,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.23.0` |
+| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.23.1` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
@@ -78,3 +78,12 @@ these AARs are deployed.
   `HardwareLib.init(context)` (previously they threw and showed as "unknown command"); the
   device warns once that such settings are in-memory only. CALL `HardwareLib.init(context)`
   AT APP START in every mode (MDB and RS232) so the switches persist across restarts.
+
+## 7.23.1 - vend decision visibility (field case D-0117, 2026-09-20)
+
+`approveVend()` / `cancelVend()` now report what they did on the log stream:
+`[app] approveVend armed - VEND APPROVED goes out on the next POLL` or
+`[app] approveVend IGNORED - no VEND REQUEST pending (state=...)`. If your gateway approves but
+the machine never gets VEND APPROVED, this line tells you whether the engine ever saw the call.
+ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
+gateway callback threads, read on the bus thread).
