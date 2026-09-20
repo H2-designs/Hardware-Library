@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.23.1
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.24.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
-   - `hardware-lib-7.23.1.aar` (replace whatever version you bundle now)
+   - `hardware-lib-7.24.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.6.0.aar')
-   implementation files('libs/hardware-lib-7.23.1.aar')
+   implementation files('libs/hardware-lib-7.24.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.23.1 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.24.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -44,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.23.1` |
+| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.24.0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
@@ -87,3 +87,12 @@ these AARs are deployed.
 the machine never gets VEND APPROVED, this line tells you whether the engine ever saw the call.
 ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
 gateway callback threads, read on the bus thread).
+
+## 7.24.0 - blocked VendListener callbacks no longer freeze the pipeline
+
+Vend callbacks now run on their own threads. Previously a blocking `onVendRequest` (waiting for
+the gateway result inside the callback) froze every log line, exchange event and later callback -
+including `onVendCancelled`, so the app never learned the machine had given up. Now cancel /
+success / failure are delivered even while `onVendRequest` is stuck, and a callback running
+longer than 3 s produces `[mdb] WARNING: a VendListener callback has been running for 3000 ms`.
+Still: RETURN IMMEDIATELY from every callback and do gateway work on your own coroutine.
