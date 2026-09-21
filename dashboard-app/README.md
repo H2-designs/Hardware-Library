@@ -1,6 +1,6 @@
 # Hardware Dashboard (desktop app)
 
-The `dashboard/log-viewer.html` dashboard packaged as a Windows desktop app. One reason it
+The `dashboard-app/dashboard.html` (Hardware Dashboard desktop app) dashboard packaged as a Windows desktop app. One reason it
 exists: **a browser tab can only speak MQTT over websockets**, and the Rabbah mosquitto broker
 only exposes plain TCP `1883`. Inside Electron the page uses Node's `mqtt` package over
 `mqtt://` TCP — the exact same path the CM30 device uses. No broker changes, no websockets.
