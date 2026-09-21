@@ -448,6 +448,10 @@
       <option value="vendDenied">Vend Denied</option>
     </select>
     <span class="divider"></span>
+    <label class="tswitch" title="Direct vend (hardware-lib 7.28.0+, persisted). ON = setDirectVend:on - a VEND REQUEST is accepted in ANY state (INACTIVE / DISABLED / ENABLED), for machines that skip the setup / READER ENABLE / SESSION BEGIN handshake and send the request straight away. The engine ACKs, fires onVendRequest, and approveVend / cancelVend work as usual. OFF (default) = spec behavior, VEND REQUEST only inside a session.">
+      <input type="checkbox" id="directVendToggle"><span class="slider"></span><span class="tlabel">Direct Vend</span>
+    </label>
+    <span class="divider"></span>
     <button id="configBtn">Config</button>
     </span>
 
@@ -1305,6 +1309,7 @@
     if (typeof data.readyFeedbackChannel === 'number') document.getElementById('rfChannel').value = String(data.readyFeedbackChannel);
     if (typeof data.pulseMode === 'string') document.getElementById('plModeLabel').textContent = 'mode: ' + (data.pulseMode === 'high' ? 'HIGH (idle LOW)' : data.pulseMode === 'low' ? 'LOW (idle HIGH)' : 'unset');
     if (data.vmcCancelMode) document.getElementById('cancelModeSelect').value = data.vmcCancelMode;
+    if (typeof data.directVend === 'boolean') document.getElementById('directVendToggle').checked = data.directVend;
     if (typeof data.showPollTraffic === 'boolean') document.getElementById('pollVisibilityCheck').checked = data.showPollTraffic;
     if (typeof data.showUnhandledCmd === 'boolean') document.getElementById('unhandledVisibilityCheck').checked = data.showUnhandledCmd;
     // Checked = HIDE other peripherals, so it mirrors the inverse of the device flag.
@@ -1762,6 +1767,9 @@
     sendCommand('cancelVend:' + mode, 'Cancel Vend (' + mode + ')');
   };
 
+  document.getElementById('directVendToggle').onchange = (e) => sendCommand(
+    e.target.checked ? 'setDirectVend:on' : 'setDirectVend:off',
+    e.target.checked ? 'Direct vend ON (VEND REQUEST accepted in any state)' : 'Direct vend OFF (session required)');
   document.getElementById('cancelModeSelect').onchange = (e) => {
     const mode = e.target.value; // 'sessionCancel' | 'vendDenied'
     sendCommand('setCancelMode:' + mode, 'Set VMC-cancel mode: ' + mode);

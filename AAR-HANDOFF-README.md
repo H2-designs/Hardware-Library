@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.27.0
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.28.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
-   - `hardware-lib-7.27.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-7.28.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.6.0.aar')
-   implementation files('libs/hardware-lib-7.27.0.aar')
+   implementation files('libs/hardware-lib-7.28.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.27.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.28.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -44,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.27.0` |
+| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.28.0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
@@ -87,6 +87,23 @@ these AARs are deployed.
 the machine never gets VEND APPROVED, this line tells you whether the engine ever saw the call.
 ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
 gateway callback threads, read on the bus thread).
+
+## 7.28.0 - direct vend: accept VEND REQUEST without the handshake
+
+Some VMCs never run the setup / READER ENABLE / SESSION BEGIN sequence and send `13 00` (VEND REQUEST)
+straight away; per spec the engine ignored it outside a session. New persisted setting **direct vend**
+(default OFF): when ON, a VEND REQUEST is accepted in INACTIVE, DISABLED and ENABLED state - the engine
+ACKs, captures price/item, jumps to the session state, logs
+`[mdb] VEND REQUEST accepted directly in <STATE> ...` and fires `onVendRequest`. `approveVend()` /
+`cancelVend()` and the rest of the vend flow (VEND SUCCESS/FAILURE, SESSION COMPLETE, END SESSION) work
+exactly as usual.
+
+- Remote: `setDirectVend:on|off`. Dashboard: **Direct Vend** toggle next to the cancel-mode selector.
+- Kotlin: `HardwareLib.setDirectVend(Boolean)` / `HardwareLib.isDirectVend`. SETTINGS_JSON: `directVend`.
+- Leave it OFF on spec-compliant machines: with it ON, a stray VEND REQUEST during setup is treated as a
+  real sale request.
+
+Demo/test APK: build 99.
 
 ## 7.27.0 - pulse polarity persisted
 
@@ -137,7 +154,7 @@ Fixes (both in the engine, no app code needed):
    as outside a session plus the session is cancelled per the configured cancel mode (and
    `onVendCancelled` fires if a VEND REQUEST was pending).
 
-Test APK for this scenario: `MDB-Slave-2-v2.13.50-build98-debug.apk` (demo app on 7.27.0 / 2.6.0).
+Test APK for this scenario: `MDB-Slave-2-v2.13.51-build99-debug.apk` (demo app on 7.28.0 / 2.6.0).
 
 ## 7.24.0 - blocked VendListener callbacks no longer freeze the pipeline
 

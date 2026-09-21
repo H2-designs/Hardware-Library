@@ -131,14 +131,14 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;7.27.0 / mqtt-lib&nbsp;2.6.0.
+    hardware-lib&nbsp;7.28.0 / mqtt-lib&nbsp;2.6.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="split700">
     <h2><span class="eyebrow">NEW &mdash; the 7.x split</span>hardware-lib: the MDB engine, MQTT-free</h2>
-    <p><strong>mdb-lib is now <code>hardware-lib-7.27.0</code></strong> &mdash; renamed, and with the
+    <p><strong>mdb-lib is now <code>hardware-lib-7.28.0</code></strong> &mdash; renamed, and with the
     entire MQTT layer removed from inside it. The engine is pure hardware/protocol: everything it
     produces exits through listeners, everything it accepts enters through plain functions.
     The Kotlin package stays <code>com.rabbah.mdb</code> and a deprecated
@@ -311,7 +311,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.6.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-7.27.0.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-7.28.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -561,6 +561,16 @@ HardwareLib.logListener = { line, showOnScreen -&gt;
     <code class="cmd">beginSession()</code> starts one. Switching mid-session cancels the live
     session so the new mode applies immediately; switching while merely enabled arms/disarms on
     the spot. <em>Dashboard: <code class="cmd">setSessionMode:auto|manual</code>.</em></p>
+
+    <h3><code>HardwareLib.setDirectVend(enabled: Boolean)</code> · <code>HardwareLib.isDirectVend</code> <em>(7.28.0)</em></h3>
+    <p>Default <code class="cmd">false</code>: a VEND REQUEST is only accepted inside a session, after READER ENABLE and
+    SESSION BEGIN, as the spec requires. <code class="cmd">true</code>: a VEND REQUEST (<code class="cmd">13 00</code>)
+    arriving in INACTIVE, DISABLED or ENABLED state is accepted too - the engine ACKs, captures price and item,
+    jumps straight to the session state, logs <code class="cmd">[mdb] VEND REQUEST accepted directly in &lt;STATE&gt;</code>
+    and fires <code class="cmd">onVendRequest</code>; <code class="cmd">approveVend()</code> / <code class="cmd">cancelVend()</code>
+    and the rest of the vend flow are unchanged. For machines that skip the handshake and send the request immediately.
+    Persisted. <em>Dashboard: the <strong>Direct Vend</strong> toggle, or <code class="cmd">setDirectVend:on|off</code>;
+    reported as <code class="cmd">directVend</code> in SETTINGS_JSON.</em></p>
 
     <h3><code>HardwareLib.setAutoBeginCooldown(polls: Int)</code> · <code>HardwareLib.autoBeginCooldown</code> <em>(7.25.0)</em></h3>
     <p>Auto mode only. How many idle POLLs the engine waits after END SESSION before it re-arms
@@ -958,6 +968,7 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
         <tr><td><code>setSessionMode:auto</code> / <code>:manual</code></td><td>setAutoSession(true/false)</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>initPulse:true</code> / <code>:false</code> <em>(persisted 7.27.0)</em></td><td>PulseLib.initPulse(high) - HIGH pulses idle LOW / LOW pulses idle HIGH; remembered as <code>pulseMode</code> and re-applied by HardwareLib.init()</td><td>[pulse] mode=... + SETTINGS_JSON. Dashboard: Init High / Init Low + mode label</td></tr>
         <tr><td><code>setReadyFeedback:[yes,]value[,channel]</code> / <code>:on</code> / <code>:off</code> <em>(persisted 7.26.0)</em></td><td>PulseLib.setReadyFeedback(value, channel) / enableReadyFeedback() / setReadyFeedback(null)</td><td>[pulse] line + SETTINGS_JSON (readyFeedbackEnabled/Value/Channel). Dashboard: Ready FB toggle</td></tr>
+        <tr><td><code>setDirectVend:on</code> / <code>:off</code> <em>(7.28.0)</em></td><td>setDirectVend(true/false) - accept a VEND REQUEST in ANY state (INACTIVE/DISABLED/ENABLED) for VMCs that skip the handshake; default off</td><td>[remote] direct vend ON/OFF + SETTINGS_JSON (directVend). Dashboard: Direct Vend toggle</td></tr>
         <tr><td><code>setAutoBeginCooldown:N</code> <em>(7.25.0)</em></td><td>setAutoBeginCooldown(N) - idle POLLs after END SESSION before auto SESSION BEGIN, 0-50, default 3</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>setMdbLevel:1|2|3</code></td><td>setMdbLevel(n)</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>setMqttLogging:on|off</code></td><td>mute/unmute the log stream over MQTT (control plane stays active)</td><td>ack + SETTINGS_JSON</td></tr>
@@ -970,9 +981,9 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
         <tr><td><code>setPeripheralVisibility:on|off</code></td><td>log-debug: show traffic addressed to OTHER peripherals (coin changer, bill validator) - independent of the unhandled toggle</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>getCodebook</code></td><td>answered by mqtt-lib's log layer</td><td>CODEBOOK_JSON snapshot (decode dictionary)</td></tr>
         <tr><td><code>ping</code></td><td>answered by mqtt-lib itself</td><td><code>PONG</code></td></tr>
-        <tr><td><code>version</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — reports the library versions actually bundled in the running app</td><td><code>[remote] mqtt-lib 2.6.0, hardware-lib 7.27.0</code></td></tr>
+        <tr><td><code>version</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — reports the library versions actually bundled in the running app</td><td><code>[remote] mqtt-lib 2.6.0, hardware-lib 7.28.0</code></td></tr>
         <tr><td><code>attachHardware</code> <em>(mqtt-lib 2.3.0)</em></td><td>answered by mqtt-lib itself — wires hardware-lib's remote commands + log stream on demand (the rescue for an app that never called <code>attachRabbahMqtt()</code>; auto-runs on connect by default)</td><td><code>[remote] hardware-lib attached …</code> or the reason it can't (absent / older than 7.16.0)</td></tr>
-        <tr><td><code>detachHardware</code> <em>(mqtt-lib 2.5.0 / hardware-lib 7.27.0)</em></td><td>the true disconnect — removes every listener attach wired (hardware logs stop, hardware commands stop answering; ping/version/attachHardware still work). <code>attachHardware</code> re-wires; an app restart auto-attaches again. The dashboard's HW toggle switch drives this pair; the Logs toggle drives <code>setMqttLogging:on|off</code></td><td><code>[remote] hardware-lib DETACHED …</code></td></tr>
+        <tr><td><code>detachHardware</code> <em>(mqtt-lib 2.5.0 / hardware-lib 7.28.0)</em></td><td>the true disconnect — removes every listener attach wired (hardware logs stop, hardware commands stop answering; ping/version/attachHardware still work). <code>attachHardware</code> re-wires; an app restart auto-attaches again. The dashboard's HW toggle switch drives this pair; the Logs toggle drives <code>setMqttLogging:on|off</code></td><td><code>[remote] hardware-lib DETACHED …</code></td></tr>
         <tr><td><em>anything else</em></td><td>offered to the app's own listeners first</td><td><code>[remote] unknown command: …</code> if nobody consumed it</td></tr>
       </tbody>
     </table></div>
@@ -997,6 +1008,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 7.27.0 · mqtt-lib 2.6.0 · demo app v2.13.50 (build 98). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 7.28.0 · mqtt-lib 2.6.0 · demo app v2.13.51 (build 99). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 
