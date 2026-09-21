@@ -7,7 +7,9 @@ only exposes plain TCP `1883`. Inside Electron the page uses Node's `mqtt` packa
 
 ## Run it
 
-- **Packaged**: unzip `Hardware-Dashboard-win32-x64.zip`, run `Hardware Dashboard.exe`.
+- **Packaged**: download `Hardware-Dashboard-win32-x64-v<version>.zip` from the repo's **Releases** page
+  (https://github.com/H2-designs/Hardware-Library/releases - the exe is ~120 MB, too big for git itself),
+  unzip, run `Hardware Dashboard.exe`. The dashboard.html source in this folder is always the latest.
 - **From source**: `npm install && npm start` in this folder
   (first time: `npm approve-scripts electron && npm rebuild electron`).
 
