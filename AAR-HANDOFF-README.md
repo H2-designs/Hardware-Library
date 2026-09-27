@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.28.0
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 7.29.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
-   - `hardware-lib-7.28.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-7.29.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.6.0.aar')
-   implementation files('libs/hardware-lib-7.28.0.aar')
+   implementation files('libs/hardware-lib-7.29.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (7.28.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (7.29.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -44,7 +44,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.28.0` |
+| `version` | `[remote] mqtt-lib 2.6.0, hardware-lib 7.29.0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 
@@ -87,6 +87,42 @@ these AARs are deployed.
 the machine never gets VEND APPROVED, this line tells you whether the engine ever saw the call.
 ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
 gateway callback threads, read on the bus thread).
+
+## 7.29.0 - onVendAborted: ONE callback for every vend that did not complete
+
+Field case: some machines never send VEND CANCEL or VEND FAILURE - a customer selects an item, walks
+away, and the VMC just ends the session. The app only got `onSessionEnded`, saw no cancel/failure, and
+left the payment UI on screen.
+
+New `VendListener.onVendAborted(reason: HardwareLib.VendAbortReason)`. It fires EXACTLY ONCE for every
+VEND REQUEST that does not end in `onVendSuccess`, whatever the path:
+
+| reason | what happened |
+|---|---|
+| `CANCELLED_BY_VMC` | machine sent VEND CANCEL (13 01) or READER CANCEL (14 02) |
+| `CANCELLED_BY_APP` | your own `cancelVend()` (or the dashboard's, or a mode switch mid-session) |
+| `FAILED` | VEND FAILURE (13 03) after approval - product not dispensed, refund |
+| `SESSION_ENDED` | END SESSION went out while the vend was still open - the machine sent no cancel/failure/success |
+| `RESET` | bus RESET or `HardwareLib.stop()` while the vend was open |
+
+Guarantee: every vend request ends in exactly one of `onVendSuccess` or `onVendAborted`. Reset the
+payment UI in `onVendAborted` and nothing can stay stuck. `onVendCancelled` / `onVendFailure` still
+fire as before (just before the unified one). Money rule for `SESSION_ENDED`: if you had called
+`approveVend()`, treat it like FAILED (refund/void); if not, treat it like a cancel.
+
+```kotlin
+override fun onVendAborted(reason: HardwareLib.VendAbortReason) {
+    scope.launch {
+        paymentGateway.cancelInFlightUiAndVoid()   // dismiss popup / card read, void any hold
+        if (reason == HardwareLib.VendAbortReason.FAILED ||
+            (reason == HardwareLib.VendAbortReason.SESSION_ENDED && approvedThisVend)) paymentGateway.refund()
+        resetUiToIdle()
+    }
+}
+```
+
+The log stream shows `[mdb] vend aborted: <reason> - onVendAborted(...) fires` each time. Demo/test APK: build 100.
+Not yet exposed in react-native-mdb (its bridge mirrors the older four callbacks).
 
 ## 7.28.0 - direct vend: accept VEND REQUEST without the handshake
 
@@ -154,7 +190,7 @@ Fixes (both in the engine, no app code needed):
    as outside a session plus the session is cancelled per the configured cancel mode (and
    `onVendCancelled` fires if a VEND REQUEST was pending).
 
-Test APK for this scenario: `MDB-Slave-2-v2.13.51-build99-debug.apk` (demo app on 7.28.0 / 2.6.0).
+Test APK for this scenario: `MDB-Slave-2-v2.13.52-build100-debug.apk` (demo app on 7.29.0 / 2.6.0).
 
 ## 7.24.0 - blocked VendListener callbacks no longer freeze the pipeline
 
