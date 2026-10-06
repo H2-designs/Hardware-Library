@@ -131,7 +131,7 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.0.0 / mqtt-lib&nbsp;2.6.0.
+    hardware-lib&nbsp;8.1.0 / mqtt-lib&nbsp;2.6.0.
   </p>
 
 
@@ -311,7 +311,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.6.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-8.0.0.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-8.1.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -1001,6 +1001,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.0.0 · mqtt-lib 2.6.0 · demo app v2.14.0 (build 101). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.1.0 · mqtt-lib 2.6.0 · demo app v2.14.0 (build 101). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

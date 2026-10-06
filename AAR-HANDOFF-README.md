@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 8.0.0
+# AAR update — mqtt-lib 2.6.0 + hardware-lib 8.1.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
-   - `hardware-lib-8.0.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.1.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.6.0.aar')
-   implementation files('libs/hardware-lib-8.0.0.aar')
+   implementation files('libs/hardware-lib-8.1.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (8.0.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (8.1.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -87,6 +87,56 @@ these AARs are deployed.
 the machine never gets VEND APPROVED, this line tells you whether the engine ever saw the call.
 ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
 gateway callback threads, read on the bus thread).
+
+## 8.1.0 - RS232 rules fire the VendListener; ready-feedback gate over several inputs (additive, no breaking change)
+
+Nothing in the MDB path changed. Two additions, both off unless you use them:
+
+### RS232: a rule can carry an `event`
+
+Until now an RS232 machine only reached the app through `Rs232Lib.vendRequestListener` (price) and
+the raw exchange listener - PRODUCTION FAIL after a paid sale was just a log line. Now a rule can name
+which `VendListener` callback it fires, so RS232 and MDB share the SAME three callbacks and the same
+guarantee (exactly one onVendSuccess / onVendFailure per onVendRequest):
+
+| `"event"` | fires | notes |
+|---|---|---|
+| `vendRequest` | `onVendRequest(amount, minorUnits, item)` | needs `priceHi`/`priceLo` or `amountStart`/`amountEnd`; price = minor units, amount = price / 100.0, item = -1 |
+| `vendSuccess` | `onVendSuccess(-1)` | ignored (logged) when no vend is open |
+| `vendFailure` | `onVendFailure()`, reason FAILED | refund here |
+| `vendCancel` | `onVendFailure()`, reason CANCELLED_BY_VMC | void the hold here |
+
+A new vendRequest while one is still open closes the first with SESSION_ENDED. The app still answers the
+machine itself with `Rs232Lib.sendHex(...)` / `sendXorFrame(...)` - RS232 has no approve/deny command.
+Rules without `event` behave exactly as before.
+
+```json
+{"setRs232Rules":[
+  {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"","event":"vendSuccess"},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"","event":"vendFailure"},
+  {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"","event":"vendCancel"}
+]}
+```
+
+`getRs232Rules` returns the `event` field too. Log: `[rs232] PRODUCTION_FAIL -> ...` then the usual
+`[mdb] vend failed: FAILED - onVendFailure fires`.
+
+### Pulse: ready feedback on more than one digital input
+
+The CM30 has three digital inputs. The gate can now require ALL of a set of inputs to show their ready
+value before a pulse train goes out:
+
+- remote: `setReadyFeedback:0=1,2=0` (input 0 must read 1 AND input 2 must read 0); the old
+  `setReadyFeedback:[yes,]value[,channel]` and `off` forms still work and mean a one-input gate
+- code: `PulseLib.setReadyFeedbackChannels(mapOf(0 to 1, 2 to 0))`; empty map = gate off;
+  `PulseLib.setReadyFeedback(value, channel)` is now the one-entry case of it
+- `checkMachineReady` / `isMachineReady()` reads every input and logs them all:
+  `[pulse] ready feedback in0 expected=1 actual=1, in2 expected=0 actual=1 ready=false`
+- persisted; `getSettings` adds `readyFeedbackChannels` as `{"0":1,"2":0}` next to the old
+  single-channel keys, so existing dashboards keep working
+
+Not yet run on a real CM30 - compiled and API-checked only. Dashboard Ready FB control is still single-channel.
 
 ## 8.0.0 - VendListener is THREE callbacks: onVendRequest / onVendSuccess / onVendFailure (BREAKING)
 

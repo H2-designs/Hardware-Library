@@ -1,0 +1,537 @@
+<title>New Machine Setup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one centered form card with numbered steps (protocol, feature level for MDB, settings), the stored JSON
+     below. Config buttons open the hardware dashboard's dark panels: MDB COMMAND CONFIG (by level) and RS232 RULE TABLE. */
+  :root {
+    --bg: #EEF0F3; --surface: #FFFFFF; --surface-2: #F6F7F9; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --code-bg: #14171B; --code-fg: #D8DDE4; --code-key: #8AB4F8; --code-str: #9BD6A6; --code-dim: #7C8591;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --surface-2: #22272E; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --warn: #E3B457; --warn-soft: #3A2E12; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --surface-2: #22272E; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --warn: #E3B457; --warn-soft: #3A2E12; --code-bg: #0E1013; color-scheme: dark }
+
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.45; padding-inline: 16px; padding-block: 28px 56px; }
+  .wrap { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  .lead { margin: 0; color: var(--muted); max-width: 64ch; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+  .step { display: grid; grid-template-columns: 56px minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+  .step:last-child, .step:has(+ .step[hidden]) { border-bottom: 0; }
+  .num { display: flex; justify-content: center; padding-top: 22px; font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--muted); }
+  .body { padding: 20px 24px 22px 0; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .body h2 { margin: 0; font-size: 17px; font-weight: 700; }
+  .hint { color: var(--muted); font-size: 13.5px; margin: 0; max-width: 70ch; }
+  .choices { display: flex; flex-wrap: wrap; gap: 10px; }
+  .choice { position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 150px; flex: 1 1 150px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); cursor: pointer; }
+  .choice input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .choice b { font-size: 15px; }
+  .choice small { color: var(--muted); font-size: 12.5px; }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .choice:has(input:focus-visible), .tog:has(input:focus-visible), .seg label:has(input:focus-visible), button:focus-visible, .numin:focus-visible, .sel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .fields { display: flex; flex-direction: column; }
+  .field { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .field:first-child { border-top: 0; }
+  .field.locked { opacity: 0.55; }
+  .ftop { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+  .fname { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .fname b { font-size: 15px; }
+  .key { font-family: var(--mono); font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 4px; }
+  .pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+  .pill.lvl { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+  .fhint { color: var(--muted); font-size: 13px; margin: 0; max-width: 72ch; }
+  .fhint.warn { color: var(--warn); font-weight: 600; }
+  .ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg label { position: relative; display: inline-flex; align-items: center; min-height: 42px; padding: 0 16px; font-weight: 600; font-size: 14px; cursor: pointer; background: var(--surface); }
+  .seg label + label { border-left: 1px solid var(--line); }
+  .seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .seg label:has(input:checked) { background: var(--accent); color: #fff; }
+  .tog { display: inline-flex; align-items: center; gap: 12px; min-height: 42px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .tog:has(input:disabled) { cursor: not-allowed; }
+  .tog input { appearance: none; -webkit-appearance: none; width: 46px; height: 26px; border-radius: 13px; background: var(--line); margin: 0; position: relative; cursor: pointer; transition: background .15s; }
+  .tog input:disabled { cursor: not-allowed; }
+  .tog input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+  .tog input:checked { background: var(--accent); }
+  .tog input:checked::after { transform: translateX(20px); }
+  .numin, .sel { font: inherit; font-size: 14px; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); font-variant-numeric: tabular-nums; }
+  .numin { width: 110px; }
+  .sel { min-width: 110px; }
+  .unit { font-size: 13px; color: var(--muted); }
+  button { font: inherit; font-size: 13.5px; font-weight: 600; min-height: 42px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+  .configline { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding-top: 4px; }
+  .configline p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  /* the dashboard's Config buttons: dark, purple */
+  .dashbtn { background: #1c2129; color: #c789e8; border: 1px solid #4a2a5a; border-radius: 6px; padding: 0 14px; min-height: 36px; font-family: 'Cascadia Code', Consolas, Menlo, monospace; font-size: 13px; font-weight: 600; }
+  .dashbtn:hover { background: #232a33; }
+  .json { background: var(--code-bg); color: var(--code-fg); border-radius: 12px; padding: 18px 20px; font-family: var(--mono); font-size: 13px; line-height: 1.55; overflow-x: auto; margin: 0; }
+  .json .k { color: var(--code-key); } .json .s { color: var(--code-str); } .json .d { color: var(--code-dim); }
+  .jhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+  .jhead h2 { margin: 0; font-size: 17px; }
+  .note { font-size: 13px; color: var(--muted); margin: 0; }
+
+  /* ---- dark overlays: the hardware dashboard's own look, same in both themes */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .panel { background: #12161c; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 10px; width: min(820px, 100%); max-height: 86vh; display: flex; flex-direction: column; font-family: 'Cascadia Code', Consolas, Menlo, monospace; font-size: 13px; color-scheme: dark; }
+  .panel header { padding: 14px 18px; border-bottom: 1px solid #232a33; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .panel h1 { font-family: inherit; font-size: 14px; font-weight: 600; color: #c789e8; letter-spacing: 0.02em; width: 100%; }
+  .panel .desc { color: #9fb3c8; font-size: 12px; flex: 1 1 100%; line-height: 1.5; margin: 0; }
+  .panel .hbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+  .panel button { background: #1c2129; color: #b8c4d1; border: 1px solid #2c3440; border-radius: 6px; padding: 6px 14px; min-height: 0; font: inherit; font-size: 12px; font-weight: 600; }
+  .panel button:hover { background: #232a33; }
+  .pbody { padding: 14px 18px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+  .config-row { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid #1b2028; }
+  .config-row-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+  .config-name { font-weight: 600; font-size: 13px; color: #d7e0ea; cursor: help; }
+  .level-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 999px; background: #173022; color: #6fe89a; border: 1px solid #2a5a3a; }
+  .config-controls-line { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+  .config-controls { display: flex; align-items: center; gap: 10px; }
+  .config-byte-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .config-byte { width: 28px; text-align: center; background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 5px; padding: 5px 0; font-size: 13px; font-family: inherit; text-transform: uppercase; cursor: help; }
+  .config-byte.dirty, .peripheral-text.dirty { border-color: #e8c766; }
+  .config-byte.fixed { background: #0f1318; color: #56657a; cursor: not-allowed; border-style: dashed; }
+  .config-byte.lvl { background: #0f1318; color: #c789e8; border-style: dashed; cursor: not-allowed; }
+  .peripheral-fields { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .peripheral-text { background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px; padding: 5px 6px; font-size: 13px; font-family: inherit; letter-spacing: 0.02em; text-align: center; cursor: help; }
+  .free-hex { text-align: left; width: min(38ch, 100%); }
+  .free-hex-count { font-size: 11px; color: #8ea0b5; white-space: nowrap; }
+  .config-status { font-size: 11px; min-height: 14px; color: #8ea0b5; }
+  .config-status.ok { color: #6fe89a; } .config-status.err { color: #e86f6f; } .config-status.pending { color: #e8c766; }
+  /* RS232 rule table */
+  .rules { border-collapse: collapse; width: 100%; min-width: 940px; font-size: 12.5px; }
+  .rules th { text-align: left; color: #8ea0b5; font-weight: 600; font-size: 11px; letter-spacing: 0.03em; padding: 4px 6px 8px; }
+  .rules td { padding: 4px 6px; border-top: 1px solid #1b2028; }
+  .rules input { background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px; padding: 5px 6px; font: inherit; font-size: 12.5px; width: 100%; box-sizing: border-box; }
+  .rules input.idx { width: 56px; text-align: center; }
+  .rules select { background: #1c2129; color: #c789e8; border: 1px solid #4a2a5a; border-radius: 6px; padding: 5px 6px; font: inherit; font-size: 12px; min-width: 150px; }
+  .rules select:has(option[value=""]:checked) { color: #8ea0b5; border-color: #2c3440; }
+  .rules .hexcol { font-family: inherit; }
+  .rules .empty { color: #56657a; padding: 14px 6px; }
+  @media (max-width: 560px) { .step { grid-template-columns: 40px minmax(0, 1fr); } .body { padding-right: 14px; } }
+  @media (prefers-reduced-motion: reduce) { .tog input, .tog input::after { transition: none; } }
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>New machine</h1>
+    <p class="lead">The order the form asks things in. Pick the protocol first. For MDB, pick the feature level next, then the plain settings; the hex payloads for that level sit behind Config, filled with the basic template. RS232 and Pulse have their own settings and the RS232 rule table sits behind its Config.</p>
+  </div>
+
+  <div class="card">
+    <section class="step" id="step1">
+      <div class="num">1</div>
+      <div class="body">
+        <h2>Protocol</h2>
+        <p class="hint">How this machine talks to the reader. Everything below changes with this choice.</p>
+        <div class="choices" role="radiogroup" aria-label="Protocol">
+          <label class="choice"><input type="radio" name="protocol" id="protoMdb" value="MDB" checked><b>MDB</b><small>Multi-Drop Bus cashless reader. Most vending machines.</small></label>
+          <label class="choice"><input type="radio" name="protocol" id="protoRs232" value="RS232"><b>RS232</b><small>Serial frames answered from a rule table.</small></label>
+          <label class="choice"><input type="radio" name="protocol" id="protoPulse" value="PULSE"><b>PULSE</b><small>Coin-pulse output with an optional ready signal.</small></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="step2">
+      <div class="num">2</div>
+      <div class="body">
+        <h2>Feature level</h2>
+        <p class="hint">What the reader declares to the machine. Ask the machine vendor if unsure. Level 3 is the safe default for new machines.</p>
+        <div class="choices" role="radiogroup" aria-label="Feature level">
+          <label class="choice"><input type="radio" name="level" id="lvl1" value="1"><b>Level 1</b><small>3-byte Begin Session. No revalue, no expansion ID.</small></label>
+          <label class="choice"><input type="radio" name="level" id="lvl2" value="2"><b>Level 2</b><small>10-byte Begin Session. Adds Revalue and Expansion ID (30 bytes).</small></label>
+          <label class="choice"><input type="radio" name="level" id="lvl3" value="3" checked><b>Level 3</b><small>Level 2 plus Expansion Enable Options. Expansion ID is 34 bytes.</small></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="step3">
+      <div class="num" id="step3Num">3</div>
+      <div class="body">
+        <h2 id="step3Title">Settings for Level 3</h2>
+
+        <!-- ================= MDB ================= -->
+        <div class="fields" id="mdbFields">
+          <div class="field" data-levels="1 2 3" id="autoSessionField">
+            <div class="ftop"><div class="fname"><b>Auto session</b><span class="key">auto_session</span></div><span class="pill">all levels</span></div>
+            <p class="fhint">On: the reader opens a session by itself after every END SESSION. Off: the app starts each session.</p>
+            <p class="fhint warn" id="autoSessionLock" hidden>Not available while Always idle is on. The machine sends the vend request itself, so there is no session to open.</p>
+            <div class="ctl"><label class="tog" for="autoSession"><input type="checkbox" id="autoSession"><span id="autoSessionLabel">Off</span></label></div>
+          </div>
+          <div class="field" data-levels="1 2 3" id="cooldownField">
+            <div class="ftop"><div class="fname"><b>Auto-begin cooldown</b><span class="key">auto_begin_cooldown</span></div><span class="pill">auto session only</span></div>
+            <p class="fhint">Idle POLLs the reader waits after END SESSION before it offers SESSION BEGIN again, so the machine can send its READER ENABLE first. 0 = on the very next POLL. Default 3.</p>
+            <div class="ctl"><input class="numin" type="number" id="cooldown" value="3" min="0" max="50" step="1" aria-label="Auto-begin cooldown in idle POLLs"><span class="unit">idle POLLs · 0 to 50</span></div>
+          </div>
+          <div class="field" data-levels="1 2 3">
+            <div class="ftop"><div class="fname"><b>Cancel mode</b><span class="key">vmc_cancel_mode</span></div><span class="pill">all levels</span></div>
+            <p class="fhint">What goes out on the next POLL after a cancelled vend. Vend Denied refuses the item and keeps the session. Session Cancel asks the machine to close the session.</p>
+            <div class="ctl"><div class="seg" role="radiogroup" aria-label="Cancel mode"><label><input type="radio" name="cancel" id="cancelDenied" value="vendDenied" checked>Vend Denied</label><label><input type="radio" name="cancel" id="cancelSession" value="sessionCancel">Session Cancel</label></div></div>
+          </div>
+          <div class="field" data-levels="1 2 3">
+            <div class="ftop"><div class="fname"><b>Direct vend</b><span class="key">direct_vend</span></div><span class="pill">all levels</span></div>
+            <p class="fhint">On: a VEND REQUEST is accepted in any state, for machines that skip the session handshake and send the request straight away. Off: only inside a session.</p>
+            <div class="ctl"><label class="tog" for="directVend"><input type="checkbox" id="directVend"><span id="directVendLabel">Off</span></label></div>
+          </div>
+          <div class="field" data-levels="1 2 3">
+            <div class="ftop"><div class="fname"><b>Nearpay UI dismiss</b><span class="key">nearpay_ui_dismiss</span></div><span class="pill">app setting · all levels</span></div>
+            <p class="fhint">On: the app closes the Nearpay payment screen by itself when the vend ends without a sale (machine cancel, failure, session ended). Off: the screen stays until the customer closes it. Lives in the app, not on the reader.</p>
+            <div class="ctl"><label class="tog" for="nearpayDismiss"><input type="checkbox" id="nearpayDismiss"><span id="nearpayDismissLabel">Off</span></label></div>
+          </div>
+          <div class="field" data-levels="3">
+            <div class="ftop"><div class="fname"><b>Always idle</b><span class="key">always_idle</span></div><span class="pill lvl">Level 3 only</span></div>
+            <p class="fhint">On: the reader tells the machine it can take a VEND REQUEST without a session. Sets bit 5 of the last option byte, so the Expansion ID ends in 20, and turns Auto session off. Off: the byte ends in 00.</p>
+            <div class="ctl"><label class="tog" for="alwaysIdle"><input type="checkbox" id="alwaysIdle"><span id="alwaysIdleLabel">Off · last byte 00</span></label></div>
+          </div>
+          <div class="field" data-levels="1 2 3">
+            <div class="ftop"><div class="fname"><b>Command payloads (hex)</b></div><span class="pill" id="payloadPill"></span></div>
+            <div class="configline"><button type="button" class="dashbtn" id="configBtn">Config</button><p>Opens the MDB command config for this level. Already filled with the basic template, so most machines never need it.</p></div>
+          </div>
+        </div>
+
+        <!-- ================= RS232 ================= -->
+        <div class="fields" id="rs232Fields" hidden>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>Baud rate</b><span class="key">rs232_baud</span></div><span class="pill">port</span></div>
+            <p class="fhint">Must match the machine controller. The device opens the port with these four values.</p>
+            <div class="ctl"><select class="sel" id="baud" aria-label="Baud rate"><option>1200</option><option>2400</option><option>4800</option><option selected>9600</option><option>19200</option><option>38400</option><option>57600</option><option>115200</option></select></div>
+          </div>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>Frame format</b><span class="key">rs232_data_bits · rs232_stop_bits · rs232_parity</span></div><span class="pill">port</span></div>
+            <p class="fhint">Data bits, stop bits and parity. 8-N-1 is the usual setting.</p>
+            <div class="ctl"><select class="sel" id="dataBits" aria-label="Data bits"><option>7</option><option selected>8</option></select><span class="unit">data bits</span><select class="sel" id="stopBits" aria-label="Stop bits"><option selected>1</option><option>2</option></select><span class="unit">stop bits</span><select class="sel" id="parity" aria-label="Parity"><option value="N" selected>N · none</option><option value="E">E · even</option><option value="O">O · odd</option></select></div>
+          </div>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>CRC check</b><span class="key">rs232_crc_check</span></div><span class="pill">framing</span></div>
+            <p class="fhint">On: frames with a bad CRC are discarded and counted. Off: every frame is accepted.</p>
+            <div class="ctl"><label class="tog" for="crc"><input type="checkbox" id="crc" checked><span id="crcLabel">On</span></label></div>
+          </div>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>Frame gap</b><span class="key">rs232_frame_gap_ms</span></div><span class="pill">framing</span></div>
+            <p class="fhint">Silence that ends a frame. The reply goes out this long after the machine's last byte. Default 1000.</p>
+            <div class="ctl"><input class="numin" type="number" id="gap" value="1000" min="1" max="10000" step="1" aria-label="Frame gap in milliseconds"><span class="unit">ms · 1 to 10000</span></div>
+          </div>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>Rule table</b><span class="key">rs232_rules</span></div><span class="pill" id="rulesPill">0 rules</span></div>
+            <div class="configline"><button type="button" class="dashbtn" id="rulesBtn">Config</button><p>Opens the RS232 rule table: what to answer to each frame the machine sends. Starts with the sample table (connect, heartbeat, payment request, production ok/fail, cancel), each payment row already tied to a vend listener event. First matching rule wins, top to bottom.</p></div>
+          </div>
+        </div>
+
+        <!-- ================= PULSE ================= -->
+        <div class="fields" id="pulseFields" hidden>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>Pulse polarity</b><span class="key">pulse_mode</span></div><span class="pill">required</span></div>
+            <p class="fhint">High: pulses go HIGH, the line idles LOW. Low: pulses go LOW, the line idles HIGH. Stored on the device and re-applied at every start; no pulse can be sent until it is set.</p>
+            <div class="ctl"><div class="seg" role="radiogroup" aria-label="Pulse polarity"><label><input type="radio" name="pulseMode" id="pulseHigh" value="high" checked>High · idle low</label><label><input type="radio" name="pulseMode" id="pulseLow" value="low">Low · idle high</label></div></div>
+          </div>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>Pulse timing</b><span class="key">pulse_width_ms · pulse_period_ms</span></div><span class="pill">per pulse</span></div>
+            <p class="fhint">Width is the ON time of one pulse, period the time from one pulse to the next. The number of pulses comes from the sale, not from here.</p>
+            <div class="ctl"><input class="numin" type="number" id="pulseWidth" value="50" min="1" max="5000" aria-label="Pulse width in milliseconds"><span class="unit">width ms</span><input class="numin" type="number" id="pulsePeriod" value="100" min="1" max="10000" aria-label="Pulse period in milliseconds"><span class="unit">period ms</span></div>
+          </div>
+          <div class="field">
+            <div class="ftop"><div class="fname"><b>Ready feedback gate</b><span class="key">ready_feedback_enabled</span></div><span class="pill">optional</span></div>
+            <p class="fhint">On: before every pulse train the device reads a digital input and only pulses if it shows the ready value. Off: pulses are always sent.</p>
+            <div class="ctl"><label class="tog" for="readyFb"><input type="checkbox" id="readyFb"><span id="readyFbLabel">Off</span></label></div>
+          </div>
+          <div class="field" id="readyFbField">
+            <div class="ftop"><div class="fname"><b>Ready signal per channel</b><span class="key">ready_feedback_channels</span></div><span class="pill">gate on only</span></div>
+            <p class="fhint">The CM30 has three digital inputs. For each one choose whether it is read and which value means READY. Every used channel must show its ready value before a pulse train goes out. Sent to the device as <code style="font-family: var(--mono)">setReadyFeedback:0=1,2=0</code> (hardware-lib 8.1.0).</p>
+            <div class="ctl" style="flex-direction: column; align-items: stretch; gap: 8px">
+              <div class="ctl"><span class="unit" style="width: 90px; font-weight: 600; color: var(--fg)">Channel 0</span><div class="seg" role="radiogroup" aria-label="Channel 0 ready value"><label><input type="radio" name="rf0" value="" id="rf0n">not used</label><label><input type="radio" name="rf0" value="0" id="rf0z">ready when 0</label><label><input type="radio" name="rf0" value="1" id="rf0o" checked>ready when 1</label></div></div>
+              <div class="ctl"><span class="unit" style="width: 90px; font-weight: 600; color: var(--fg)">Channel 1</span><div class="seg" role="radiogroup" aria-label="Channel 1 ready value"><label><input type="radio" name="rf1" value="" id="rf1n" checked>not used</label><label><input type="radio" name="rf1" value="0" id="rf1z">ready when 0</label><label><input type="radio" name="rf1" value="1" id="rf1o">ready when 1</label></div></div>
+              <div class="ctl"><span class="unit" style="width: 90px; font-weight: 600; color: var(--fg)">Channel 2</span><div class="seg" role="radiogroup" aria-label="Channel 2 ready value"><label><input type="radio" name="rf2" value="" id="rf2n" checked>not used</label><label><input type="radio" name="rf2" value="0" id="rf2z">ready when 0</label><label><input type="radio" name="rf2" value="1" id="rf2o">ready when 1</label></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+    <div class="jhead"><h2>What gets stored</h2><button type="button" id="copyJson">Copy JSON</button></div>
+    <p class="note">Same keys the frontend uses today for MDB; RS232 and Pulse keys follow the same style. Settings hidden by the protocol or level are left out.</p>
+    <pre class="json" id="json"></pre>
+  </div>
+</div>
+
+<!-- ================= MDB COMMAND CONFIG ================= -->
+<div class="overlay" id="configOverlay" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="configTitle">
+    <header>
+      <h1 id="configTitle">MDB COMMAND CONFIG</h1>
+      <p class="desc">Edit the raw hex payload sent for each response — length is fixed per command, except Begin Session where the byte count is editable too (1–35 bytes). Only the commands that exist at <span id="configLevelName">Level 3</span> are shown.</p>
+      <div class="hbtns"><button type="button" id="configRefreshBtn">Refresh from device</button><button type="button" id="configCloseBtn">Close</button></div>
+    </header>
+    <div class="pbody" id="configBody"></div>
+  </div>
+</div>
+
+<!-- ================= RS232 RULE TABLE ================= -->
+<div class="overlay" id="rulesOverlay" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <header>
+      <h1 id="rulesTitle">RS232 RULE TABLE</h1>
+      <p class="desc">One row per frame the machine can send. rx is the hex pattern to match, tx the hex reply. Price hi/lo are byte positions in the machine's frame that carry the price; amount start/end mark an ASCII amount instead (end −1 = up to the trailing CRC). First matching rule wins, top to bottom. "Event to the app" fires the same vend listener MDB uses: vend request carries the price, then exactly one success or failure per request.</p>
+      <div class="hbtns"><button type="button" id="ruleAddBtn">+ Add rule</button><button type="button" id="rulesLoadBtn">Load from device</button><button type="button" id="rulesResetBtn">Reset to sample</button><button type="button" id="rulesClearBtn">Clear all</button><button type="button" id="rulesCloseBtn">Done</button></div>
+    </header>
+    <div class="pbody" id="rulesBody"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---- MDB config items (hardware-lib 8.0.0 defaults; template keeps FF 0B)
+  const ITEMS = [
+    { name: 'READER_CONFIG_DATA', key: 'reader_config_data', label: 'Reader Config Data', desc: 'SETUP response (response ID 0x01)', levels: [1, 2, 3],
+      template: (lv) => '01 0' + lv + ' 19 78 01 02 FF 0B',
+      bytes: [
+        { fixed: true, title: 'Response ID — fixed at 0x01 (READER CONFIG DATA). Required by the MDB spec.' },
+        { level: true, title: 'Feature Level — follows step 2.' },
+        { title: 'Country/Currency Code, high byte' }, { title: 'Country/Currency Code, low byte' },
+        { title: 'Scale Factor — multiplier applied to displayed prices' }, { title: 'Decimal Places — digits after the decimal point once scaled' },
+        { title: 'Application Maximum Response Time (seconds) — how long the VMC will wait for our replies' },
+        { title: 'Miscellaneous Options bitmap' } ] },
+    { name: 'READER_CONFIG_INFO', key: 'reader_config_info', label: 'Reader Config Info (Peripheral ID) — Level 2', desc: 'EXPANSION response (response ID 0x09)', levels: [2], simple: true,
+      template: () => '09 43 41 53 30 30 30 30 30 30 30 30 30 30 30 31 30 30 30 30 30 30 30 30 30 30 30 31 00 01' },
+    { name: 'READER_CONFIG_INFO_L3', key: 'reader_config_info_l3', label: 'Reader Config Info (Peripheral ID) — Level 3', desc: 'EXPANSION response (response ID 0x09), plus 4 optional-feature-bits bytes only Level 3 has', levels: [3], simple: true,
+      template: () => '09 43 41 53 30 30 30 30 30 30 30 30 30 30 30 31 30 30 30 30 30 30 30 30 30 30 30 31 00 01 00 00 00 00',
+      extraTitles: [
+        'Optional feature bits Z31 (bits 31-24) — reserved, left at 0.',
+        'Optional feature bits Z32 (bits 23-16) — reserved, left at 0.',
+        'Optional feature bits Z33 (bits 15-8) — bit 0: Coupon. Bit 1: Ask Begin Session. Bit 2: Enhanced Item Number. Left at 0.',
+        'Optional feature bits Z34 (bits 7-0, sent LAST) — bit 5: Always Idle (hex 20) follows the Always idle switch in step 3. Bit 3: Negative Vend. Bit 6: Remote Vend. Bit 7: Basket/Partial Refund.' ] },
+    { name: 'SESSION_BEGIN', key: 'begin_session_bytes', label: 'Begin Session (Level 1)', desc: 'Session starts (response ID 0x03). LENGTH IS EDITABLE (1–35 bytes). Standard Level 1 form: 03 + Funds Available high/low (FF FF = unknown).', levels: [1], variableLength: true, badge: true,
+      template: () => '03 FF FF' },
+    { name: 'SESSION_BEGIN_L2', key: 'begin_session_bytes', label: 'Begin Session (Level 2/3)', desc: 'Session starts (response ID 0x03). LENGTH IS EDITABLE (1–35 bytes): some Level 2 machines only accept the 3-byte form (03 FF FF). Standard form: 03 + Funds hi/lo + 4-byte Payment Media ID + Payment Type + 2-byte Payment Data.', levels: [2, 3], variableLength: true, badge: true,
+      template: () => '03 FF FF 00 00 00 01 00 00 00' },
+    { name: 'REVALUE_LIMIT', key: 'revalue_limit', label: 'Revalue Limit', desc: 'Reply to REVALUE LIMIT REQUEST (response ID 0x0F)', levels: [2, 3],
+      template: () => '0F FF FF',
+      bytes: [ { fixed: true, title: 'Response ID — fixed at 0x0F (REVALUE LIMIT AMOUNT).' }, { title: 'Revalue Limit, high byte' }, { title: 'Revalue Limit, low byte' } ] },
+  ];
+  const values = {};          // MDB payload name -> current hex
+  const rows = {};            // MDB panel rows
+  // the sample rule table from the rs232-sample app: a typical "A0" machine protocol
+  const DEFAULT_RULES = () => [
+    { name: 'CONNECT', rx: 'A0 04 00 03 43 4F 4E E5', tx: 'A1 05 00 02 4F 4B A2' },
+    { name: 'HEARTBEAT', rx: 'A0 06 00 02 48 42 ??', tx: 'A1 06 00 02 4F 4B A1' },
+    { name: 'PAYMENT_REQUEST', rx: 'A0 01 *', tx: '', amountStart: 4, amountEnd: -1, event: 'vendRequest' },
+    { name: 'PAYMENT_TYPED', rx: 'A0 06 *', tx: '', amountStart: 5, amountEnd: -1, event: 'vendRequest' },
+    { name: 'PRODUCTION_OK', rx: 'A0 03 00 07 53 55 43 43 45 53 53 E7', tx: '', event: 'vendSuccess' },
+    { name: 'PRODUCTION_FAIL', rx: 'A0 03 00 06 46 41 49 4C 45 44 A6', tx: '', event: 'vendFailure' },
+    { name: 'CANCEL', rx: 'A0 08 00 06 43 41 4E 43 45 4C A8', tx: '', event: 'vendCancel' },
+  ];
+  const EVENT_OPTIONS = [['', 'none · report only'], ['vendRequest', 'vend request · onVendRequest(price)'], ['vendSuccess', 'vend success · onVendSuccess'], ['vendFailure', 'vend failure · onVendFailure FAILED'], ['vendCancel', 'vend cancel · onVendFailure CANCELLED_BY_VMC']];
+  let rules = DEFAULT_RULES();   // RS232 rules {name, rx, tx, priceHi, priceLo, amountStart, amountEnd}
+
+  const level = () => document.querySelector('input[name="level"]:checked').value;
+  const protocol = () => document.querySelector('input[name="protocol"]:checked').value;
+  const hexBytes = (v) => v.trim() ? v.trim().split(/\s+/) : [];
+  const asciiOf = (bytes) => bytes.map(h => String.fromCharCode(parseInt(h, 16))).join('').replace(/\s+$/, '');
+  const hexOfAscii = (txt, len) => txt.padEnd(len, ' ').slice(0, len).split('').map(c => c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+  const clamp = (id, lo, hi, def) => Math.max(lo, Math.min(hi, parseInt($(id).value || String(def), 10)));
+
+  function loadTemplates() { const lv = +level(); for (const it of ITEMS) values[it.name] = it.template(lv); }
+  function alwaysIdleToByte() { const b = hexBytes(values.READER_CONFIG_INFO_L3); if (b.length === 34) { b[33] = $('alwaysIdle').checked ? '20' : '00'; values.READER_CONFIG_INFO_L3 = b.join(' '); } }
+  function byteToAlwaysIdle() { const b = hexBytes(values.READER_CONFIG_INFO_L3); if (b.length === 34 && /^[0-9A-F]{2}$/i.test(b[33])) { $('alwaysIdle').checked = (parseInt(b[33], 16) & 0x20) !== 0; applyAlwaysIdleLock(); } }
+
+  // Always idle on  ->  Auto session forced off and locked
+  function applyAlwaysIdleLock() {
+    const lock = $('alwaysIdle').checked && level() === '3';
+    if (lock) $('autoSession').checked = false;
+    $('autoSession').disabled = lock;
+    $('autoSessionField').classList.toggle('locked', lock);
+    $('autoSessionLock').hidden = !lock;
+  }
+
+  // ---- MDB COMMAND CONFIG panel
+  function buildConfigPanel() {
+    const body = $('configBody'); body.innerHTML = '';
+    const lv = +level();
+    $('configLevelName').textContent = 'Level ' + lv;
+    for (const it of ITEMS) {
+      if (!it.levels.includes(lv)) continue;
+      const row = document.createElement('div'); row.className = 'config-row';
+      const head = document.createElement('div'); head.className = 'config-row-head';
+      const name = document.createElement('span'); name.className = 'config-name'; name.textContent = it.label; name.title = it.desc; head.appendChild(name);
+      if (it.badge) { const b = document.createElement('span'); b.className = 'level-badge'; b.textContent = 'ACTIVE — sent by device'; head.appendChild(b); }
+      row.appendChild(head);
+      const line = document.createElement('div'); line.className = 'config-controls-line';
+      const status = document.createElement('div'); status.className = 'config-status'; status.textContent = 'default value — not yet confirmed from device';
+      const bytes = hexBytes(values[it.name]);
+      let read;
+
+      if (it.variableLength) {
+        const wrap = document.createElement('div'); wrap.className = 'peripheral-fields';
+        const input = document.createElement('input'); input.className = 'peripheral-text free-hex'; input.value = values[it.name]; input.spellcheck = false; input.title = it.desc; input.setAttribute('aria-label', it.label);
+        const count = document.createElement('span'); count.className = 'free-hex-count';
+        const update = () => { const clean = input.value.replace(/[^0-9A-F]/g, ''); const ok = clean.length % 2 === 0 && clean.length >= 2 && clean.length <= 70; count.textContent = clean.length % 2 === 0 ? (clean.length / 2) + ' byte' + (clean.length === 2 ? '' : 's') : 'incomplete byte'; count.style.color = ok ? '' : '#e86f6f'; return ok; };
+        input.oninput = () => { input.value = input.value.toUpperCase().replace(/[^0-9A-F ]/g, ''); input.classList.add('dirty'); update(); };
+        update(); wrap.appendChild(input); wrap.appendChild(count); line.appendChild(wrap);
+        read = () => update() ? input.value.replace(/[^0-9A-F]/g, '').match(/../g).join(' ') : null;
+      } else if (it.simple) {
+        const wrap = document.createElement('div'); wrap.className = 'peripheral-fields';
+        const field = (val, max, title, w, type) => { const i = document.createElement('input'); i.className = 'peripheral-text'; i.maxLength = max; i.value = val; i.title = title; i.setAttribute('aria-label', title); i.style.width = w + 'ch'; if (type) { i.type = type; i.min = 0; i.max = 65535; } i.oninput = () => i.classList.add('dirty'); wrap.appendChild(i); return i; };
+        const manu = field(asciiOf(bytes.slice(1, 4)), 3, 'Manufacturer — ASCII, 3 characters', 5);
+        const serial = field(asciiOf(bytes.slice(4, 16)), 12, 'Serial Number — ASCII, 12 characters', 13);
+        const model = field(asciiOf(bytes.slice(16, 28)), 12, 'Model Number — ASCII, 12 characters', 13);
+        const sw = field(String(parseInt(bytes[28], 16) * 256 + parseInt(bytes[29], 16)), 5, 'Software Version (0–65535), stored as 2 bytes', 7, 'number');
+        const extras = [];
+        if (bytes.length > 30) {
+          const br = document.createElement('div'); br.className = 'config-byte-row';
+          bytes.slice(30).forEach((h, i) => { const b = document.createElement('input'); b.className = 'config-byte'; b.maxLength = 2; b.value = h; b.title = it.extraTitles[i]; b.setAttribute('aria-label', 'Option byte Z3' + (i + 1)); b.oninput = () => { b.value = b.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase().slice(0, 2); b.classList.add('dirty'); }; br.appendChild(b); extras.push(b); });
+          wrap.appendChild(br);
+        }
+        line.appendChild(wrap);
+        read = () => { const swv = Math.max(0, Math.min(65535, parseInt(sw.value || '0', 10))); const out = ['09', ...hexOfAscii(manu.value, 3), ...hexOfAscii(serial.value, 12), ...hexOfAscii(model.value, 12), (swv >> 8).toString(16).toUpperCase().padStart(2, '0'), (swv & 255).toString(16).toUpperCase().padStart(2, '0'), ...extras.map(e => e.value.padStart(2, '0'))]; return extras.every(e => /^[0-9A-F]{2}$/.test(e.value)) ? out.join(' ') : null; };
+      } else {
+        const br = document.createElement('div'); br.className = 'config-byte-row'; const inputs = [];
+        it.bytes.forEach((spec, i) => { const b = document.createElement('input'); b.className = 'config-byte' + (spec.fixed ? ' fixed' : spec.level ? ' lvl' : ''); b.maxLength = 2; b.value = bytes[i] || '00'; b.title = spec.title; b.setAttribute('aria-label', spec.title); if (spec.fixed || spec.level) b.disabled = true; else b.oninput = () => { b.value = b.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase().slice(0, 2); b.classList.add('dirty'); }; br.appendChild(b); inputs.push(b); });
+        line.appendChild(br);
+        read = () => inputs.every(b => /^[0-9A-F]{2}$/.test(b.value)) ? inputs.map(b => b.value).join(' ') : null;
+      }
+
+      const ctl = document.createElement('div'); ctl.className = 'config-controls';
+      const save = document.createElement('button'); save.type = 'button'; save.textContent = 'Save';
+      save.onclick = () => { const v = read(); if (v === null) { status.textContent = 'not saved — every byte needs two hex digits'; status.className = 'config-status err'; return; } values[it.name] = v; if (it.name === 'READER_CONFIG_INFO_L3') byteToAlwaysIdle(); row.querySelectorAll('.dirty').forEach(e => e.classList.remove('dirty')); status.textContent = 'saved in this form — goes to the device as {"setConfig":{"' + it.name + '":"' + v + '"}}'; status.className = 'config-status ok'; render(); };
+      const reset = document.createElement('button'); reset.type = 'button'; reset.textContent = 'Reset';
+      reset.onclick = () => { values[it.name] = it.template(+level()); if (it.name === 'READER_CONFIG_INFO_L3') { $('alwaysIdle').checked = false; applyAlwaysIdleLock(); } buildConfigPanel(); rows[it.name].status.textContent = 'reset to the basic template for Level ' + level(); rows[it.name].status.className = 'config-status pending'; render(); };
+      ctl.appendChild(save); ctl.appendChild(reset); line.appendChild(ctl);
+      row.appendChild(line); row.appendChild(status); body.appendChild(row);
+      rows[it.name] = { row, status };
+    }
+  }
+
+  // ---- RS232 RULE TABLE panel
+  function buildRulesPanel() {
+    const body = $('rulesBody'); body.innerHTML = '';
+    if (!rules.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No rules yet. Press + Add rule, or Load from device to pull the table the device already has.'; body.appendChild(e); return; }
+    const wrap = document.createElement('div'); wrap.style.overflowX = 'auto';
+    const t = document.createElement('table'); t.className = 'rules';
+    t.innerHTML = '<thead><tr><th>#</th><th>Rule name</th><th>Machine sends (rx, hex)</th><th>We reply (tx, hex)</th><th>Price hi</th><th>Price lo</th><th>Amt start</th><th>Amt end</th><th>Event to the app</th><th></th></tr></thead>';
+    const tb = document.createElement('tbody');
+    rules.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      const cell = (val, key, cls, w, type) => { const td = document.createElement('td'); const inp = document.createElement('input'); inp.value = val === undefined || val === null ? '' : val; inp.className = cls || ''; if (w) inp.style.width = w; if (type) inp.type = type; inp.setAttribute('aria-label', key); inp.oninput = () => { r[key] = inp.type === 'number' ? (inp.value === '' ? undefined : parseInt(inp.value, 10)) : (key === 'rx' || key === 'tx' ? inp.value.toUpperCase().replace(/[^0-9A-F ?*]/g, '') : inp.value); if (key === 'rx' || key === 'tx') inp.value = r[key]; render(); }; td.appendChild(inp); return td; };
+      const n = document.createElement('td'); n.textContent = String(i + 1); n.style.color = '#56657a'; tr.appendChild(n);
+      tr.appendChild(cell(r.name, 'name', '', '13ch'));
+      tr.appendChild(cell(r.rx, 'rx', 'hexcol', '22ch'));
+      tr.appendChild(cell(r.tx, 'tx', 'hexcol', '22ch'));
+      tr.appendChild(cell(r.priceHi, 'priceHi', 'idx', null, 'number'));
+      tr.appendChild(cell(r.priceLo, 'priceLo', 'idx', null, 'number'));
+      tr.appendChild(cell(r.amountStart, 'amountStart', 'idx', null, 'number'));
+      tr.appendChild(cell(r.amountEnd, 'amountEnd', 'idx', null, 'number'));
+      const evTd = document.createElement('td'); const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Event to the app');
+      for (const [v, t] of EVENT_OPTIONS) { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((r.event || '') === v) o.selected = true; sel.appendChild(o); }
+      sel.onchange = () => { r.event = sel.value || undefined; render(); }; evTd.appendChild(sel); tr.appendChild(evTd);
+      const act = document.createElement('td'); const rm = document.createElement('button'); rm.type = 'button'; rm.textContent = 'Remove'; rm.onclick = () => { rules.splice(i, 1); buildRulesPanel(); render(); }; act.appendChild(rm); tr.appendChild(act);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); wrap.appendChild(t); body.appendChild(wrap);
+  }
+  const openPanel = (id, build, focusId) => { build(); $(id).hidden = false; $(focusId).focus(); };
+  const closePanel = (id, backId) => { $(id).hidden = true; $(backId).focus(); };
+
+  // ---- the plain form
+  function applyProtocol(reloadTemplates) {
+    const p = protocol(); const lv = level();
+    $('step2').hidden = p !== 'MDB';
+    $('step3Num').textContent = p === 'MDB' ? '3' : '2';
+    $('step3Title').textContent = p === 'MDB' ? 'Settings for Level ' + lv : p === 'RS232' ? 'RS232 settings' : 'Pulse settings';
+    $('mdbFields').hidden = p !== 'MDB'; $('rs232Fields').hidden = p !== 'RS232'; $('pulseFields').hidden = p !== 'PULSE';
+    if (p === 'MDB') {
+      for (const f of document.querySelectorAll('#mdbFields .field')) f.hidden = !f.dataset.levels.split(' ').includes(lv);
+      if (reloadTemplates) { loadTemplates(); $('alwaysIdle').checked = false; }
+      applyAlwaysIdleLock();
+      $('payloadPill').textContent = ITEMS.filter(it => it.levels.includes(+lv)).length + ' payloads at Level ' + lv + ' · basic template';
+      if (!$('configOverlay').hidden) buildConfigPanel();
+    }
+    render();
+  }
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  function build() {
+    const p = protocol(); const o = { protocol: p };
+    if (p === 'MDB') {
+      const lv = +level();
+      o.auto_session = $('autoSession').checked;
+      if (o.auto_session) o.auto_begin_cooldown = clamp('cooldown', 0, 50, 3);
+      o.feature_level = String(lv);
+      o.vmc_cancel_mode = document.querySelector('input[name="cancel"]:checked').value;
+      o.direct_vend = $('directVend').checked;
+      o.nearpay_ui_dismiss = $('nearpayDismiss').checked;
+      if (lv === 3) o.always_idle = $('alwaysIdle').checked;
+      for (const it of ITEMS) if (it.levels.includes(lv)) o[it.key] = values[it.name];
+    } else if (p === 'RS232') {
+      o.rs232_baud = parseInt($('baud').value, 10);
+      o.rs232_data_bits = parseInt($('dataBits').value, 10);
+      o.rs232_stop_bits = parseInt($('stopBits').value, 10);
+      o.rs232_parity = $('parity').value;
+      o.rs232_crc_check = $('crc').checked;
+      o.rs232_frame_gap_ms = clamp('gap', 1, 10000, 1000);
+      o.rs232_rules = rules.map(r => { const x = { name: r.name || '', rx: r.rx || '', tx: r.tx || '' }; for (const k of ['priceHi', 'priceLo', 'amountStart', 'amountEnd']) if (r[k] !== undefined && !Number.isNaN(r[k])) x[k] = r[k]; if (r.event) x.event = r.event; return x; });
+    } else {
+      o.pulse_mode = document.querySelector('input[name="pulseMode"]:checked').value;
+      o.pulse_width_ms = clamp('pulseWidth', 1, 5000, 50);
+      o.pulse_period_ms = clamp('pulsePeriod', 1, 10000, 100);
+      o.ready_feedback_enabled = $('readyFb').checked;
+      if (o.ready_feedback_enabled) {
+        o.ready_feedback_channels = [0, 1, 2].map(ch => { const v = document.querySelector('input[name="rf' + ch + '"]:checked').value; return v === '' ? null : { channel: ch, value: parseInt(v, 10) }; }).filter(Boolean);
+      }
+    }
+    return o;
+  }
+  function fmt(v, indent) {
+    if (Array.isArray(v)) { if (!v.length) return '<span class="d">[]</span>'; return '[\n' + v.map(x => indent + '  ' + fmt(x, indent + '  ')).join(',\n') + '\n' + indent + ']'; }
+    if (v && typeof v === 'object') return '{\n' + Object.entries(v).map(([k, x]) => indent + '  <span class="k">"' + k + '"</span>: ' + fmt(x, indent + '  ')).join(',\n') + '\n' + indent + '}';
+    if (typeof v === 'string') return '<span class="s">"' + esc(v) + '"</span>';
+    return '<span class="d">' + v + '</span>';
+  }
+  function render() {
+    $('autoSessionLabel').textContent = $('autoSession').disabled ? 'Off · locked by Always idle' : $('autoSession').checked ? 'On · sessions start by themselves' : 'Off · the app starts each session';
+    $('cooldownField').hidden = !$('autoSession').checked || protocol() !== 'MDB';
+    $('alwaysIdleLabel').textContent = $('alwaysIdle').checked ? 'On · last byte 20' : 'Off · last byte 00';
+    $('directVendLabel').textContent = $('directVend').checked ? 'On · accept a vend request in any state' : 'Off · only inside a session';
+    $('nearpayDismissLabel').textContent = $('nearpayDismiss').checked ? 'On · close the payment screen when the vend fails' : 'Off · the customer closes it';
+    $('crcLabel').textContent = $('crc').checked ? 'On · bad-CRC frames are discarded' : 'Off · every frame is accepted';
+    $('readyFbLabel').textContent = $('readyFb').checked ? 'On · pulse only when the machine is ready' : 'Off · pulses are always sent';
+    $('readyFbField').hidden = !$('readyFb').checked;
+    $('rulesPill').textContent = rules.length + (rules.length === 1 ? ' rule' : ' rules');
+    $('json').innerHTML = '<span class="k">"machine_settings"</span>: ' + fmt(build(), '  ');
+  }
+
+  document.querySelectorAll('input[name="level"]').forEach(r => r.addEventListener('change', () => applyProtocol(true)));
+  document.querySelectorAll('input[name="protocol"]').forEach(r => r.addEventListener('change', () => applyProtocol(false)));
+  for (const id of ['autoSession', 'directVend', 'nearpayDismiss', 'crc', 'readyFb', 'baud', 'dataBits', 'stopBits', 'parity']) $(id).addEventListener('change', render);
+  for (const id of ['cooldown', 'gap', 'pulseWidth', 'pulsePeriod']) $(id).addEventListener('input', render);
+  document.querySelectorAll('input[name="rf0"], input[name="rf1"], input[name="rf2"]').forEach(r => r.addEventListener('change', render));
+  document.querySelectorAll('input[name="cancel"], input[name="pulseMode"]').forEach(r => r.addEventListener('change', render));
+  $('alwaysIdle').addEventListener('change', () => { alwaysIdleToByte(); applyAlwaysIdleLock(); if (!$('configOverlay').hidden) buildConfigPanel(); render(); });
+
+  $('configBtn').addEventListener('click', () => openPanel('configOverlay', buildConfigPanel, 'configCloseBtn'));
+  $('configCloseBtn').addEventListener('click', () => closePanel('configOverlay', 'configBtn'));
+  $('configRefreshBtn').addEventListener('click', () => { for (const r of Object.values(rows)) { r.status.textContent = 'would send getConfig and fill from CONFIG_JSON — no device in this template'; r.status.className = 'config-status pending'; } });
+  $('rulesBtn').addEventListener('click', () => openPanel('rulesOverlay', buildRulesPanel, 'rulesCloseBtn'));
+  $('rulesCloseBtn').addEventListener('click', () => closePanel('rulesOverlay', 'rulesBtn'));
+  $('ruleAddBtn').addEventListener('click', () => { rules.push({ name: 'rule ' + (rules.length + 1), rx: '', tx: '' }); buildRulesPanel(); render(); const last = $('rulesBody').querySelector('tbody tr:last-child input'); if (last) last.focus(); });
+  $('rulesClearBtn').addEventListener('click', () => { rules = []; buildRulesPanel(); render(); });
+  $('rulesResetBtn').addEventListener('click', () => { rules = DEFAULT_RULES(); buildRulesPanel(); render(); });
+  $('rulesLoadBtn').addEventListener('click', () => { const e = document.createElement('div'); e.className = 'config-status pending'; e.textContent = 'would send getRs232Rules and fill from RS232_RULES_JSON — no device in this template'; $('rulesBody').prepend(e); });
+  for (const id of ['configOverlay', 'rulesOverlay']) $(id).addEventListener('click', (e) => { if (e.target === $(id)) $(id).hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('configOverlay').hidden = true; $('rulesOverlay').hidden = true; } });
+  $('copyJson').addEventListener('click', () => {
+    const text = '"machine_settings": ' + JSON.stringify(build(), null, 2);
+    const done = () => { $('copyJson').textContent = 'Copied'; setTimeout(() => { $('copyJson').textContent = 'Copy JSON'; }, 1500); };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents($('json')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback); else fallback();
+  });
+
+  loadTemplates();
+  applyProtocol(false);
+})();
+</script>
