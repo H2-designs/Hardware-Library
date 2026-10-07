@@ -111,6 +111,7 @@
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
     <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.1.0 / 2.7.0</a>
+    <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
     <a href="#lifecycle">Lifecycle</a>
@@ -203,6 +204,49 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     Dashboard: <strong>link</strong> badge (green / amber / red) + <strong>Link</strong> button. Code:
     <code>MqttLib.statsJson()</code>, <code>MqttLib.connectionLosses</code>, <code>MqttLib.activeClientId</code>.
     A fixed <code>clientId</code> passed in <code>MqttConfig</code> is used exactly as given.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="relnotes">
+    <h2><span class="eyebrow">Release notes</span>Every release and what it changed</h2>
+    <p>Newest first. Each hardware-lib release ships with the mqtt-lib it was tested with; "demo APK" is the
+    MDB-Slave-2 test app build that carried it. One GitHub release is kept at a time:
+    <a href="https://github.com/H2-designs/Hardware-Library/releases">H2-designs/Hardware-Library/releases</a>.</p>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
+      <tbody>
+        <tr><td><strong>hardware-lib 8.1.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 102</td><td>7 Oct 2026</td><td>RS232 rules carry <code>"event"</code> (vendRequest / vendSuccess / vendFailure / vendCancel) and fire the same three-callback VendListener as MDB. Ready-feedback gate over several digital inputs (<code>setReadyFeedbackChannels</code>, <code>setReadyFeedback:0=1,2=0</code>, SETTINGS_JSON <code>readyFeedbackChannels</code>). Direct vend ON reports ENABLED_STATE on the state listener while the bus is INACTIVE/DISABLED (<code>VMC_STATUS.busState</code> = real). mqtt-lib: stable per-process client id (fixes a late Will overwriting a fresh <code>online</code>, field case D-0130), DISCONNECT on stop, reconnect backoff 3-60 s with jitter, connection counters, takeover WARNING, <code>mqttStats</code>, counters in <code>version</code>; dashboard link badge. <a href="#v810">Details</a>.</td><td>None required. Optional: add <code>event</code> to RS232 rules, use the multi-input gate.</td></tr>
+        <tr><td><strong>hardware-lib 8.0.0</strong><br>mqtt-lib 2.6.0<br>demo APK build 101</td><td>27 Sep 2026</td><td><strong>BREAKING.</strong> VendListener is exactly three callbacks: <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure</code>. <code>onVendFailure</code> fires exactly once for every VEND REQUEST that does not reach success: machine cancel (13 01 / 14 02), dispense failure (13 03), session ended with the vend still open (machines that send no cancel at all), app <code>cancelVend()</code>, RESET / stop(). <code>HardwareLib.lastVendFailureReason</code> = CANCELLED_BY_VMC / CANCELLED_BY_APP / FAILED / SESSION_ENDED / RESET. <code>onVendCancelled</code>, <code>onSessionEnded</code> removed. One dashboard only (the Electron app). react-native-mdb: <code>onVendFailure</code> carries <code>{ reason }</code>.</td><td>Delete the removed overrides, move UI reset into <code>onVendFailure</code>.</td></tr>
+        <tr><td>hardware-lib 7.29.0</td><td>Sep 2026</td><td>Never shipped: a unified <code>onVendAborted(reason)</code> callback, withdrawn in favour of the 8.0.0 three-callback shape.</td><td>&mdash;</td></tr>
+        <tr><td>hardware-lib 7.28.0<br>demo APK build 99</td><td>Sep 2026</td><td>Direct vend: persisted setting (<code>setDirectVend:on|off</code>, dashboard toggle, SETTINGS_JSON <code>directVend</code>) that accepts a VEND REQUEST in INACTIVE / DISABLED / ENABLED for machines that skip the handshake; the engine ACKs, captures price and item, jumps to the session state and fires <code>onVendRequest</code>.</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.27.0<br>demo APK build 98<br>pulse-sample 1.5</td><td>Sep 2026</td><td>Pulse polarity persisted: a successful <code>initPulse(true|false)</code> is remembered as <code>pulseMode</code> (high / low / unset) and re-driven by <code>HardwareLib.init(context)</code> at the next start. Dashboard mode label next to Init High / Init Low.</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.26.0<br>demo APK build 97</td><td>Sep 2026</td><td>Ready-feedback gate persisted (<code>setReadyFeedback:[yes,]value[,channel]</code> / <code>:on</code> / <code>:off</code>, SETTINGS_JSON readyFeedbackEnabled/Value/Channel, dashboard Ready FB toggle). Every MDB exchange was logged twice over MQTT; the duplicate dispatch is gone.</td><td>None. Last writer wins between app and dashboard.</td></tr>
+        <tr><td>hardware-lib 7.25.0</td><td>20 Sep 2026</td><td>Field case D-0222 (Sielaff): auto session mode deadlocked after a denied vend with <code>UNHANDLED rx=14 01 15</code> forever. Fix 1: auto-begin cooldown - after END SESSION auto mode waits N idle POLLs (default 3, <code>setAutoBeginCooldown:0-50</code>, SETTINGS_JSON <code>autoBeginCooldownPolls</code>) before re-arming SESSION BEGIN; a READER ENABLE during the cooldown arms immediately. Fix 2: READER ENABLE / DISABLE / CANCEL are answered inside a session.</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.24.0</td><td>Sep 2026</td><td>Vend callbacks run on their own threads: a blocking <code>onVendRequest</code> no longer freezes logs, exchange events or later callbacks; a callback running longer than 3 s logs a WARNING.</td><td>Still return promptly; do gateway work on your own thread.</td></tr>
+        <tr><td>hardware-lib 7.23.1</td><td>20 Sep 2026</td><td>Field case D-0117: <code>approveVend()</code> / <code>cancelVend()</code> report what they did (<code>[app] approveVend armed ...</code> / <code>IGNORED - no VEND REQUEST pending</code>); vend flags made @Volatile.</td><td>Log the Boolean these functions return.</td></tr>
+        <tr><td>hardware-lib 7.23.0<br>mqtt-lib 2.6.0</td><td>Sep 2026</td><td>Nothing turns on by itself: <code>mqttLogsEnabled</code> defaults OFF (dashboard Logs toggle / <code>setMqttLogging:on</code>), <code>MqttConfig.autoAttachHardware</code> defaults OFF (dashboard HW toggle / <code>attachHardware</code>). Settings commands work without <code>HardwareLib.init()</code> (in-memory, with a one-time warning).</td><td>Call <code>HardwareLib.init(context)</code> at app start in every mode so settings persist.</td></tr>
+        <tr><td>hardware-lib 7.22.0</td><td>Sep 2026</td><td><code>Rs232Lib.exchangeListener</code> fires for every coded RS232 event (137-143) with the MDB-style surface: code, eventName, params, message, rxHex, ruleName, txHex, price.</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.19.0<br>mqtt-lib 2.5.0 / 2.5.2 / 2.5.3</td><td>Sep 2026</td><td><code>detachHardware</code> (the true remote disconnect; dashboard HW toggle). R8 keep rules embedded in both AARs (consumerProguardFiles; mqtt-lib also keeps <code>com.rabbah.mdb.**</code>), so minified app builds can no longer strip the library (field case D-0416 "bundled: absent").</td><td>Remove any app-side ProGuard rules for the libraries; not needed.</td></tr>
+        <tr><td>hardware-lib 7.17.0<br>mqtt-lib 2.2.0 - 2.4.0</td><td>Aug - Sep 2026</td><td>RS232 codebook schema 137-143 on the RABBAH_LOG envelope; mqtt-lib 2.4.0 unifies MDB log codes with the exchange codes (110-136, one code space). mqtt-lib 2.2.0: configurable topic suffixes (logs / cmd / status) and retained online/offline presence (birth + Last Will).</td><td>Backend enums keyed 110-136 / 137-143.</td></tr>
+        <tr><td>hardware-lib 7.16.0<br>mqtt-lib 2.3.0</td><td>Aug 2026</td><td><code>HardwareLib.attachLogSink</code> / <code>attachRabbahMqtt()</code> wire the whole library to any transport in one call; mqtt-lib 2.3.0 can auto-attach on first connect and answers <code>version</code> / <code>attachHardware</code> by itself.</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.14.0</td><td>Aug 2026</td><td>react-native-mdb bridge: every native function and callback mirrored as a JS function or event; the Kotlin engine ships no networking.</td><td>RN apps install the package; no bridge code.</td></tr>
+        <tr><td>hardware-lib 7.10.0</td><td>Aug 2026</td><td>RS232 rule table (<code>Rs232Lib</code>): rx patterns with <code>??</code> and trailing <code>*</code>, tx replies, binary or ASCII price extraction, XOR CRC check, framed replies, persisted and hot-reloaded; dashboard <code>rs232*</code> commands and <code>{"setRs232Rules":[...]}</code>.</td><td>RS232 machines: load rules, set <code>vendRequestListener</code>.</td></tr>
+        <tr><td>hardware-lib 7.9.x</td><td>Aug 2026</td><td>Pulse ready-feedback gate (<code>setReadyFeedback</code>, <code>isMachineReady</code>); pulse trains driven edge by edge on an urgent thread after the vendor pulser proved unreliable (7.9.3).</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.7.0</td><td>Aug 2026</td><td>Empty-session suppression: auto-mode BEGIN -> COMPLETE -> END cycles with no customer log nothing (<code>setEmptySessionVisibility:on|off</code>).</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.5.0</td><td>Aug 2026</td><td><code>PulseLib</code>: pulse output over the CM30 digital IO (<code>initPulse</code>, <code>sendPulse</code>, <code>vendorPulse</code>).</td><td>Pulse machines: call <code>initPulse</code> before the first train.</td></tr>
+        <tr><td>hardware-lib 7.2.0 / 7.3.0</td><td>Aug 2026</td><td>Multi-consumer listeners (<code>addExchangeListener</code>, <code>addLogListener</code>, <code>addStateListener</code>, <code>addControlListener</code>) so the bridge never overwrites the app's slot; <code>simulateExchange(hex)</code> self-test.</td><td>Prefer the add/remove forms.</td></tr>
+        <tr><td>hardware-lib 7.1.0<br>mqtt-lib 2.0.0 / 2.1.0</td><td>Aug 2026</td><td>Event-driven MQTT connection listener; VMC_STATUS event-driven (no 3 s heartbeat); every public call returns Boolean. mqtt-lib 2.1.0: passthrough operator channel <code>devices/{code}/passthrough</code> separate from the backend-owned cmd topic.</td><td>None.</td></tr>
+        <tr><td>hardware-lib 7.0.0</td><td>Aug 2026</td><td>The split: mdb-lib renamed hardware-lib with the MQTT layer removed; everything exits through listeners and enters through <code>handleCommand</code>; <code>MdbMqttBridge</code> reproduces the old wire format byte-identically.</td><td><code>typealias MdbLib = HardwareLib</code> keeps old code compiling.</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="callout">
+      <p><strong>Fleet rules that came out of this history:</strong> nothing turns on by itself (logs and auto-attach
+      OFF by default); no app-side ProGuard for the libraries; every VMC deviation becomes a persisted operator
+      setting, never app code; the VendListener stays at exactly three callbacks; one dashboard, one GitHub release;
+      <code>HardwareLib.init(context)</code> at app start in every mode.</p>
+    </div>
   </section>
 
   <!-- ============================================================ -->
