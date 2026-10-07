@@ -25,6 +25,87 @@
 > recovers the bridge — but REPLACE BOTH FILES anyway: the old hardware-lib predates the
 > vend-cancel callback, RS232 codes, detach, and the log-mute fix.
 
+## Android: what changes from 8.0.0 to 8.1.0 / 2.7.0 (nothing mandatory)
+
+Both AARs are additive. An app built on 8.0.0 / 2.6.0 compiles unchanged against 8.1.0 / 2.7.0 and behaves the
+same. The steps below are only for USING the new features. One behaviour change to know about is at the end.
+
+### RS232 machines - get the vend events through the same VendListener as MDB
+
+On 8.0.0 the app only got the price (`Rs232Lib.vendRequestListener`) and had to recognise PRODUCTION OK /
+PRODUCTION FAIL / CANCEL itself from `Rs232Lib.exchangeListener` by rule name - most apps never did, so a
+failed production after a paid sale was just a log line.
+
+1. Put `"event"` on the rules (in `setRs232Rules`, or wherever the app loads them):
+
+```json
+{"setRs232Rules":[
+  {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"","event":"vendSuccess"},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"","event":"vendFailure"},
+  {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"","event":"vendCancel"}
+]}
+```
+
+   `vendRequest` needs a price position (`priceHi`/`priceLo` or `amountStart`/`amountEnd`) or the
+   device rejects the rule.
+
+2. Set `HardwareLib.vendListener` for RS232 machines too - the SAME object the app already has for MDB:
+
+```kotlin
+HardwareLib.vendListener = object : HardwareLib.VendListener {
+    override fun onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {   // itemNumber = -1 on RS232
+        scope.launch {
+            val ok = gateway.authorize(minorUnits)
+            Rs232Lib.sendHex(if (ok) TX_PAYMENT_SUCCESS else TX_PAYMENT_FAILED)   // RS232: answer with bytes
+        }
+    }
+    override fun onVendSuccess(itemNumber: Int) { scope.launch { gateway.capture(); ui.showDispensed() } }
+    override fun onVendFailure() {
+        when (HardwareLib.lastVendFailureReason) {
+            HardwareLib.VendFailureReason.FAILED -> scope.launch { gateway.refund(); ui.resetToIdle() }           // PRODUCTION_FAIL
+            HardwareLib.VendFailureReason.CANCELLED_BY_VMC -> scope.launch { gateway.voidHold(); ui.resetToIdle() } // CANCEL
+            else -> scope.launch { gateway.voidHold(); ui.resetToIdle() }
+        }
+    }
+}
+```
+
+   Same guarantee as MDB: every `onVendRequest` ends in exactly one `onVendSuccess` or `onVendFailure`.
+   The price arrives as minor units (`amount` = minorUnits / 100.0).
+
+3. Keep answering the machine with `Rs232Lib.sendHex(...)` / `sendXorFrame(...)` after the card result -
+   unchanged, RS232 has no approve/deny command.
+
+4. Optional: `Rs232Lib.vendRequestListener` still fires too; once the VendListener is wired it can be removed.
+
+### Pulse machines - ready feedback on more than one input
+
+On 8.0.0: `PulseLib.setReadyFeedback(value, channel)` / `setReadyFeedback:yes,value,channel` - one input.
+Still works. To require several inputs at once:
+
+```kotlin
+PulseLib.setReadyFeedbackChannels(mapOf(0 to 1, 2 to 0))   // digital_in(0) must read 1 AND digital_in(2) must read 0
+PulseLib.setReadyFeedbackChannels(emptyMap())              // gate off
+```
+
+   or over MQTT `setReadyFeedback:0=1,2=0`. If the app reads the gate back from `getSettings`, the new field
+   is `readyFeedbackChannels` (`{"0":1,"2":0}`); the old `readyFeedbackValue` / `readyFeedbackChannel`
+   keys still exist and show the first entry. `PulseLib.isMachineReady()` now checks every listed input.
+
+### MDB - one behaviour change to know about
+
+With direct vend ON (`setDirectVend(true)` / `setDirectVend:on`), the state listener now reports
+`ENABLED_STATE` while the bus is still INACTIVE or DISABLED - this is what lets the app's ready/health
+screen pass on machines that never send READER ENABLE. No code change needed. If any code treated
+INACTIVE/DISABLED as "machine not up yet" in direct-vend mode, it will now see ENABLED instead; the real
+bus state is in the VMC_STATUS heartbeat as `busState` (with `"directVend": true`).
+
+### mqtt-lib 2.7.0 - no code change
+
+Stable client id, backoff and the connection counters are automatic. A fixed `clientId` passed in
+`MqttConfig` is still used exactly as given - never share one id between two live clients.
+
 ## Why no code is needed
 
 mqtt-lib 2.3.0+ CAN auto-attach hardware-lib on the first successful broker
