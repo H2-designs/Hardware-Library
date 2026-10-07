@@ -111,6 +111,12 @@
   #vmcStatus.vmc-vend { background: #1d3a26; color: #6fe89a; animation: pop 0.35s ease-out; }
   #vmcStatus.vmc-stale-overlay { background: #3a2f1a; color: #f0a94e; }
   #vmcStatus.vmc-stale-overlay .dot { animation: pulse 1.1s ease-in-out infinite; }
+  #linkStatus { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; background: #1c2129; color: #56657a; cursor: help; }
+  #linkStatus .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  #linkStatus.link-ok { background: #1d3a26; color: #6fe89a; }
+  #linkStatus.link-warn { background: #3a2f1a; color: #f0a94e; }
+  #linkStatus.link-bad { background: #3a1d1d; color: #e86f6f; }
+  #linkStatus.link-bad .dot { animation: pulse 1.1s ease-in-out infinite; }
 
   @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
@@ -503,6 +509,8 @@
   <div id="subheader">
     <span class="pgroup mode-mdb">
     <span id="vmcStatus" class="vmc-nodata"><span class="dot"></span><span id="vmcStatusText">no VMC data yet</span></span>
+    <span id="linkStatus" title="MQTT link health from the device (mqtt-lib 2.7.0): sessions since app start, connection losses, failed retries. Updated on every reconnect and by the Link button (mqttStats)."><span class="dot"></span><span id="linkStatusText">link: no data</span></span>
+    <button id="linkBtn" title="mqttStats - the device reports its MQTT client id, session count, losses and retries">Link</button>
     <span class="divider"></span>
     <label class="checkbox-label"><input type="checkbox" id="pollVisibilityCheck"> Show POLL/ACK traffic</label>
     <label class="checkbox-label"><input type="checkbox" id="unhandledVisibilityCheck"> Show unhandled commands</label>
@@ -1344,6 +1352,26 @@
     vmcStatusTextEl.textContent = text;
   }
 
+  /** MQTT_STATS:{...} from mqtt-lib 2.7.0 - connection counters the device keeps since app start. */
+  const linkStatusEl = document.getElementById('linkStatus');
+  const linkStatusTextEl = document.getElementById('linkStatusText');
+  function applyLinkStats(json) {
+    let d;
+    try { d = JSON.parse(json); } catch (e) { addLine('-- MQTT_STATS parse error: ' + e.message + ' --'); return; }
+    const losses = d.connectionLosses | 0, failed = d.failedConnectAttempts | 0, sessions = d.sessionsEstablished | 0;
+    const cls = d.takeoverSuspected ? 'link-bad' : (losses + failed) > 0 ? 'link-warn' : 'link-ok';
+    linkStatusEl.className = cls;
+    linkStatusTextEl.textContent = 'link: ' + sessions + (sessions === 1 ? ' session' : ' sessions') +
+      ' · ' + losses + (losses === 1 ? ' loss' : ' losses') + ' · ' + failed + ' failed retries' +
+      (d.takeoverSuspected ? ' · TAKEOVER?' : '') + (d.sessionUptimeSec != null ? ' · up ' + d.sessionUptimeSec + 's' : '');
+    linkStatusEl.title = 'client id ' + (d.clientId || '?') + '\nsessions since app start: ' + sessions +
+      '\nconnection losses: ' + losses + '\nfailed connect attempts: ' + failed +
+      '\nshort sessions in a row: ' + (d.consecutiveShortSessions | 0) + (d.takeoverSuspected ? ' (another client is probably using this id)' : '') +
+      '\nlast loss: ' + (d.lastLossReason || '-') + (d.lastLossAgoSec >= 0 ? ' (' + d.lastLossAgoSec + ' s ago, that session lasted ' + d.lastSessionDurationSec + ' s)' : '') +
+      '\nnext retry delay: ' + d.nextRetryDelayMs + ' ms';
+  }
+  document.getElementById('linkBtn').addEventListener('click', () => sendCommand('mqttStats', 'Link stats'));
+
   function applyVmcStatus(json) {
     let data;
     try {
@@ -1514,6 +1542,10 @@
     if (text.startsWith('VMC_STATUS:')) {
       applyVmcStatus(text.slice('VMC_STATUS:'.length));
       return; // a periodic heartbeat, not a real MDB exchange — kept out of the scrolling log
+    }
+    if (text.startsWith('MQTT_STATS:')) {
+      applyLinkStats(text.slice('MQTT_STATS:'.length));
+      return; // link-health sync, shown in the badge, not in the scrolling log
     }
     if (text.startsWith('CODEBOOK_JSON:')) {
       applyCodebook(fromDevice, text.slice('CODEBOOK_JSON:'.length));

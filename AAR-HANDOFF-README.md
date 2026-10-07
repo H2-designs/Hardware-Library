@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.6.0 + hardware-lib 8.1.0
+# AAR update — mqtt-lib 2.7.0 + hardware-lib 8.1.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
-   - `mqtt-lib-2.6.0.aar` (replaces 2.2.0)
+   - `mqtt-lib-2.7.0.aar` (replaces 2.6.0 / 2.2.0)
    - `hardware-lib-8.1.0.aar` (replace whatever version you bundle now)
 
    ```gradle
-   implementation files('libs/mqtt-lib-2.6.0.aar')
+   implementation files('libs/mqtt-lib-2.7.0.aar')
    implementation files('libs/hardware-lib-8.1.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (8.1.0 / 2.6.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (8.1.0 / 2.7.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them — the "bundled: absent" failure seen on
    D-0416 is impossible with these versions.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
@@ -87,6 +87,51 @@ these AARs are deployed.
 the machine never gets VEND APPROVED, this line tells you whether the engine ever saw the call.
 ALWAYS log the Boolean these functions return. The vend flags are now @Volatile (written from
 gateway callback threads, read on the bus thread).
+
+## mqtt-lib 2.7.0 - presence (online/offline) fixes, connection counters, takeover detection (no code change)
+
+Field case D-0130, 2026-10-07: the status topic flipped offline/online every 3 s. Pattern = online for 3.1 s,
+offline for 60 ms = two live sessions with the SAME client id kicking each other (MQTT session takeover),
+not a network problem. Fixed on our side as far as the library can, and made visible:
+
+**Presence fixes**
+- **Stable client id per process.** Before, every reconnect used a new `<deviceId>-<millis>` id, so after a
+  cellular drop the broker kept the OLD half-open session alive (up to 45 s) with its Will still armed; when
+  that Will finally fired it wrote a retained `offline` OVER the new session's `online` - the device
+  showed offline while connected. Now the id is `<deviceId>-<random, fixed for the process>`: the broker
+  closes the old session the moment the new one connects, its Will fires FIRST, our fresh `online` lands
+  last. A fixed `clientId` you pass yourself is used untouched - never share one between two live clients.
+- **Graceful stop sends DISCONNECT** after the retained `offline`, so the broker no longer fires the Will on
+  top of it (no doubled offline, no late Will).
+- **Backoff with jitter** instead of a flat 3 s: 3, 6, 12, 24, 48, 60 s + 0-1 s random on consecutive
+  failures or short sessions; back to 3 s after a session lasts 30 s. Two colliding clients stop flapping
+  the status topic every 3 s; a real outage still recovers in 3 s.
+
+**Counters you can see in the dashboard** (kept since app start, nothing persisted)
+
+| counter | meaning |
+|---|---|
+| sessionsEstablished | connects that reached CONNACK |
+| connectionLosses | sessions that were up and then died (broker kick, EOF, ping failure) |
+| failedConnectAttempts | retries that never reached CONNACK (unreachable, refused, timeout) |
+| consecutiveShortSessions | sessions < 5 s in a row - 3 or more = `takeoverSuspected` |
+| lastLossReason / lastLossAgoSec / lastSessionDurationSec | what killed the last session and when |
+
+- every (re)connect publishes one log line: `[mqtt] reconnected as D-0130-3f2a - session #7, losses=6,
+  failed attempts=0, previous session lasted 3 s, last loss: EOFException - TAKEOVER SUSPECTED (3 short
+  sessions in a row)`, plus `MQTT_STATS:{...}`
+- 3 short sessions in a row log once: `[mqtt] WARNING: 3 sessions in a row closed within 5 s of connecting
+  ... another client is probably connected with client id 'X' (session takeover). Check for a duplicate
+  device code or a second app instance.`
+- new command `mqttStats` (alias `linkStats`) -> `MQTT_STATS:{...}`; `version` now also prints the
+  client id and the three counters
+- dashboard: new **link** badge in the sub-header (green = clean, amber = losses/retries, red = takeover
+  suspected; hover for the details) and a **Link** button that sends `mqttStats`
+- code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
+  `sessionsEstablished` / `activeClientId`
+
+What the library cannot fix: two physical units provisioned with the same device code, or a second process
+on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.
 
 ## 8.1.0 - RS232 rules fire the VendListener; ready-feedback gate over several inputs (additive, no breaking change)
 
