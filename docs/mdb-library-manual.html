@@ -110,6 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.1.0 / 2.7.0</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
     <a href="#lifecycle">Lifecycle</a>
@@ -134,6 +135,75 @@
     hardware-lib&nbsp;8.1.0 / mqtt-lib&nbsp;2.7.0.
   </p>
 
+
+  <!-- ============================================================ -->
+  <section id="v810">
+    <h2><span class="eyebrow">NEW &mdash; 8.1.0 / mqtt-lib 2.7.0 &mdash; 7 October 2026</span>What changed in 8.1.0 and mqtt-lib 2.7.0</h2>
+    <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
+    the steps below are only for using the new features. Upgrade steps for the Android app are in
+    <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>RS232 rules fire the same <code>VendListener</code> as MDB</h3>
+    <p>A rule may carry <code class="cmd">"event"</code>: <code>vendRequest</code> (needs a price position),
+    <code>vendSuccess</code>, <code>vendFailure</code> (reason FAILED) or <code>vendCancel</code> (reason
+    CANCELLED_BY_VMC). On match the three callbacks of <code>HardwareLib.vendListener</code> fire with the same
+    guarantee as MDB: exactly one <code>onVendSuccess</code> / <code>onVendFailure</code> per
+    <code>onVendRequest</code>. The price arrives as minor units (<code>amount</code> = minorUnits / 100.0),
+    <code>itemNumber</code> is -1. A new request while one is open closes the first with SESSION_ENDED. Rules
+    without <code>event</code> behave as before; <code>vendRequestListener</code> still fires too. The app
+    still answers the machine with <code>Rs232Lib.sendHex</code> / <code>sendXorFrame</code>.</p>
+    <pre class="code">{"setRs232Rules":[
+  {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,<span class="s">"event":"vendRequest"</span>},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"",<span class="s">"event":"vendSuccess"</span>},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"",<span class="s">"event":"vendFailure"</span>},
+  {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"",<span class="s">"event":"vendCancel"</span>}
+]}</pre>
+    <pre class="code"><span class="c">// same listener object as MDB; on RS232 answer the machine with bytes</span>
+HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListener {
+    <span class="k">override fun</span> onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {
+        scope.launch { Rs232Lib.sendHex(<span class="k">if</span> (gateway.authorize(minorUnits)) TX_SUCCESS <span class="k">else</span> TX_FAILED) }
+    }
+    <span class="k">override fun</span> onVendSuccess(itemNumber: Int) { scope.launch { gateway.capture() } }
+    <span class="k">override fun</span> onVendFailure() {            <span class="c">// FAILED = PRODUCTION_FAIL -> refund; CANCELLED_BY_VMC = CANCEL -> void</span>
+        <span class="k">if</span> (HardwareLib.lastVendFailureReason == HardwareLib.VendFailureReason.FAILED) scope.launch { gateway.refund() }
+        <span class="k">else</span> scope.launch { gateway.voidHold() }
+    }
+}</pre>
+
+    <h3>Ready feedback over several digital inputs (PulseLib)</h3>
+    <p>The CM30 has three inputs. <code>PulseLib.setReadyFeedbackChannels(mapOf(0 to 1, 2 to 0))</code> requires
+    digital_in(0) to read 1 AND digital_in(2) to read 0 before every pulse train; an empty map disables the gate.
+    Remote: <code class="cmd">setReadyFeedback:0=1,2=0</code>. The single-channel
+    <code>setReadyFeedback(value, channel)</code> / <code>setReadyFeedback:[yes,]value[,channel]</code> still
+    work and are now the one-entry case. <code>isMachineReady()</code> reads every listed input and logs them all:
+    <code>[pulse] ready feedback in0 expected=1 actual=1, in2 expected=0 actual=1 ready=false</code>. Persisted;
+    <code>SETTINGS_JSON</code> adds <code>readyFeedbackChannels</code> (<code>{"0":1,"2":0}</code>) next to the
+    old keys.</p>
+
+    <h3>Direct vend reports ENABLED_STATE</h3>
+    <p>With direct vend ON the state listener and <code>VMC_STATUS.state</code> report
+    <code>ENABLED_STATE</code> while the bus is still INACTIVE or DISABLED, so an app that waits for ENABLED
+    before its ready screen passes on machines that never send READER ENABLE. The real bus state travels as
+    <code>VMC_STATUS.busState</code> with <code>"directVend": true</code>. The listener fires at once when
+    <code>setDirectVend(true)</code> is called and returns to the real state when it is turned off.</p>
+
+    <h3>mqtt-lib 2.7.0 &mdash; presence fixes and link counters</h3>
+    <p>Field case D-0130: the status topic flipped offline/online every 3 s (online 3.1 s, offline 60 ms) =
+    two live sessions with one client id kicking each other. Library side: the client id is now
+    <strong>stable per process</strong> (<code>&lt;deviceId&gt;-&lt;random&gt;</code>, reused on every reconnect)
+    so a late Will from an old half-open session can no longer write a retained <code>offline</code> over a fresh
+    <code>online</code>; <code>stop()</code> sends a proper DISCONNECT after its retained offline; reconnects back
+    off 3 &rarr; 60 s with jitter instead of a flat 3 s. Counters since app start:
+    <code>sessionsEstablished</code>, <code>connectionLosses</code>, <code>failedConnectAttempts</code>,
+    <code>consecutiveShortSessions</code>, <code>lastLossReason</code>. Every (re)connect logs
+    <code>[mqtt] reconnected as D-0130-3f2a - session #7, losses=6, failed attempts=0, previous session lasted 3 s, last loss: EOFException</code>
+    plus <code>MQTT_STATS:{...}</code>; three short sessions in a row log one WARNING naming the client id
+    (session takeover). Commands: <code class="cmd">mqttStats</code> (alias <code>linkStats</code>) &rarr;
+    <code>MQTT_STATS:{...}</code>; <code>version</code> now also prints the client id and the counters.
+    Dashboard: <strong>link</strong> badge (green / amber / red) + <strong>Link</strong> button. Code:
+    <code>MqttLib.statsJson()</code>, <code>MqttLib.connectionLosses</code>, <code>MqttLib.activeClientId</code>.
+    A fixed <code>clientId</code> passed in <code>MqttConfig</code> is used exactly as given.</p>
+  </section>
 
   <!-- ============================================================ -->
   <section id="split700">
@@ -982,75 +1052,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
         <tr><td><em>anything else</em></td><td>offered to the app's own listeners first</td><td><code>[remote] unknown command: …</code> if nobody consumed it</td></tr>
       </tbody>
     </table></div>
-  </section>
-
-  <!-- ============================================================ -->
-  <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.1.0 / mqtt-lib 2.7.0</span>What changed in 8.1.0 and mqtt-lib 2.7.0</h2>
-    <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
-    the steps below are only for using the new features. Upgrade steps for the Android app are in
-    <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
-
-    <h3>RS232 rules fire the same <code>VendListener</code> as MDB</h3>
-    <p>A rule may carry <code class="cmd">"event"</code>: <code>vendRequest</code> (needs a price position),
-    <code>vendSuccess</code>, <code>vendFailure</code> (reason FAILED) or <code>vendCancel</code> (reason
-    CANCELLED_BY_VMC). On match the three callbacks of <code>HardwareLib.vendListener</code> fire with the same
-    guarantee as MDB: exactly one <code>onVendSuccess</code> / <code>onVendFailure</code> per
-    <code>onVendRequest</code>. The price arrives as minor units (<code>amount</code> = minorUnits / 100.0),
-    <code>itemNumber</code> is -1. A new request while one is open closes the first with SESSION_ENDED. Rules
-    without <code>event</code> behave as before; <code>vendRequestListener</code> still fires too. The app
-    still answers the machine with <code>Rs232Lib.sendHex</code> / <code>sendXorFrame</code>.</p>
-    <pre class="code">{"setRs232Rules":[
-  {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,<span class="s">"event":"vendRequest"</span>},
-  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"",<span class="s">"event":"vendSuccess"</span>},
-  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"",<span class="s">"event":"vendFailure"</span>},
-  {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"",<span class="s">"event":"vendCancel"</span>}
-]}</pre>
-    <pre class="code"><span class="c">// same listener object as MDB; on RS232 answer the machine with bytes</span>
-HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListener {
-    <span class="k">override fun</span> onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {
-        scope.launch { Rs232Lib.sendHex(<span class="k">if</span> (gateway.authorize(minorUnits)) TX_SUCCESS <span class="k">else</span> TX_FAILED) }
-    }
-    <span class="k">override fun</span> onVendSuccess(itemNumber: Int) { scope.launch { gateway.capture() } }
-    <span class="k">override fun</span> onVendFailure() {            <span class="c">// FAILED = PRODUCTION_FAIL -> refund; CANCELLED_BY_VMC = CANCEL -> void</span>
-        <span class="k">if</span> (HardwareLib.lastVendFailureReason == HardwareLib.VendFailureReason.FAILED) scope.launch { gateway.refund() }
-        <span class="k">else</span> scope.launch { gateway.voidHold() }
-    }
-}</pre>
-
-    <h3>Ready feedback over several digital inputs (PulseLib)</h3>
-    <p>The CM30 has three inputs. <code>PulseLib.setReadyFeedbackChannels(mapOf(0 to 1, 2 to 0))</code> requires
-    digital_in(0) to read 1 AND digital_in(2) to read 0 before every pulse train; an empty map disables the gate.
-    Remote: <code class="cmd">setReadyFeedback:0=1,2=0</code>. The single-channel
-    <code>setReadyFeedback(value, channel)</code> / <code>setReadyFeedback:[yes,]value[,channel]</code> still
-    work and are now the one-entry case. <code>isMachineReady()</code> reads every listed input and logs them all:
-    <code>[pulse] ready feedback in0 expected=1 actual=1, in2 expected=0 actual=1 ready=false</code>. Persisted;
-    <code>SETTINGS_JSON</code> adds <code>readyFeedbackChannels</code> (<code>{"0":1,"2":0}</code>) next to the
-    old keys.</p>
-
-    <h3>Direct vend reports ENABLED_STATE</h3>
-    <p>With direct vend ON the state listener and <code>VMC_STATUS.state</code> report
-    <code>ENABLED_STATE</code> while the bus is still INACTIVE or DISABLED, so an app that waits for ENABLED
-    before its ready screen passes on machines that never send READER ENABLE. The real bus state travels as
-    <code>VMC_STATUS.busState</code> with <code>"directVend": true</code>. The listener fires at once when
-    <code>setDirectVend(true)</code> is called and returns to the real state when it is turned off.</p>
-
-    <h3>mqtt-lib 2.7.0 &mdash; presence fixes and link counters</h3>
-    <p>Field case D-0130: the status topic flipped offline/online every 3 s (online 3.1 s, offline 60 ms) =
-    two live sessions with one client id kicking each other. Library side: the client id is now
-    <strong>stable per process</strong> (<code>&lt;deviceId&gt;-&lt;random&gt;</code>, reused on every reconnect)
-    so a late Will from an old half-open session can no longer write a retained <code>offline</code> over a fresh
-    <code>online</code>; <code>stop()</code> sends a proper DISCONNECT after its retained offline; reconnects back
-    off 3 &rarr; 60 s with jitter instead of a flat 3 s. Counters since app start:
-    <code>sessionsEstablished</code>, <code>connectionLosses</code>, <code>failedConnectAttempts</code>,
-    <code>consecutiveShortSessions</code>, <code>lastLossReason</code>. Every (re)connect logs
-    <code>[mqtt] reconnected as D-0130-3f2a - session #7, losses=6, failed attempts=0, previous session lasted 3 s, last loss: EOFException</code>
-    plus <code>MQTT_STATS:{...}</code>; three short sessions in a row log one WARNING naming the client id
-    (session takeover). Commands: <code class="cmd">mqttStats</code> (alias <code>linkStats</code>) &rarr;
-    <code>MQTT_STATS:{...}</code>; <code>version</code> now also prints the client id and the counters.
-    Dashboard: <strong>link</strong> badge (green / amber / red) + <strong>Link</strong> button. Code:
-    <code>MqttLib.statsJson()</code>, <code>MqttLib.connectionLosses</code>, <code>MqttLib.activeClientId</code>.
-    A fixed <code>clientId</code> passed in <code>MqttConfig</code> is used exactly as given.</p>
   </section>
 
   <!-- ============================================================ -->

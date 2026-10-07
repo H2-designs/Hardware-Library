@@ -207,6 +207,7 @@
 <header class="top">
   <span class="title">MDB SLAVE — ARCHITECTURE</span>
   <nav>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 2.7.0 / 8.1.0</a>
     <a href="#overview">Overview</a>
     <a href="#components">Components</a>
     <a href="#remote">Remote protocol</a>
@@ -228,6 +229,7 @@
     remotely. This document states exactly what each piece does, which bytes trigger which
     responses, and where every decision is made in the code.
   </p>
+  <div class="callout"><p><strong>New in mqtt-lib 2.7.0 + hardware-lib 8.1.0 (7 October 2026):</strong> the D-0130 presence flapping was a client-id takeover; mqtt-lib now keeps one client id per process, backs off with jitter and reports connection counters; hardware-lib adds RS232 rule events, a multi-input ready gate and direct-vend ENABLED_STATE. <a href="#v810">Details</a>.</p></div>
 
   <section id="overview">
     <h2><span class="eyebrow">01 — the shape of it</span>System overview</h2>
@@ -578,7 +580,7 @@ HardwareLib.exchangeListener = { e -&gt;                               <span cla
       app: on-screen broker settings, log/telemetry/burst buttons, a live queued/sent/dropped
       line, and an <code class="cmd">inbox</code> subscription.
     </p>
-    <h3>Presence hardening &amp; link counters (mqtt-lib 2.7.0)</h3>
+    <h3 id="v810">Presence hardening &amp; link counters (mqtt-lib 2.7.0)</h3>
     <p>Field case D-0130 (2026-10-07): the retained status flipped offline/online every 3 s - the signature of two
     live sessions sharing one client id (online 3.1 s, offline 60 ms). mqtt-lib 2.7.0 keeps <strong>one client id
     per process</strong> (<code class="cmd">&lt;deviceId&gt;-&lt;random&gt;</code>, reused on every reconnect) so

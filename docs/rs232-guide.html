@@ -128,6 +128,7 @@
   <code>Rs232Lib</code> rules — every frame from the vendor document, the rule table that
   answers it, and the functions that build replies. hardware-lib 8.1.0.</p>
   <p><span class="verified">✓ every frame below verified against the library via simulateFrame</span></p>
+  <div class="callout"><p><b>New in hardware-lib 8.1.0 (7 October 2026):</b> a rule can carry <code>"event"</code> and fire the same <code>HardwareLib.vendListener</code> as MDB - PRODUCTION_FAIL becomes <code>onVendFailure</code>, no more rule-name matching. <a href="#v810">Jump to the section</a>.</p></div>
 
   <h2><span class="eyebrow">1 · Frame anatomy</span>The payment request, byte by byte</h2>
   <p>Every frame is <code>[Start][CMD][Length][Data][CRC]</code>. This is the real payment
@@ -282,7 +283,7 @@
   display content (a QR code), answer with CMD <code>07</code>:
   <code>sendXorFrame("A1 07", "02 " + Rs232Lib.asciiHex(content))</code>.</p>
 
-  <h2><span class="eyebrow">NEW · hardware-lib 8.1.0</span>Vend events straight into HardwareLib.vendListener</h2>
+  <h2 id="v810"><span class="eyebrow">NEW · hardware-lib 8.1.0 · 7 October 2026</span>Vend events straight into HardwareLib.vendListener</h2>
   <p>Add <code>"event"</code> to a rule and the matched frame fires the same three-callback
   <code>HardwareLib.vendListener</code> the MDB engine uses - no more recognising PRODUCTION_FAIL by rule name in
   <code>exchangeListener</code>. Values: <code>vendRequest</code> (needs <code>amountStart/End</code> or

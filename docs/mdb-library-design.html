@@ -139,6 +139,7 @@
 <header class="top">
   <span class="title">MDB + MQTT LIBRARIES — AS BUILT</span>
   <nav>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.1.0 / 2.7.0</a>
     <a href="#modules">Modules</a>
     <a href="#queue">Outbound queue</a>
     <a href="#commands">Inbound commands</a>
@@ -159,6 +160,7 @@
     <code class="cmd">VendListener</code>, and the exact public API. The demo app is a ~140-line
     thin integration of exactly what any Android developer would write.
   </p>
+  <div class="callout"><p><strong>New in hardware-lib 8.1.0 + mqtt-lib 2.7.0 (7 October 2026):</strong> RS232 rules carry <code class="cmd">"event"</code> and fire the same VendListener as MDB; ready-feedback gate over several digital inputs; direct vend reports ENABLED_STATE; mqtt-lib stable client id, backoff, connection counters, takeover warning. <a href="#v810">Details in the public API section</a>.</p></div>
 
   <section id="modules">
     <h2><span class="eyebrow">01 — the boundaries</span>Module & dependency diagram</h2>
@@ -770,7 +772,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <span class="k">val</span> droppedMessages: Long                             <span class="c">// queue-overflow counter</span>
 }</pre>
 
-    <h3>hardware-lib (8.1.0)</h3>
+    <h3 id="v810">hardware-lib (8.1.0)</h3>
     <p><strong>8.1.0 additions</strong> (all additive): RS232 rules carry <code class="cmd">"event"</code> and fire the
     same <code class="cmd">VendListener</code> as MDB (vendRequest / vendSuccess / vendFailure / vendCancel);
     <code class="cmd">PulseLib.setReadyFeedbackChannels(map)</code> gates pulses on several digital inputs at once

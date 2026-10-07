@@ -118,6 +118,7 @@
 <header class="top">
   <span class="title">react-native-mdb</span>
   <nav>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.1.0 / 2.7.0</a>
     <a href="#install">Install</a>
     <a href="#quickstart">Quick start</a>
     <a href="#payments">Payments</a>
@@ -138,6 +139,7 @@
     package, and every native function and callback is mirrored 1:1 as a JS function or event.
     Android-only &mdash; the CM30 hardware runtime is armeabi-v7a.
   </p>
+  <div class="callout"><p><strong>New in hardware-lib 8.1.0 + mqtt-lib 2.7.0 (7 October 2026):</strong> swap the two AARs, no JS or bridge change. RS232 rules can raise the same <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure</code> events as MDB; direct vend reports <code>ENABLED_STATE</code>; mqtt-lib keeps a stable client id and reports connection counters. <a href="#v810">Details</a>.</p></div>
 
   <h2 id="install"><span class="eyebrow">01 &middot; Setup</span>Install</h2>
   <pre><code>npm install &lt;path-to&gt;/react-native-mdb    # or publish to your own registry</code></pre>
@@ -315,7 +317,7 @@ await Mdb.isMachineReady();                 // digital-in check now - sendPulse 
     <tr><td><span class="pill event">MdbStateChanged</span></td><td><code>{ state }</code></td><td>New in hardware-lib 7.14.0 (raw DeviceEventEmitter name). Edge-triggered on every transition: INACTIVE_STATE / DISABLED_STATE / ENABLED_STATE / VEND_STATE &mdash; never fires on heartbeats.</td></tr>
     <tr><td><span class="pill event">MdbExchange</span></td><td><code>{ code, name, rxHex, txName, message, sessionId? }</code></td><td>New in hardware-lib 7.14.0 (raw DeviceEventEmitter name). One per bus exchange, with its stable integer CMD code (111&nbsp;=&nbsp;RESET&rarr;ACK, 112&nbsp;=&nbsp;POLL&rarr;JUST&nbsp;RESET, 113&nbsp;=&nbsp;SETUP&rarr;READER&nbsp;CONFIG, 114&nbsp;=&nbsp;EXPANSION&rarr;PERIPHERAL&nbsp;ID, ... full table in the Library Manual).</td></tr>
   </table></div>
-  <p><strong>Since hardware-lib 8.1.0</strong> RS232 machines raise the same three vend events when their rules carry
+  <p id="v810"><strong>Since hardware-lib 8.1.0</strong> RS232 machines raise the same three vend events when their rules carry
   <code>"event":"vendRequest" | "vendSuccess" | "vendFailure" | "vendCancel"</code> (set with the
   <code>setRs232Rules</code> JSON from the dashboard or backend): <code>onVendRequest</code> arrives with the price
   in minor units and <code>itemNumber: -1</code>, then exactly one <code>onVendSuccess</code> /
