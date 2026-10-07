@@ -130,6 +130,8 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
+Demo/test APK: **MDB-Slave-2 v2.15.0 build 102** bundles hardware-lib 8.1.0 + mqtt-lib 2.7.0 (replaces build 101).
+
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.
 
