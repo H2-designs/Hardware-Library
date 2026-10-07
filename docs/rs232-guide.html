@@ -282,6 +282,33 @@
   display content (a QR code), answer with CMD <code>07</code>:
   <code>sendXorFrame("A1 07", "02 " + Rs232Lib.asciiHex(content))</code>.</p>
 
+  <h2><span class="eyebrow">NEW · hardware-lib 8.1.0</span>Vend events straight into HardwareLib.vendListener</h2>
+  <p>Add <code>"event"</code> to a rule and the matched frame fires the same three-callback
+  <code>HardwareLib.vendListener</code> the MDB engine uses - no more recognising PRODUCTION_FAIL by rule name in
+  <code>exchangeListener</code>. Values: <code>vendRequest</code> (needs <code>amountStart/End</code> or
+  <code>priceHi/Lo</code>), <code>vendSuccess</code>, <code>vendFailure</code> (reason FAILED),
+  <code>vendCancel</code> (reason CANCELLED_BY_VMC). Exactly one success or failure per request, like MDB. The
+  price arrives as minor units with <code>itemNumber = -1</code>. Rules without <code>event</code> behave as
+  before, and the app still answers the machine with <code>sendXorAscii</code> / <code>sendHex</code>.</p>
+  <pre class="code"><code>[
+ {"name":"CONNECT",         "rx":"A0 04 00 03 43 4F 4E E5", "tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"HEARTBEAT",       "rx":"A0 06 00 02 48 42 ??",    "tx":"A1 06 00 02 4F 4B A1"},
+ {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"", "amountStart":4, "amountEnd":-1, "event":"vendRequest"},
+ {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"", "amountStart":5, "amountEnd":-1, "event":"vendRequest"},
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"", "event":"vendSuccess"},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":"", "event":"vendFailure"},
+ {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":"", "event":"vendCancel"}
+]</code></pre>
+  <pre class="code"><code>HardwareLib.vendListener = object : HardwareLib.VendListener {
+    override fun onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {
+        thread { Rs232Lib.sendXorAscii("A1 02", if (chargeCustomer(minorUnits)) "SUCCESS" else "FAILED") }
+    }
+    override fun onVendSuccess(itemNumber: Int) { capture() }            // PRODUCTION_OK
+    override fun onVendFailure() {                                        // PRODUCTION_FAIL or CANCEL
+        if (HardwareLib.lastVendFailureReason == HardwareLib.VendFailureReason.FAILED) refund() else voidHold()
+    }
+}</code></pre>
+
   <h2><span class="eyebrow">4 · App code</span>The whole integration</h2>
   <pre class="code"><code>Rs232Lib.setRulesJson(rulesJsonAbove)          // once - persisted across restarts
 Rs232Lib.setCrcCheck(true)                     // discard bad-CRC frames (persisted)
@@ -321,6 +348,7 @@ Rs232Lib.exchangeListener = { e ->
       <tr><td><code>asciiHex(text)</code></td><td class="wrap">"SUCCESS" → <code>53 55 43 43 45 53 53</code></td></tr>
       <tr><td><code>simulateFrame(hex)</code></td><td class="wrap">fake a received frame — test rules with no machine</td></tr>
       <tr><td><code>vendRequestListener</code> / <code>exchangeListener</code></td><td class="wrap">price hook / every frame</td></tr>
+      <tr><td><code>"event"</code> on a rule <em>(8.1.0)</em></td><td class="wrap">vendRequest / vendSuccess / vendFailure / vendCancel &rarr; fires <code>HardwareLib.vendListener</code>, same callbacks and guarantee as MDB; <code>getRs232Rules</code> returns it</td></tr>
       <tr><td><code>frameGapMs</code></td><td class="wrap">silence that ends a frame — the reply goes out this long after the machine's last byte (default 1000 ms; remote: <code>rs232Gap:MS</code>)</td></tr>
       <tr><td><code>HardwareLib.addRs232EventListener</code></td><td class="wrap">coded log schema (7.17.0): every exchange as (eventName, params) — codes 137 RX_MATCHED, 138 RX_UNMATCHED, 139 CRC_DISCARDED, 140 TX, 141 PORT_OPEN, 142 PORT_CLOSED, 143 RULES_LOADED, continuing the MDB CMD schema (110–136); forward to your log envelope (or <code>RabbahLog.rs232(name, p)</code> on mqtt-lib)</td></tr>
     </tbody>

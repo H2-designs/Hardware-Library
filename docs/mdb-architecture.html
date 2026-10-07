@@ -578,6 +578,21 @@ HardwareLib.exchangeListener = { e -&gt;                               <span cla
       app: on-screen broker settings, log/telemetry/burst buttons, a live queued/sent/dropped
       line, and an <code class="cmd">inbox</code> subscription.
     </p>
+    <h3>Presence hardening &amp; link counters (mqtt-lib 2.7.0)</h3>
+    <p>Field case D-0130 (2026-10-07): the retained status flipped offline/online every 3 s - the signature of two
+    live sessions sharing one client id (online 3.1 s, offline 60 ms). mqtt-lib 2.7.0 keeps <strong>one client id
+    per process</strong> (<code class="cmd">&lt;deviceId&gt;-&lt;random&gt;</code>, reused on every reconnect) so
+    the broker closes an old half-open session the moment the new one connects and its Will fires BEFORE the
+    fresh <code class="cmd">online</code> (before, each reconnect took a new id and a late Will could write a
+    retained <code class="cmd">offline</code> over a live device); <code class="cmd">stop()</code> sends DISCONNECT
+    after its retained offline; reconnects back off 3 &rarr; 60 s with jitter. Counters since app start
+    (sessions, losses, failed retries, short sessions in a row, last loss reason) ride a
+    <code class="cmd">[mqtt] reconnected ...</code> log line on every connect, the
+    <code class="cmd">MQTT_STATS:{...}</code> control line (<code class="cmd">mqttStats</code>), the
+    <code class="cmd">version</code> reply, and the dashboard's link badge; three short sessions in a row log a
+    takeover WARNING with the client id. hardware-lib 8.1.0 in the same release: RS232 rule
+    <code class="cmd">"event"</code> &rarr; VendListener, multi-input ready gate, direct-vend ENABLED_STATE.</p>
+
     <h3>Backend contract: suffixes &amp; presence (mqtt-lib 2.2.0+)</h3>
     <p>
       The two built-in channels are configurable: <code class="cmd">logTopicSuffix</code>
@@ -888,7 +903,7 @@ HardwareLib.exchangeListener = { e -&gt;                               <span cla
 </main>
 
 <footer>
-  CM30 MDB Slave project. Current as of app v2.14.0 (build 101) / hardware-lib 8.1.0 / mqtt-lib 2.5.0: auto-attach + attachHardware/version built-ins, passthrough operator channel, compact RabbahLog codebook envelope (MDB 110–136 + RS232 137–143, one unified code space since mqtt-lib 2.4.0), generic RabbahMqtt API, broker auth, backend-contract topic suffixes, retained online/offline presence (birth + LWT), two-thread timing
+  CM30 MDB Slave project. Current as of app v2.15.0 (build 102) / hardware-lib 8.1.0 / mqtt-lib 2.7.0: auto-attach + attachHardware/version built-ins, passthrough operator channel, compact RabbahLog codebook envelope (MDB 110–136 + RS232 137–143, one unified code space since mqtt-lib 2.4.0), generic RabbahMqtt API, broker auth, backend-contract topic suffixes, retained online/offline presence (birth + LWT), two-thread timing
   engine (bus + offload), JUST RESET consumed once setup starts, order-independent setup retries,
   REVALUE handling, and variable-length BEGIN SESSION payloads. Handshakes and bit layouts
   verified against the MDB/ICP v4.3 specification and against real machine traces.

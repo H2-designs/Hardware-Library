@@ -770,7 +770,15 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <span class="k">val</span> droppedMessages: Long                             <span class="c">// queue-overflow counter</span>
 }</pre>
 
-    <h3>hardware-lib (8.0.0)</h3>
+    <h3>hardware-lib (8.1.0)</h3>
+    <p><strong>8.1.0 additions</strong> (all additive): RS232 rules carry <code class="cmd">"event"</code> and fire the
+    same <code class="cmd">VendListener</code> as MDB (vendRequest / vendSuccess / vendFailure / vendCancel);
+    <code class="cmd">PulseLib.setReadyFeedbackChannels(map)</code> gates pulses on several digital inputs at once
+    (remote <code class="cmd">setReadyFeedback:0=1,2=0</code>); with direct vend on the state listener reports
+    ENABLED_STATE while the bus is INACTIVE/DISABLED (VMC_STATUS carries <code class="cmd">busState</code>).
+    <strong>mqtt-lib 2.7.0</strong>: stable per-process client id (fixes a late Will overwriting a fresh
+    <code class="cmd">online</code>), DISCONNECT on stop, reconnect backoff with jitter, connection counters and a
+    session-takeover warning, <code class="cmd">mqttStats</code> &rarr; <code class="cmd">MQTT_STATS:{...}</code>.</p>
     <pre class="code"><span class="k">object</span> HardwareLib {
     <span class="k">fun</span> init(context: Context)   <span class="c">// MQTT optional: without it HardwareLib runs fully offline</span>
     <span class="k">fun</span> start() / stop()         <span class="c">// open/close the MDB port + worker loop</span>
