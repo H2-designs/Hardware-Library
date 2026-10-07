@@ -181,6 +181,15 @@ value before a pulse train goes out:
 - persisted; `getSettings` adds `readyFeedbackChannels` as `{"0":1,"2":0}` next to the old
   single-channel keys, so existing dashboards keep working
 
+### Direct vend reports ENABLED_STATE on the state listener
+
+Some machines in direct-vend mode never send READER ENABLE, so the bus stays INACTIVE/DISABLED although
+vends work. Apps that gate their ready screen on the state listener saying `ENABLED_STATE` waited forever.
+With direct vend ON the state listener (and `VMC_STATUS.state`) now report `ENABLED_STATE` whenever the
+bus state is INACTIVE or DISABLED; the real bus state travels alongside as `VMC_STATUS.busState` with
+`"directVend": true`. The listener fires immediately when `setDirectVend(true)` is called, and goes back to
+the real state when it is turned off. VEND_STATE and a real ENABLED_STATE are reported as before.
+
 Not yet run on a real CM30 - compiled and API-checked only. Dashboard Ready FB control is still single-channel.
 
 ## 8.0.0 - VendListener is THREE callbacks: onVendRequest / onVendSuccess / onVendFailure (BREAKING)
