@@ -1,0 +1,138 @@
+<title>Release Notes 8.1.0</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+<main>
+  <div>
+    <h1>hardware-lib 8.1.0 + mqtt-lib 2.7.0</h1>
+    <div class="meta"><span>Release notes for the Android app</span><span>7 October 2026</span><span>replaces 8.0.0 / 2.6.0</span><a href="https://github.com/H2-designs/Hardware-Library/releases/tag/v8.1.0">GitHub release v8.1.0</a></div>
+  </div>
+
+  <div class="tldr">
+    <span class="pill">What you have to do</span>
+    <ul>
+      <li><strong>Swap both AARs in <code>libs/</code> and rebuild. No code change is required.</strong> Both libraries are additive; an app built on 8.0.0 / 2.6.0 compiles and behaves the same.</li>
+      <li><strong>Optional code</strong>, only to use the new parts: RS232 vend events through the existing VendListener, and a ready-feedback gate on more than one digital input. Steps are in the handoff README, section "Android: what changes from 8.0.0 to 8.1.0 / 2.7.0".</li>
+      <li><strong>One behaviour change to know.</strong> With direct vend ON the state listener now reports <code>ENABLED_STATE</code> even while the bus is still INACTIVE/DISABLED, so the health-check screen passes on machines that never send READER ENABLE.</li>
+    </ul>
+  </div>
+
+  <section>
+    <header><h2>Files</h2><span class="tag">in AAR-Update-latest.zip</span></header>
+    <div class="twrap"><table>
+      <thead><tr><th>File</th><th>Version</th></tr></thead>
+      <tbody>
+        <tr><td><code>libs/hardware-lib-8.1.0.aar</code></td><td>8.1.0, was 8.0.0</td></tr>
+        <tr><td><code>libs/mqtt-lib-2.7.0.aar</code></td><td>2.7.0, was 2.6.0</td></tr>
+        <tr><td><code>libs/CM30-HardwareLibrary-1.0.9.aar</code></td><td>unchanged</td></tr>
+        <tr><td><code>MDB-Slave-2-v2.15.0-build102-debug.apk</code></td><td>demo and test app on the new libraries</td></tr>
+        <tr><td><code>Hardware-Dashboard-win32-x64-v8.1.0.zip</code></td><td>Windows dashboard, now with a link-health badge</td></tr>
+      </tbody>
+    </table></div>
+<pre><code>implementation files('libs/mqtt-lib-2.7.0.aar')
+implementation files('libs/hardware-lib-8.1.0.aar')
+implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
+  </section>
+
+  <section>
+    <header><h2>hardware-lib 8.1.0</h2><span class="tag ok">additive, no breaking change</span></header>
+    <div class="item">
+      <h3>RS232: rules can fire the VendListener</h3>
+      <p>A rule may carry <code>"event"</code>: <code>vendRequest</code>, <code>vendSuccess</code>, <code>vendFailure</code> or <code>vendCancel</code>. On match the same three callbacks the MDB engine uses fire: <code>onVendRequest(amount, minorUnits, -1)</code> with the price the rule extracted, then exactly one <code>onVendSuccess</code> or <code>onVendFailure</code> (reason FAILED for vendFailure, CANCELLED_BY_VMC for vendCancel). PRODUCTION FAIL after a paid sale now reaches the app as <code>onVendFailure</code> instead of a log line. Rules without <code>event</code> behave exactly as before. The app still answers the machine with <code>Rs232Lib.sendHex</code> or <code>sendXorFrame</code>.</p>
+<pre><code>{"setRs232Rules":[
+  {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"","event":"vendSuccess"},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"","event":"vendFailure"},
+  {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"","event":"vendCancel"}
+]}</code></pre>
+    </div>
+    <div class="item">
+      <h3>Pulse: ready feedback on several inputs</h3>
+      <p><code>PulseLib.setReadyFeedbackChannels(mapOf(0 to 1, 2 to 0))</code>, or remote <code>setReadyFeedback:0=1,2=0</code>. Every listed input must show its ready value before a pulse train goes out. The old single-channel <code>setReadyFeedback(value, channel)</code> and <code>setReadyFeedback:yes,value,channel</code> still work. <code>getSettings</code> adds <code>readyFeedbackChannels</code>.</p>
+    </div>
+    <div class="item">
+      <h3>MDB: direct vend reports ENABLED_STATE</h3>
+      <p>With <code>setDirectVend(true)</code> the state listener and <code>VMC_STATUS.state</code> say <code>ENABLED_STATE</code> while the bus is INACTIVE or DISABLED. The real state is in <code>VMC_STATUS.busState</code>. Fires immediately when direct vend is switched on, returns to the real state when switched off.</p>
+    </div>
+    <p>Everything else, the MDB engine, the three-callback VendListener and every remote command, is unchanged.</p>
+  </section>
+
+  <section>
+    <header><h2>mqtt-lib 2.7.0</h2><span class="tag ok">no code change</span></header>
+    <p>Field case D-0130: the status topic flipped online and offline every 3 seconds. That pattern, online for 3.1 s and offline for 60 ms, is two live sessions sharing one client id and kicking each other, not a network fault.</p>
+    <ul>
+      <li><strong>Stable client id per process.</strong> The id is now <code>&lt;deviceId&gt;-&lt;random&gt;</code> and reused on every reconnect. Before, each reconnect took a new id, so after a drop the broker kept the old half-open session alive for up to 45 s with its Will armed, and that late Will wrote a retained <code>offline</code> over the new session's <code>online</code>. A <code>clientId</code> the app passes in <code>MqttConfig</code> is used exactly as given. Never share one id between two live clients.</li>
+      <li><strong>Graceful stop sends DISCONNECT</strong> after the retained <code>offline</code>, so the broker does not fire the Will on top of it.</li>
+      <li><strong>Reconnect backoff with jitter</strong>: 3, 6, 12, 24, 48, 60 s instead of a flat 3 s, back to 3 s after a session lasts 30 s.</li>
+      <li><strong>Connection counters</strong> since app start: sessions established, connection losses, failed connect attempts, short sessions in a row, last loss reason. Every reconnect logs one line, for example <code>[mqtt] reconnected as D-0130-3f2a - session #7, losses=6, failed attempts=0, ...</code>, plus <code>MQTT_STATS:{...}</code>. Three short sessions in a row log a WARNING naming the client id. New command <code>mqttStats</code>. <code>version</code> now also prints the client id and the counters. The dashboard shows them in a link badge.</li>
+    </ul>
+  </section>
+
+  <section>
+    <header><h2>Verify after deploy</h2><span class="tag">dashboard passthrough</span></header>
+    <div class="twrap"><table>
+      <thead><tr><th>Send</th><th>Expect</th></tr></thead>
+      <tbody>
+        <tr><td><code>version</code></td><td><code>[remote] mqtt-lib 2.7.0, hardware-lib 8.1.0 - client id D-xxxx-..., sessions=1 losses=0 failed attempts=0</code></td></tr>
+        <tr><td><code>getSettings</code></td><td><code>SETTINGS_JSON</code> containing <code>readyFeedbackChannels</code></td></tr>
+        <tr><td><code>mqttStats</code></td><td><code>MQTT_STATS:{...}</code> and the link badge turns green</td></tr>
+        <tr><td><code>open</code></td><td><code>VMC_STATUS</code> and MDB logs</td></tr>
+      </tbody>
+    </table></div>
+    <p>If <code>version</code> still reports 8.0.0 or 2.6.0, an old AAR is still in <code>libs/</code>.</p>
+  </section>
+
+  <section>
+    <header><h2>Known limits</h2><span class="tag warn">read before the field test</span></header>
+    <ul>
+      <li>Not yet run on a real CM30. Compiled, API-checked with javap and dex-checked. D-0130 is the first field check.</li>
+      <li>The dashboard's Ready FB control is still single-channel. Use <code>setReadyFeedback:0=1,2=0</code> on the passthrough bar for multi-input.</li>
+      <li>RS232 has no approve or deny command. The app answers the machine with bytes, as before.</li>
+    </ul>
+  </section>
+</main>
