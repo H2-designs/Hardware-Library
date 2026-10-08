@@ -118,7 +118,7 @@
 <header class="top">
   <span class="title">react-native-mdb</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.1.0 / 2.7.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.0 / 2.7.0</a>
     <a href="#install">Install</a>
     <a href="#quickstart">Quick start</a>
     <a href="#payments">Payments</a>
@@ -139,7 +139,7 @@
     package, and every native function and callback is mirrored 1:1 as a JS function or event.
     Android-only &mdash; the CM30 hardware runtime is armeabi-v7a.
   </p>
-  <div class="callout"><p><strong>New in hardware-lib 8.1.0 + mqtt-lib 2.7.0 (7 October 2026):</strong> swap the two AARs, no JS or bridge change. RS232 rules can raise the same <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure</code> events as MDB; direct vend reports <code>ENABLED_STATE</code>; mqtt-lib keeps a stable client id and reports connection counters. <a href="#v810">Details</a>.</p></div>
+  <div class="callout"><p><strong>New in hardware-lib 8.2.0 + mqtt-lib 2.7.0 (8 October 2026):</strong> swap the two AARs, no JS or bridge change. 8.2.0 adds the <strong>Force End</strong> operator switch (<code>setForceSessionEnd:on|off</code>): the session is closed after every vend success on machines that never send SESSION COMPLETE. RS232 rules can raise the same <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure</code> events as MDB; direct vend reports <code>ENABLED_STATE</code>; mqtt-lib keeps a stable client id and reports connection counters. <a href="#v810">Details</a>.</p></div>
 
   <h2 id="install"><span class="eyebrow">01 &middot; Setup</span>Install</h2>
   <pre><code>npm install &lt;path-to&gt;/react-native-mdb    # or publish to your own registry</code></pre>

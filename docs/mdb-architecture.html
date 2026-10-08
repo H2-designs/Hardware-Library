@@ -207,7 +207,7 @@
 <header class="top">
   <span class="title">MDB SLAVE — ARCHITECTURE</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 2.7.0 / 8.1.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.0 / 2.7.0</a>
     <a href="#overview">Overview</a>
     <a href="#components">Components</a>
     <a href="#remote">Remote protocol</a>
@@ -229,7 +229,7 @@
     remotely. This document states exactly what each piece does, which bytes trigger which
     responses, and where every decision is made in the code.
   </p>
-  <div class="callout"><p><strong>New in mqtt-lib 2.7.0 + hardware-lib 8.1.0 (7 October 2026):</strong> the D-0130 presence flapping was a client-id takeover; mqtt-lib now keeps one client id per process, backs off with jitter and reports connection counters; hardware-lib adds RS232 rule events, a multi-input ready gate and direct-vend ENABLED_STATE. <a href="#v810">Details</a>.</p></div>
+  <div class="callout"><p><strong>New in hardware-lib 8.2.0 + mqtt-lib 2.7.0 (8 October 2026):</strong> <strong>8.2.0 (8 October): force session end after vend</strong> - persisted switch (<code>setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong>) that sends SESSION CANCEL REQUEST on the POLL after every VEND SUCCESS, for machines that never send SESSION COMPLETE. The D-0130 presence flapping was a client-id takeover; mqtt-lib now keeps one client id per process, backs off with jitter and reports connection counters; hardware-lib adds RS232 rule events, a multi-input ready gate and direct-vend ENABLED_STATE. <a href="#v810">Details</a>.</p></div>
 
   <section id="overview">
     <h2><span class="eyebrow">01 — the shape of it</span>System overview</h2>
@@ -592,7 +592,7 @@ HardwareLib.exchangeListener = { e -&gt;                               <span cla
     <code class="cmd">[mqtt] reconnected ...</code> log line on every connect, the
     <code class="cmd">MQTT_STATS:{...}</code> control line (<code class="cmd">mqttStats</code>), the
     <code class="cmd">version</code> reply, and the dashboard's link badge; three short sessions in a row log a
-    takeover WARNING with the client id. hardware-lib 8.1.0 in the same release: RS232 rule
+    takeover WARNING with the client id. hardware-lib 8.1.0 / 8.2.0 in the same releases: force session end after VEND SUCCESS (<code class="cmd">setForceSessionEnd:on|off</code>), RS232 rule
     <code class="cmd">"event"</code> &rarr; VendListener, multi-input ready gate, direct-vend ENABLED_STATE.</p>
 
     <h3>Backend contract: suffixes &amp; presence (mqtt-lib 2.2.0+)</h3>
@@ -905,7 +905,7 @@ HardwareLib.exchangeListener = { e -&gt;                               <span cla
 </main>
 
 <footer>
-  CM30 MDB Slave project. Current as of app v2.16.0 (build 103) / hardware-lib 8.1.0 / mqtt-lib 2.7.0: auto-attach + attachHardware/version built-ins, passthrough operator channel, compact RabbahLog codebook envelope (MDB 110–136 + RS232 137–143, one unified code space since mqtt-lib 2.4.0), generic RabbahMqtt API, broker auth, backend-contract topic suffixes, retained online/offline presence (birth + LWT), two-thread timing
+  CM30 MDB Slave project. Current as of app v2.16.0 (build 103) / hardware-lib 8.2.0 / mqtt-lib 2.7.0: auto-attach + attachHardware/version built-ins, passthrough operator channel, compact RabbahLog codebook envelope (MDB 110–136 + RS232 137–143, one unified code space since mqtt-lib 2.4.0), generic RabbahMqtt API, broker auth, backend-contract topic suffixes, retained online/offline presence (birth + LWT), two-thread timing
   engine (bus + offload), JUST RESET consumed once setup starts, order-independent setup retries,
   REVALUE handling, and variable-length BEGIN SESSION payloads. Handshakes and bit layouts
   verified against the MDB/ICP v4.3 specification and against real machine traces.

@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.1.0 / 2.7.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.0 / 2.7.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,18 +133,28 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.1.0 / mqtt-lib&nbsp;2.7.0.
+    hardware-lib&nbsp;8.2.0 / mqtt-lib&nbsp;2.7.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.1.0 / mqtt-lib 2.7.0 &mdash; 7 October 2026</span>What changed in 8.1.0 and mqtt-lib 2.7.0</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.0 / 8.1.0 / mqtt-lib 2.7.0 &mdash; 8 October 2026</span>What changed in 8.2.0, 8.1.0 and mqtt-lib 2.7.0</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
 
-    <h3>RS232 rules fire the same <code>VendListener</code> as MDB</h3>
+    <h3>8.2.0 &mdash; force session end after vend</h3>
+    <p>Field case: a machine keeps the session open after VEND APPROVED / VEND SUCCESS and never sends SESSION
+    COMPLETE. Persisted switch, default OFF: <code class="cmd">HardwareLib.setForceSessionEnd(true)</code>, remote
+    <code class="cmd">setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong> toggle, SETTINGS_JSON
+    <code>forceSessionEndAfterVend</code>. When ON, as soon as <strong>VEND SUCCESS</strong> is ACKed the reader arms
+    SESSION CANCEL REQUEST (04) for the next POLL; the VMC answers SESSION COMPLETE and the session closes with END
+    SESSION as usual. A failed vend keeps the spec flow; nothing extra is sent if SESSION COMPLETE already arrived; the
+    VendListener callbacks are unchanged. Also in 8.2.0: END SESSION clears every per-session flag (forced cancel,
+    stale approve, pending request) so nothing leaks into the next session.</p>
+
+    <h3>8.1.0 &mdash; RS232 rules fire the same <code>VendListener</code> as MDB</h3>
     <p>A rule may carry <code class="cmd">"event"</code>: <code>vendRequest</code> (needs a price position),
     <code>vendSuccess</code>, <code>vendFailure</code> (reason FAILED) or <code>vendCancel</code> (reason
     CANCELLED_BY_VMC). On match the three callbacks of <code>HardwareLib.vendListener</code> fire with the same
@@ -1128,6 +1138,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.1.0 · mqtt-lib 2.7.0 · demo app v2.16.0 (build 103). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.0 · mqtt-lib 2.7.0 · demo app v2.16.0 (build 103). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 
