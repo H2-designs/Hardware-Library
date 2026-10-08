@@ -228,6 +228,36 @@ bus state is in the VMC_STATUS heartbeat as `busState` (with `"directVend": true
 Stable client id, backoff and the connection counters are automatic. A fixed `clientId` passed in
 `MqttConfig` is still used exactly as given - never share one id between two live clients.
 
+## Register listeners ONCE - the "every line shows 10 times" problem (field case, 8 Oct 2026)
+
+A device log looked like this: each exchange once in the library's own words, then the same event ten more
+times in the app's own format:
+
+```
+SETUP CONFIG rx=11 00 03 10 02 00 26 tx=READER CONFIG DATA level=3
+[V/113] 11 00 03 10 02 00 26 | READER CONFIG DATA | 3
+[V/113] 11 00 03 10 02 00 26 | READER CONFIG DATA | 3
+... (x10)
+```
+
+The library emits every exchange exactly once. The repeats mean the app registered the SAME listener ten times.
+`HardwareLib.addExchangeListener`, `addLogListener`, `addStateListener`, `addControlListener` and
+`addRs232EventListener` keep a plain list: every call adds one more entry, nothing removes it, and the count
+grows for as long as the app runs. The library's own bridge is guarded (`attachRabbahMqtt()` attaches once), so
+duplicates always come from app code - typically a listener added in an Activity/Fragment `onCreate` or
+`onResume` and never removed, a Service that restarts, or a reconnect handler that re-registers on every connect.
+
+Rules:
+
+1. Register listeners ONCE per process - in the Application class or a singleton. The listener slots are
+   process-wide, not per screen.
+2. If a screen must listen, keep the lambda in a field and call the matching `remove...Listener(sameReference)`
+   in `onDestroy` / `onPause`. Removal only works with the exact reference that was added.
+3. The single-slot vars (`HardwareLib.exchangeListener = ...`, `logListener = ...`) replace instead of adding -
+   safe to assign again, but they are one slot each.
+4. Check: the dashboard shows one line per exchange (it reads the MQTT stream, which is never duplicated); if the
+   on-device view shows N copies, the app has N registrations.
+
 ## How we verify after deploy (from the dashboard)
 
 Send these on the passthrough bar (or press the toolbar buttons):
