@@ -73,6 +73,43 @@ Reads every gated input now and returns `true` only if all match (always `true` 
 before taking the card, so you never charge for a train the gate would then refuse. The log line lists what it
 read: `[pulse] ready feedback in0 expected=1 actual=1, in2 expected=0 actual=1 ready=false`.
 
+## Ready feedback only - minimal sample
+
+For an app that only needs the ready gate (polarity and trains already handled elsewhere):
+
+```kotlin
+import com.rabbah.mdb.HardwareLib
+import com.rabbah.mdb.PulseLib
+
+// once, at app start - without it the gate is forgotten at the next restart
+HardwareLib.init(applicationContext)
+
+// arm the gate from the backend machine model (persisted on the device)
+fun applyReadyFeedback(supported: Boolean, readyValue: Int?, channel: Int = 0) {
+    // supported=false, or no value -> gate off: every pulse train is allowed
+    PulseLib.setReadyFeedback(supported, readyValue, channel)
+}
+
+// or: several inputs at once - every listed input must show its ready value
+fun applyReadyFeedback(inputs: Map<Int, Int>) {      // e.g. mapOf(0 to 1, 2 to 0); emptyMap() = off
+    PulseLib.setReadyFeedbackChannels(inputs)
+}
+
+// before taking the card: is the machine ready right now?
+fun machineReady(): Boolean = PulseLib.isMachineReady()   // true when the gate is off; logs what it read
+
+// what is armed (for a service screen / getSettings mirror)
+fun gateDescription(): String =
+    if (PulseLib.readyFeedbackChannels.isEmpty()) "gate off"
+    else PulseLib.readyFeedbackChannels.entries.joinToString { "in" + it.key + " must be " + it.value }
+```
+
+Typical use in a sale:  then authorize and ;
+ runs the same check again by itself and refuses the train if the input changed meanwhile.
+
+Remote twins:  (one input),  (several), ,
+ (re-arm the last saved gate), .
+
 ## State you can read
 
 | property | meaning |
