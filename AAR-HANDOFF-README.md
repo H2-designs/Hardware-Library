@@ -1,19 +1,19 @@
-# AAR update — mqtt-lib 2.7.0 + hardware-lib 8.1.0
+# AAR update — mqtt-lib 2.7.0 + hardware-lib 8.2.0
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.7.0.aar` (replaces 2.6.0)
-   - `hardware-lib-8.1.0.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.0.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.7.0.aar')
-   implementation files('libs/hardware-lib-8.1.0.aar')
+   implementation files('libs/hardware-lib-8.2.0.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (8.1.0 / 2.7.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (8.2.0 / 2.7.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
    `com.rabbah.mdb` — HardwareLib must be present in the dex.
@@ -21,10 +21,25 @@
 > Replace BOTH files every time. A build that swaps one AAR and keeps the other old one shows
 > "hardware-lib absent" on the device (R8 renames the unprotected old file).
 
-## What changed in this library - hardware-lib 8.1.0 + mqtt-lib 2.7.0 (vs the fleet's 8.0.0 / 2.6.0)
+## What changed in this library - hardware-lib 8.2.0 + mqtt-lib 2.7.0 (vs the fleet's 8.0.0 / 2.6.0)
 
-Both additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
+All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.0 - force session end after vend (8 October 2026, no code change)
+
+Field case: a machine keeps the session open after VEND APPROVED / VEND SUCCESS and never sends SESSION
+COMPLETE, so the reader never gets to send END SESSION and the next customer cannot start. New persisted
+setting **force session end** (default OFF): when ON, as soon as VEND SUCCESS or VEND FAILURE is ACKed the reader
+arms SESSION CANCEL REQUEST (04) for the next POLL; the VMC answers SESSION COMPLETE and the session closes with
+END SESSION as usual. If the VMC's SESSION COMPLETE has already arrived, nothing extra is sent. The
+VendListener callbacks are unchanged - only the wire-level close is forced.
+
+- Dashboard: **Force End** toggle next to Direct Vend. Remote: `setForceSessionEnd:on|off`.
+- Kotlin: `HardwareLib.setForceSessionEnd(Boolean)` / `HardwareLib.isForceSessionEnd`. SETTINGS_JSON: `forceSessionEndAfterVend`.
+- Log: `[mdb] force session end: SESSION CANCEL REQUEST goes out on the next POLL (after VEND SUCCESS)`.
+- Also in 8.2.0: when END SESSION goes out, every per-session flag is cleared (a forced cancel still armed, an
+  approve that arrived after the machine cancelled, the pending-request flag), so nothing leaks into the next session.
 
 ### 8.1.0 - RS232 rules fire the VendListener; ready-feedback gate over several inputs (additive, no breaking change)
 
@@ -219,7 +234,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.7.0, hardware-lib 8.1.0 - client id D-0130-3f2a, sessions=1 losses=0 failed attempts=0` |
+| `version` | `[remote] mqtt-lib 2.7.0, hardware-lib 8.2.0 - client id D-0130-3f2a, sessions=1 losses=0 failed attempts=0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 | `mqttStats` | `MQTT_STATS:{...}` - the link badge in the dashboard fills in |

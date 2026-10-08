@@ -178,6 +178,11 @@
             <div class="ctl"><label class="tog" for="directVend"><input type="checkbox" id="directVend"><span id="directVendLabel">Off</span></label></div>
           </div>
           <div class="field" data-levels="1 2 3">
+            <div class="ftop"><div class="fname"><b>Force session end after vend</b><span class="key">force_session_end_after_vend</span></div><span class="pill">all levels</span></div>
+            <p class="fhint">On: after every vend success or failure the reader sends Session Cancel Request on the next POLL, so a machine that never sends SESSION COMPLETE still closes the session. Off: wait for the machine to close it, as the spec says.</p>
+            <div class="ctl"><label class="tog" for="forceEnd"><input type="checkbox" id="forceEnd"><span id="forceEndLabel">Off</span></label></div>
+          </div>
+          <div class="field" data-levels="1 2 3">
             <div class="ftop"><div class="fname"><b>Nearpay UI dismiss</b><span class="key">nearpay_ui_dismiss</span></div><span class="pill">app setting · all levels</span></div>
             <p class="fhint">On: the app closes the Nearpay payment screen by itself when the vend ends without a sale (machine cancel, failure, session ended). Off: the screen stays until the customer closes it. Lives in the app, not on the reader.</p>
             <div class="ctl"><label class="tog" for="nearpayDismiss"><input type="checkbox" id="nearpayDismiss"><span id="nearpayDismissLabel">Off</span></label></div>
@@ -464,6 +469,7 @@
       o.feature_level = String(lv);
       o.vmc_cancel_mode = document.querySelector('input[name="cancel"]:checked').value;
       o.direct_vend = $('directVend').checked;
+      o.force_session_end_after_vend = $('forceEnd').checked;
       o.nearpay_ui_dismiss = $('nearpayDismiss').checked;
       if (lv === 3) o.always_idle = $('alwaysIdle').checked;
       for (const it of ITEMS) if (it.levels.includes(lv)) o[it.key] = values[it.name];
@@ -497,6 +503,7 @@
     $('cooldownField').hidden = !$('autoSession').checked || protocol() !== 'MDB';
     $('alwaysIdleLabel').textContent = $('alwaysIdle').checked ? 'On · last byte 20' : 'Off · last byte 00';
     $('directVendLabel').textContent = $('directVend').checked ? 'On · accept a vend request in any state' : 'Off · only inside a session';
+    $('forceEndLabel').textContent = $('forceEnd').checked ? 'On · cancel the session after every vend' : 'Off · wait for the machine to close it';
     $('nearpayDismissLabel').textContent = $('nearpayDismiss').checked ? 'On · close the payment screen when the vend fails' : 'Off · the customer closes it';
     $('crcLabel').textContent = $('crc').checked ? 'On · bad-CRC frames are discarded' : 'Off · every frame is accepted';
     $('readyFbLabel').textContent = $('readyFb').checked ? 'On · pulse only when the machine is ready' : 'Off · pulses are always sent';
@@ -507,7 +514,7 @@
 
   document.querySelectorAll('input[name="level"]').forEach(r => r.addEventListener('change', () => applyProtocol(true)));
   document.querySelectorAll('input[name="protocol"]').forEach(r => r.addEventListener('change', () => applyProtocol(false)));
-  for (const id of ['autoSession', 'directVend', 'nearpayDismiss', 'crc', 'readyFb', 'baud', 'dataBits', 'stopBits', 'parity']) $(id).addEventListener('change', render);
+  for (const id of ['autoSession', 'directVend', 'forceEnd', 'nearpayDismiss', 'crc', 'readyFb', 'baud', 'dataBits', 'stopBits', 'parity']) $(id).addEventListener('change', render);
   for (const id of ['cooldown', 'gap', 'pulseWidth', 'pulsePeriod']) $(id).addEventListener('input', render);
   document.querySelectorAll('input[name="rf0"], input[name="rf1"], input[name="rf2"]').forEach(r => r.addEventListener('change', render));
   document.querySelectorAll('input[name="cancel"], input[name="pulseMode"]').forEach(r => r.addEventListener('change', render));

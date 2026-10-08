@@ -216,6 +216,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.0</strong><br>mqtt-lib 2.7.0</td><td>8 Oct 2026</td><td>Force session end after vend: persisted setting (<code>setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong> toggle, SETTINGS_JSON <code>forceSessionEndAfterVend</code>, Kotlin <code>HardwareLib.setForceSessionEnd</code>). When ON the reader arms SESSION CANCEL REQUEST for the POLL after every VEND SUCCESS / VEND FAILURE, so a VMC that never sends SESSION COMPLETE still closes the session; skipped when SESSION COMPLETE already arrived. END SESSION now clears every per-session flag (forced cancel, stale approve, pending request). Not yet released - in the repo only.</td><td>None required. Turn it on per machine from the dashboard.</td></tr>
         <tr><td><strong>hardware-lib 8.1.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 102</td><td>7 Oct 2026</td><td>RS232 rules carry <code>"event"</code> (vendRequest / vendSuccess / vendFailure / vendCancel) and fire the same three-callback VendListener as MDB. Ready-feedback gate over several digital inputs (<code>setReadyFeedbackChannels</code>, <code>setReadyFeedback:0=1,2=0</code>, SETTINGS_JSON <code>readyFeedbackChannels</code>). Direct vend ON reports ENABLED_STATE on the state listener while the bus is INACTIVE/DISABLED (<code>VMC_STATUS.busState</code> = real). mqtt-lib: stable per-process client id (fixes a late Will overwriting a fresh <code>online</code>, field case D-0130), DISCONNECT on stop, reconnect backoff 3-60 s with jitter, connection counters, takeover WARNING, <code>mqttStats</code>, counters in <code>version</code>; dashboard link badge. <a href="#v810">Details</a>.</td><td>None required. Optional: add <code>event</code> to RS232 rules, use the multi-input gate.</td></tr>
         <tr><td><strong>hardware-lib 8.0.0</strong><br>mqtt-lib 2.6.0<br>demo APK build 101</td><td>27 Sep 2026</td><td><strong>BREAKING.</strong> VendListener is exactly three callbacks: <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure</code>. <code>onVendFailure</code> fires exactly once for every VEND REQUEST that does not reach success: machine cancel (13 01 / 14 02), dispense failure (13 03), session ended with the vend still open (machines that send no cancel at all), app <code>cancelVend()</code>, RESET / stop(). <code>HardwareLib.lastVendFailureReason</code> = CANCELLED_BY_VMC / CANCELLED_BY_APP / FAILED / SESSION_ENDED / RESET. <code>onVendCancelled</code>, <code>onSessionEnded</code> removed. One dashboard only (the Electron app). react-native-mdb: <code>onVendFailure</code> carries <code>{ reason }</code>.</td><td>Delete the removed overrides, move UI reset into <code>onVendFailure</code>.</td></tr>
         <tr><td>hardware-lib 7.29.0</td><td>Sep 2026</td><td>Never shipped: a unified <code>onVendAborted(reason)</code> callback, withdrawn in favour of the 8.0.0 three-callback shape.</td><td>&mdash;</td></tr>
@@ -425,7 +426,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.7.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-8.1.0.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-8.2.0.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -678,6 +679,15 @@ HardwareLib.logListener = { line, showOnScreen -&gt;
     and the rest of the vend flow are unchanged. For machines that skip the handshake and send the request immediately.
     Persisted. <em>Dashboard: the <strong>Direct Vend</strong> toggle, or <code class="cmd">setDirectVend:on|off</code>;
     reported as <code class="cmd">directVend</code> in SETTINGS_JSON.</em></p>
+
+    <h3><code>HardwareLib.setForceSessionEnd(enabled: Boolean)</code> · <code>HardwareLib.isForceSessionEnd</code> <em>(8.2.0)</em></h3>
+    <p>Default <code class="cmd">false</code>: after VEND SUCCESS / VEND FAILURE the reader waits for the VMC's SESSION COMPLETE
+    and then sends END SESSION, per spec. <code class="cmd">true</code>: as soon as VEND SUCCESS or VEND FAILURE is ACKed
+    the reader arms SESSION CANCEL REQUEST (04) for the next POLL; the VMC answers SESSION COMPLETE and the session
+    closes with END SESSION as usual. For machines that keep the session open after a vend and never send SESSION
+    COMPLETE on their own. Nothing extra is sent when SESSION COMPLETE already arrived. The VendListener callbacks
+    are unchanged. Persisted. <em>Dashboard: the <strong>Force End</strong> toggle, or
+    <code class="cmd">setForceSessionEnd:on|off</code>; reported as <code class="cmd">forceSessionEndAfterVend</code> in SETTINGS_JSON.</em></p>
 
     <h3><code>HardwareLib.setAutoBeginCooldown(polls: Int)</code> · <code>HardwareLib.autoBeginCooldown</code> <em>(7.25.0)</em></h3>
     <p>Auto mode only. How many idle POLLs the engine waits after END SESSION before it re-arms
@@ -1077,6 +1087,7 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
         <tr><td><code>setReadyFeedback:[yes,]value[,channel]</code> / <code>:on</code> / <code>:off</code> <em>(persisted 7.26.0)</em></td><td>PulseLib.setReadyFeedback(value, channel) / enableReadyFeedback() / setReadyFeedback(null)</td><td>[pulse] line + SETTINGS_JSON (readyFeedbackEnabled/Value/Channel). Dashboard: Ready FB toggle</td></tr>
         <tr><td><code>setReadyFeedback:0=1,2=0</code> <em>(8.1.0)</em></td><td>PulseLib.setReadyFeedbackChannels(mapOf(0 to 1, 2 to 0)) - every listed input must match</td><td>[pulse] ready feedback armed - digital_in(0) must equal 1, digital_in(2) must equal 0 + SETTINGS_JSON readyFeedbackChannels</td></tr>
         <tr><td><code>mqttStats</code> / <code>linkStats</code> <em>(mqtt-lib 2.7.0)</em></td><td>answered by mqtt-lib itself - MqttLib.statsJson()</td><td><code>MQTT_STATS:{clientId, connected, sessionsEstablished, connectionLosses, failedConnectAttempts, consecutiveShortSessions, takeoverSuspected, lastLossReason, ...}</code>. Dashboard: link badge</td></tr>
+        <tr><td><code>setForceSessionEnd:on</code> / <code>:off</code> <em>(8.2.0)</em></td><td>setForceSessionEnd(true/false) - SESSION CANCEL REQUEST on the POLL after every VEND SUCCESS / FAILURE, for VMCs that never send SESSION COMPLETE; default off</td><td>[remote] force session end ON/OFF + SETTINGS_JSON (forceSessionEndAfterVend). Dashboard: Force End toggle</td></tr>
         <tr><td><code>setDirectVend:on</code> / <code>:off</code> <em>(7.28.0)</em></td><td>setDirectVend(true/false) - accept a VEND REQUEST in ANY state (INACTIVE/DISABLED/ENABLED) for VMCs that skip the handshake; default off</td><td>[remote] direct vend ON/OFF + SETTINGS_JSON (directVend). Dashboard: Direct Vend toggle</td></tr>
         <tr><td><code>setAutoBeginCooldown:N</code> <em>(7.25.0)</em></td><td>setAutoBeginCooldown(N) - idle POLLs after END SESSION before auto SESSION BEGIN, 0-50, default 3</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>setMdbLevel:1|2|3</code></td><td>setMdbLevel(n)</td><td>ack + SETTINGS_JSON</td></tr>
