@@ -179,7 +179,7 @@
           </div>
           <div class="field" data-levels="1 2 3">
             <div class="ftop"><div class="fname"><b>Force session end after vend</b><span class="key">force_session_end_after_vend</span></div><span class="pill">all levels</span></div>
-            <p class="fhint">On: after every vend success or failure the reader sends Session Cancel Request on the next POLL, so a machine that never sends SESSION COMPLETE still closes the session. Off: wait for the machine to close it, as the spec says.</p>
+            <p class="fhint">On: after every vend success the reader sends Session Cancel Request on the next POLL, so a machine that never sends SESSION COMPLETE still closes the session. Off: wait for the machine to close it, as the spec says.</p>
             <div class="ctl"><label class="tog" for="forceEnd"><input type="checkbox" id="forceEnd"><span id="forceEndLabel">Off</span></label></div>
           </div>
           <div class="field" data-levels="1 2 3">

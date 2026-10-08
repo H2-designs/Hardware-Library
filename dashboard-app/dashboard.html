@@ -458,7 +458,7 @@
       <input type="checkbox" id="directVendToggle"><span class="slider"></span><span class="tlabel">Direct Vend</span>
     </label>
     <span class="divider"></span>
-    <label class="tswitch" title="Force session end after vend (hardware-lib 8.2.0+, persisted). ON = setForceSessionEnd:on - after every VEND SUCCESS / VEND FAILURE the reader sends SESSION CANCEL REQUEST on the next POLL, so a machine that never sends SESSION COMPLETE still closes the session. OFF = spec behavior: wait for the machine's SESSION COMPLETE. Synced from SETTINGS_JSON.">
+    <label class="tswitch" title="Force session end after vend (hardware-lib 8.2.0+, persisted). ON = setForceSessionEnd:on - after every VEND SUCCESS the reader sends SESSION CANCEL REQUEST on the next POLL, so a machine that never sends SESSION COMPLETE still closes the session. OFF = spec behavior: wait for the machine's SESSION COMPLETE. Synced from SETTINGS_JSON.">
       <input type="checkbox" id="forceEndToggle"><span class="slider"></span><span class="tlabel">Force End</span>
     </label>
     <span class="divider"></span>

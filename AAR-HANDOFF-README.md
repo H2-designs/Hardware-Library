@@ -30,14 +30,14 @@ section lists the code the Android app may add to USE the new parts.
 
 Field case: a machine keeps the session open after VEND APPROVED / VEND SUCCESS and never sends SESSION
 COMPLETE, so the reader never gets to send END SESSION and the next customer cannot start. New persisted
-setting **force session end** (default OFF): when ON, as soon as VEND SUCCESS or VEND FAILURE is ACKed the reader
+setting **force session end** (default OFF): when ON, as soon as VEND SUCCESS is ACKed the reader
 arms SESSION CANCEL REQUEST (04) for the next POLL; the VMC answers SESSION COMPLETE and the session closes with
 END SESSION as usual. If the VMC's SESSION COMPLETE has already arrived, nothing extra is sent. The
 VendListener callbacks are unchanged - only the wire-level close is forced.
 
 - Dashboard: **Force End** toggle next to Direct Vend. Remote: `setForceSessionEnd:on|off`.
 - Kotlin: `HardwareLib.setForceSessionEnd(Boolean)` / `HardwareLib.isForceSessionEnd`. SETTINGS_JSON: `forceSessionEndAfterVend`.
-- Log: `[mdb] force session end: SESSION CANCEL REQUEST goes out on the next POLL (after VEND SUCCESS)`.
+- Log: `[mdb] force session end: SESSION CANCEL REQUEST goes out on the next POLL (after VEND SUCCESS)`. A failed vend keeps the spec flow.
 - Also in 8.2.0: when END SESSION goes out, every per-session flag is cleared (a forced cancel still armed, an
   approve that arrived after the machine cancelled, the pending-request flag), so nothing leaks into the next session.
 
