@@ -4,6 +4,9 @@ hardware-lib 8.2.0, `PulseLib` (package `com.rabbah.mdb`). A pulse machine takes
 digital output of the CM30, and may raise a digital input to say "ready for credit". The library drives every
 edge itself on a dedicated high-priority thread, so the app never touches the IO directly.
 
+Complete sample: [samples/PulsePaymentSample.kt](samples/PulsePaymentSample.kt) - app start, machine configuration from
+the backend model, and a sale (ready check -> hold the card -> pulse -> capture or void).
+
 ## The four calls, in the order a machine is set up
 
 ### 1. Set the polarity once - `initPulse`
