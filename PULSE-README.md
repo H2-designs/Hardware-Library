@@ -104,11 +104,11 @@ fun gateDescription(): String =
     else PulseLib.readyFeedbackChannels.entries.joinToString { "in" + it.key + " must be " + it.value }
 ```
 
-Typical use in a sale:  then authorize and ;
- runs the same check again by itself and refuses the train if the input changed meanwhile.
+Typical use in a sale: `if (!machineReady()) { show("Machine busy"); return }` then authorize and `sendPulse`;
+`sendPulse` runs the same check again by itself and refuses the train if the input changed meanwhile.
 
-Remote twins:  (one input),  (several), ,
- (re-arm the last saved gate), .
+Remote twins: `setReadyFeedback:yes,1,0` (one input), `setReadyFeedback:0=1,2=0` (several), `setReadyFeedback:off`,
+`setReadyFeedback:on` (re-arm the last saved gate), `checkMachineReady`.
 
 ## State you can read
 
