@@ -60,6 +60,8 @@ Also in 8.2.1, two field cases (15 October 2026):
   (2) with direct vend ON the reported name stays ENABLED_STATE across the real INACTIVE -> DISABLED transitions, and
   the listener used to be silent for those - now it fires again on every real bus transition (same name, so the app
   can simply re-apply it). `VMC_STATUS.busState` still carries the real state.
+- **`HardwareLib.currentState` returns the same reported state the listeners deliver** (ENABLED_STATE under direct
+  vend while the bus is INACTIVE/DISABLED); the real bus state is the new `HardwareLib.busState`.
 - **SESSION COMPLETE (13 04) and the other vend-group commands are answered in EVERY state.** A machine that was
   mid-session when the reader restarted keeps sending SESSION COMPLETE afterwards; before 8.2.1 that was UNHANDLED in
   INACTIVE / DISABLED / ENABLED and the machine never closed its side. Now: 13 04 -> ACK, then END SESSION on the next
@@ -212,6 +214,28 @@ Demo/test APK: **MDB-Slave-2 v2.16.0 build 103** bundles hardware-lib 8.2.0 + mq
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.
+
+### Health check that can never get stuck (8.2.1)
+
+Field case: with direct vend turned on remotely, the app's health check waited for an ENABLED_STATE event, missed it
+(registered after it fired) and stayed on the health-check screen forever. Since 8.2.1 the state is held and
+replayed, so the check can be written like this and cannot miss anything:
+
+```kotlin
+fun waitForReader(onReady: () -> Unit) {
+    // 1. ask first - with direct vend ON this already says ENABLED_STATE, bus still in setup or not
+    if (HardwareLib.currentState == "ENABLED_STATE" || HardwareLib.currentState == "VEND_STATE") { onReady(); return }
+    // 2. then listen - a listener registered now gets the current state IMMEDIATELY (replayed), then every change
+    val l: (String) -> Unit = { state ->
+        if (state == "ENABLED_STATE" || state == "VEND_STATE") onReady()
+    }
+    HardwareLib.addStateListener(l)       // remove with HardwareLib.removeStateListener(l) when done
+}
+```
+
+Do not time out the check on "no event"; poll `HardwareLib.currentState` or wait for the listener - both carry the
+same reported state. If the screen must show the real bus state as well, read `HardwareLib.busState` or
+`VMC_STATUS.busState`.
 
 ## Android: what changes from 8.0.0 to 8.1.0 / 2.7.0 (nothing mandatory)
 

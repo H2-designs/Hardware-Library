@@ -62,7 +62,7 @@ three methods and Java implementers must override all three.
 
 | member | what it does |
 |---|---|
-| `currentState: String` | `INACTIVE_STATE`, `DISABLED_STATE`, `ENABLED_STATE`, `VEND_STATE`. With direct vend ON, INACTIVE/DISABLED are reported as ENABLED_STATE. |
+| `currentState: String` | `INACTIVE_STATE`, `DISABLED_STATE`, `ENABLED_STATE`, `VEND_STATE` - the REPORTED state (with direct vend ON, INACTIVE/DISABLED read as ENABLED_STATE). `busState` is the real one. |
 | `isSessionActive: Boolean` | true between BEGIN SESSION and END SESSION. |
 | `stateListener` / `addStateListener` | plain state name, edge-triggered on every transition. |
 | `statusListener` | JSON `{"state","recentActivity"}` plus `busState` and `directVend` when direct vend rewrites the state. Same payload as the `VMC_STATUS:` control line. |
