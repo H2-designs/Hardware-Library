@@ -54,6 +54,12 @@ Also in 8.2.1, two field cases (15 October 2026):
   no state change). A direct-vend machine that sends READER ENABLE before its setup is finished, or re-sends it
   after a RESET, no longer sees an unanswered command and retries forever. With direct vend OFF, INACTIVE stays
   spec-strict and READER ENABLE is answered once setup is complete (DISABLED), as before.
+- **The reported state is held and re-announced.** Two things the app saw as "ENABLED_STATE arrives only once":
+  (1) a state or status listener registered AFTER the last transition got nothing until the next one - now every
+  newly registered `stateListener` / `addStateListener` / `statusListener` receives the current state at once;
+  (2) with direct vend ON the reported name stays ENABLED_STATE across the real INACTIVE -> DISABLED transitions, and
+  the listener used to be silent for those - now it fires again on every real bus transition (same name, so the app
+  can simply re-apply it). `VMC_STATUS.busState` still carries the real state.
 - **SESSION COMPLETE (13 04) and the other vend-group commands are answered in EVERY state.** A machine that was
   mid-session when the reader restarted keeps sending SESSION COMPLETE afterwards; before 8.2.1 that was UNHANDLED in
   INACTIVE / DISABLED / ENABLED and the machine never closed its side. Now: 13 04 -> ACK, then END SESSION on the next
