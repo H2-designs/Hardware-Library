@@ -48,6 +48,35 @@ answers a POLL once; the copies were extra publishers. Three library-side guards
 
 Not yet run on a real CM30 - compiled and API-checked.
 
+Also in 8.2.1: READER ENABLE (14 01) and READER CANCEL (14 02) are now answered in INACTIVE too (ACK / CAN, no
+state change), so a machine that sends READER ENABLE before its setup is finished, or re-sends it after a RESET, no
+longer sees an unanswered command and retries forever.
+
+### What the reader answers in each MDB state (8.2.1)
+
+Two gates run before every state: a first byte outside 10-17 is another peripheral and is ignored; RESET (10) from
+ANY state is ACKed and jumps to INACTIVE. Everything not listed for a state goes UNHANDLED (visible with
+`setUnhandledVisibility:on`).
+
+| machine sends | INACTIVE (setup) | DISABLED (set up, reader off) | ENABLED (ready) | VEND (session open) |
+|---|---|---|---|---|
+| POLL 12 | JUST RESET x5, then ACK | ACK | SESSION BEGIN when armed (auto / beginSession), else ACK | the queued reply: VEND APPROVED, VEND DENIED, SESSION CANCEL REQUEST, END SESSION - else ACK |
+| SETUP CONFIG 11 00 | READER CONFIG DATA | READER CONFIG DATA (retry) | - | - |
+| SETUP MAX/MIN 11 01 | ACK (L1: -> DISABLED) | ACK (retry) | - | - |
+| EXPANSION REQUEST ID 17 00 | PERIPHERAL ID (L2: -> DISABLED; L3 stays) | PERIPHERAL ID (retry, L2+) | - | - |
+| EXPANSION ENABLE OPTIONS 17 04 | ACK (L3: -> DISABLED) | ACK (retry, L3) | - | - |
+| READER ENABLE 14 01 | ACK (8.2.1; stays INACTIVE) | ACK -> ENABLED, auto mode arms SESSION BEGIN | ACK, re-arms in auto mode | ACK |
+| READER DISABLE 14 00 | ACK | ACK | ACK -> DISABLED | ACK, session closes with END SESSION on the next POLL |
+| READER CANCEL 14 02 | CAN (8.2.1) | CAN | CAN | CAN, session cancelled per cancel mode, onVendFailure if a vend was open |
+| VEND REQUEST 13 00 | only with direct vend ON: ACK -> VEND, onVendRequest | same | with direct vend ON or Always Idle declared: ACK -> VEND | ACK, onVendRequest; approveVend / cancelVend decide the next POLL |
+| VEND CANCEL 13 01 | - | - | - | ACK; next POLL sends the cancel mode reply; onVendFailure (CANCELLED_BY_VMC) |
+| VEND SUCCESS 13 02 | - | - | - | ACK; onVendSuccess; with Force End ON arms SESSION CANCEL REQUEST |
+| VEND FAILURE 13 03 | - | - | - | ACK; onVendFailure (FAILED) |
+| SESSION COMPLETE 13 04 | - | - | - | ACK; next POLL sends END SESSION -> ENABLED (onVendFailure SESSION_ENDED if a vend was still open) |
+| CASH SALE 13 05 | - | - | - | - (logged, unhandled) |
+| REVALUE REQUEST 15 00 | - | - | - | REVALUE DENIED (L2+) |
+| REVALUE LIMIT REQUEST 15 01 | - | - | - | REVALUE LIMIT AMOUNT (L2+) |
+
 ### 8.2.0 - force session end after vend (8 October 2026, no code change)
 
 Field case: a machine keeps the session open after VEND APPROVED / VEND SUCCESS and never sends SESSION
