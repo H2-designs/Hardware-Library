@@ -1,4 +1,4 @@
-# hardware-lib 8.2.0 - every public function, by protocol
+# hardware-lib 8.2.1 - every public function, by protocol
 
 Package `com.rabbah.mdb`. Three singletons: `HardwareLib` (MDB engine, settings, payloads, listeners),
 `Rs232Lib` (serial rule engine), `PulseLib` (coin-pulse output). Every call returns `Boolean` (true = done or

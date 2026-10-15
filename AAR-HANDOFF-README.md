@@ -1,21 +1,21 @@
-# AAR update — mqtt-lib 2.7.0 + hardware-lib 8.2.0
+# AAR update — mqtt-lib 2.7.1 + hardware-lib 8.2.1
 
 Companion files: API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
-   - `mqtt-lib-2.7.0.aar` (replaces 2.6.0)
-   - `hardware-lib-8.2.0.aar` (replace whatever version you bundle now)
+   - `mqtt-lib-2.7.1.aar` (replaces 2.6.0 / 2.7.0)
+   - `hardware-lib-8.2.1.aar` (replace whatever version you bundle now)
 
    ```gradle
-   implementation files('libs/mqtt-lib-2.7.0.aar')
-   implementation files('libs/hardware-lib-8.2.0.aar')
+   implementation files('libs/mqtt-lib-2.7.1.aar')
+   implementation files('libs/hardware-lib-8.2.1.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
 2. Build and deploy. That's it — **do NOT write any wiring code, do NOT edit proguard.**
-   These AARs (8.2.0 / 2.7.0) carry their R8 keep rules INSIDE (consumerProguardFiles),
+   These AARs (8.2.1 / 2.7.1) carry their R8 keep rules INSIDE (consumerProguardFiles),
    so minified builds can no longer strip them.
    Verify the APK BEFORE deploying: Android Studio > Build > Analyze APK > search
    `com.rabbah.mdb` — HardwareLib must be present in the dex.
@@ -23,10 +23,30 @@ Companion files: API-REFERENCE.md (every public function of HardwareLib / Rs232L
 > Replace BOTH files every time. A build that swaps one AAR and keeps the other old one shows
 > "hardware-lib absent" on the device (R8 renames the unprotected old file).
 
-## What changed in this library - hardware-lib 8.2.0 + mqtt-lib 2.7.0 (vs the fleet's 8.0.0 / 2.6.0)
+## What changed in this library - hardware-lib 8.2.1 + mqtt-lib 2.7.1 (vs the fleet's 8.0.0 / 2.6.0)
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.1 / mqtt-lib 2.7.1 - every exchange reaches the backend exactly once (15 October 2026, no code change)
+
+Field case D-0961: the backend showed VEND APPROVED four times within 20 ms and other exchanges twice. The MDB engine
+answers a POLL once; the copies were extra publishers. Three library-side guards now make duplicates impossible:
+
+1. **`add*Listener` never registers the same instance twice** (`addExchangeListener`, `addLogListener`,
+   `addStateListener`, `addControlListener`, `addRs232EventListener`, and `MqttLib.addCommandListener`). A bridge
+   or Activity that calls `attach()` on every recreation no longer stacks publishers.
+2. **`HardwareLib.attachRabbahMqtt()` is a complete bridge.** It now publishes every MDB exchange as ONE coded
+   RabbahLog item itself and keeps the plain exchange text local (exactly how RS232 already worked). The sample
+   `MdbMqttBridge` is now a two-line wrapper around `attachRabbahMqtt()` / `detachRabbahMqtt()`. **Delete any
+   exchange or log forwarder the app has of its own** - with 8.2.1 it only produces a second copy (which the next
+   guard then drops anyway). Plain exchange lines that used to reach the backend as `device.log.unknown_source`
+   stop; the coded item carries the same exchange.
+3. **RabbahLog drops an item identical to the previous one within 30 ms** (same schema, code, params, session id).
+   Two publishers wired by mistake collapse to one wire item; `RabbahLog.dedupedItems` counts the drops - a rising
+   counter means the app still has an extra publisher.
+
+Not yet run on a real CM30 - compiled and API-checked.
 
 ### 8.2.0 - force session end after vend (8 October 2026, no code change)
 
@@ -266,7 +286,7 @@ Send these on the passthrough bar (or press the toolbar buttons):
 
 | Send | Expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.7.0, hardware-lib 8.2.0 - client id D-0130-3f2a, sessions=1 losses=0 failed attempts=0` |
+| `version` | `[remote] mqtt-lib 2.7.1, hardware-lib 8.2.1 - client id D-0130-3f2a, sessions=1 losses=0 failed attempts=0` |
 | `help` | the full command list |
 | `open` | `VMC_STATUS` + MDB logs start flowing |
 | `mqttStats` | `MQTT_STATS:{...}` - the link badge in the dashboard fills in |
