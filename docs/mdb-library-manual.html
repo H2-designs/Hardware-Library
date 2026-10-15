@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.0 / 2.7.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.1 / 2.7.1</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,16 +133,51 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.0 / mqtt-lib&nbsp;2.7.0.
+    hardware-lib&nbsp;8.2.1 / mqtt-lib&nbsp;2.7.1.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.0 / 8.1.0 / mqtt-lib 2.7.0 &mdash; 8 October 2026</span>What changed in 8.2.0, 8.1.0 and mqtt-lib 2.7.0</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.1 / 2.7.1 &mdash; 15 October 2026</span>What changed in 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>8.2.1 / mqtt-lib 2.7.1 &mdash; every exchange reaches the backend exactly once</h3>
+    <p>Field case D-0961: VEND APPROVED arrived 4x within 20 ms on the backend, most exchanges 2x. Causes in the
+    library's contract with the app: listener lists accepted the same instance again on every Activity recreation,
+    and the sample MQTT bridge (copied into the fleet app) published next to <code class="cmd">attachRabbahMqtt</code>.
+    Now <code class="cmd">addStateListener</code> / <code class="cmd">addStatusListener</code> /
+    <code class="cmd">addLogListener</code> / <code class="cmd">addExchangeListener</code> /
+    <code class="cmd">addControlListener</code> and <code class="cmd">MqttLib.addCommandListener</code> return
+    <code>false</code> for a repeat registration of the same instance; <code class="cmd">HardwareLib.attachRabbahMqtt()</code>
+    is the complete bridge (publishes the coded MDB exchange items itself, keeps the plain exchange text local;
+    <code>MdbMqttBridge</code> in samples is a two-line wrapper); mqtt-lib 2.7.1 <code class="cmd">RabbahLog.log</code>
+    drops an item identical to the previous one (code, session, params) within 30 ms and counts it in
+    <code class="cmd">RabbahLog.dedupedItems</code>. Register listeners once; do not keep a custom bridge next to
+    <code class="cmd">attachRabbahMqtt</code>.</p>
+
+    <h3>8.2.1 &mdash; a health check that can never get stuck (no app change)</h3>
+    <p>Field case: with direct vend turned on remotely the app's health check waited for ENABLED_STATE, missed the
+    single announcement and stayed on the health-check screen forever. The reported state is now <strong>held</strong>:
+    any <code class="cmd">stateListener</code> / <code class="cmd">addStateListener</code> /
+    <code class="cmd">statusListener</code> registered at any time receives the current state immediately, in every
+    state; with direct vend ON the listener fires ENABLED_STATE again on every real bus transition (INACTIVE &rarr;
+    DISABLED &rarr; ENABLED); and while direct vend is ON and the bus is still INACTIVE/DISABLED, ENABLED_STATE is
+    re-sent to the state listeners every 5 s until the bus is really ENABLED/VEND or direct vend goes off (local
+    listeners only, VMC_STATUS over MQTT stays event-driven). <code class="cmd">HardwareLib.currentState</code> returns
+    the same reported state; the real bus state is the new <code class="cmd">HardwareLib.busState</code> /
+    <code>VMC_STATUS.busState</code>. Control listeners get VMC_STATUS and SETTINGS_JSON on registration.</p>
+
+    <h3>8.2.1 &mdash; session commands answered in every state, READER ENABLE in INACTIVE</h3>
+    <p>Field case: after a reader restart the VMC kept sending SESSION COMPLETE (13 04) and the reader logged it
+    UNHANDLED forever. VEND CANCEL / VEND SUCCESS / VEND FAILURE / SESSION COMPLETE (13 01..04) are now ACKed in every
+    state; outside VEND_STATE nothing else happens except that a stray SESSION COMPLETE arms END SESSION for the next
+    POLL (state unchanged, no VendListener callback). RESET wipes every per-session flag. With direct vend ON, READER
+    ENABLE (14 01) is ACKed and READER CANCEL (14 02) answered with CAN while still INACTIVE, no state change; with
+    direct vend OFF INACTIVE stays spec-strict. The full per-state answer table is in
+    <code>AAR-HANDOFF-README.md</code>, section "What the reader answers in each MDB state".</p>
 
     <h3>8.2.0 &mdash; force session end after vend</h3>
     <p>Field case: a machine keeps the session open after VEND APPROVED / VEND SUCCESS and never sends SESSION
@@ -226,6 +261,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.1</strong><br>mqtt-lib 2.7.1<br>demo APK build 104</td><td>15 Oct 2026</td><td>Every exchange reaches the backend exactly once (D-0961): add*Listener / <code>MqttLib.addCommandListener</code> ignore a repeat registration of the same instance, <code>attachRabbahMqtt()</code> is the complete bridge and publishes the coded exchange items itself (samples <code>MdbMqttBridge</code> = two-line wrapper), <code>RabbahLog.log</code> drops an identical item within 30 ms (<code>dedupedItems</code>). Health check that can never get stuck: reported state held and replayed to any state/status/control listener on registration, re-announced on every real bus transition, 5 s heartbeat to the state listeners while direct vend is ON and the bus is INACTIVE/DISABLED; <code>currentState</code> = reported state, new <code>busState</code> = real. SESSION COMPLETE / VEND CANCEL / SUCCESS / FAILURE ACKed in every state, stray SESSION COMPLETE &rarr; END SESSION on the next POLL, RESET wipes every per-session flag. READER ENABLE / CANCEL answered in INACTIVE when direct vend is ON. New docs: API-REFERENCE.md, PULSE-README.md, samples/PulsePaymentSample.kt.</td><td>None. Swap the AARs. Register listeners once; drop any custom bridge next to <code>attachRabbahMqtt</code>.</td></tr>
         <tr><td><strong>hardware-lib 8.2.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 103</td><td>8 Oct 2026</td><td>Force session end after vend: persisted setting (<code>setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong> toggle, SETTINGS_JSON <code>forceSessionEndAfterVend</code>, Kotlin <code>HardwareLib.setForceSessionEnd</code>). When ON the reader arms SESSION CANCEL REQUEST for the POLL after every VEND SUCCESS, so a VMC that never sends SESSION COMPLETE still closes the session; skipped when SESSION COMPLETE already arrived. END SESSION now clears every per-session flag (forced cancel, stale approve, pending request).</td><td>None required. Turn it on per machine from the dashboard.</td></tr>
         <tr><td><strong>hardware-lib 8.1.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 102</td><td>7 Oct 2026</td><td>RS232 rules carry <code>"event"</code> (vendRequest / vendSuccess / vendFailure / vendCancel) and fire the same three-callback VendListener as MDB. Ready-feedback gate over several digital inputs (<code>setReadyFeedbackChannels</code>, <code>setReadyFeedback:0=1,2=0</code>, SETTINGS_JSON <code>readyFeedbackChannels</code>). Direct vend ON reports ENABLED_STATE on the state listener while the bus is INACTIVE/DISABLED (<code>VMC_STATUS.busState</code> = real). mqtt-lib: stable per-process client id (fixes a late Will overwriting a fresh <code>online</code>, field case D-0130), DISCONNECT on stop, reconnect backoff 3-60 s with jitter, connection counters, takeover WARNING, <code>mqttStats</code>, counters in <code>version</code>; dashboard link badge. <a href="#v810">Details</a>.</td><td>None required. Optional: add <code>event</code> to RS232 rules, use the multi-input gate.</td></tr>
         <tr><td><strong>hardware-lib 8.0.0</strong><br>mqtt-lib 2.6.0<br>demo APK build 101</td><td>27 Sep 2026</td><td><strong>BREAKING.</strong> VendListener is exactly three callbacks: <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure</code>. <code>onVendFailure</code> fires exactly once for every VEND REQUEST that does not reach success: machine cancel (13 01 / 14 02), dispense failure (13 03), session ended with the vend still open (machines that send no cancel at all), app <code>cancelVend()</code>, RESET / stop(). <code>HardwareLib.lastVendFailureReason</code> = CANCELLED_BY_VMC / CANCELLED_BY_APP / FAILED / SESSION_ENDED / RESET. <code>onVendCancelled</code>, <code>onSessionEnded</code> removed. One dashboard only (the Electron app). react-native-mdb: <code>onVendFailure</code> carries <code>{ reason }</code>.</td><td>Delete the removed overrides, move UI reset into <code>onVendFailure</code>.</td></tr>
@@ -1138,6 +1174,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.0 · mqtt-lib 2.7.0 · demo app v2.16.0 (build 103). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.1 · mqtt-lib 2.7.1 · demo app v2.17.0 (build 104). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

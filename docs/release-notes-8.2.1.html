@@ -1,0 +1,168 @@
+<title>Release Notes 8.2.1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+
+<main>
+  <div>
+    <h1>hardware-lib 8.2.1 + mqtt-lib 2.7.1</h1>
+    <div class="meta"><span>Release notes for the Android app</span><span>15 October 2026</span><span>cumulative against the fleet's 8.0.0 / 2.6.0</span><a href="https://github.com/H2-designs/Hardware-Library/releases/tag/v8.2.1">GitHub release v8.2.1</a></div>
+  </div>
+
+  <div class="tldr">
+    <span class="pill">What you have to do</span>
+    <ul>
+      <li><strong>Swap both AARs in <code>libs/</code> and rebuild. No code change is required.</strong> Everything since 8.0.0 is additive; an app built on 8.0.0 / 2.6.0 compiles and behaves the same.</li>
+      <li><strong>8.2.1 fixes four field cases inside the library:</strong> duplicated log items on the backend, the health check that waited forever for <code>ENABLED_STATE</code> under direct vend, SESSION COMPLETE left UNHANDLED after a reader restart, and READER ENABLE not answered in INACTIVE with direct vend on. The app keeps its state listener exactly as it is.</li>
+      <li><strong>One thing to check, not to add:</strong> register the hardware listeners once (Application or a singleton) and do not keep a custom MQTT bridge next to <code>HardwareLib.attachRabbahMqtt()</code>. The library now ignores a repeat registration of the same instance, but a second bridge object is still a second publisher.</li>
+      <li><strong>Optional code</strong>, only to use the new parts: RS232 vend events through the existing VendListener, and a ready-feedback gate on more than one digital input. Steps are in the handoff README.</li>
+    </ul>
+  </div>
+
+  <section>
+    <header><h2>Files</h2><span class="tag">in AAR-Update-latest.zip</span></header>
+    <div class="twrap"><table>
+      <thead><tr><th>File</th><th>Version</th></tr></thead>
+      <tbody>
+        <tr><td><code>libs/hardware-lib-8.2.1.aar</code></td><td>8.2.1, fleet has 8.0.0</td></tr>
+        <tr><td><code>libs/mqtt-lib-2.7.1.aar</code></td><td>2.7.1, fleet has 2.6.0</td></tr>
+        <tr><td><code>libs/CM30-HardwareLibrary-1.0.9.aar</code></td><td>unchanged</td></tr>
+        <tr><td><code>AAR-Update-latest.zip</code></td><td>the three AARs + AAR-HANDOFF-README.md + API-REFERENCE.md + PULSE-README.md</td></tr>
+        <tr><td><code>MDB-Slave-2-v2.17.0-build104-debug.apk</code></td><td>demo/test app on the new libraries</td></tr>
+        <tr><td><code>Hardware-Dashboard-win32-x64-v8.2.1.zip</code></td><td>Windows dashboard (Force End toggle, link-health badge)</td></tr>
+      </tbody>
+    </table></div>
+<pre><code>implementation files('libs/mqtt-lib-2.7.1.aar')
+implementation files('libs/hardware-lib-8.2.1.aar')
+implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
+  </section>
+
+  <section>
+    <header><h2>New in 8.2.1 / 2.7.1: every exchange reaches the backend exactly once</h2><span class="tag ok">field case D-0961, library fix</span></header>
+    <p>The backend showed VEND APPROVED four times within 20 ms and most other exchanges twice. Two causes, both in the library's contract with the app: listener lists accepted the same instance again on every Activity recreation, and the sample MQTT bridge (copied into the fleet app) published next to <code>attachRabbahMqtt</code>, so one exchange had several publishers.</p>
+    <ul>
+      <li><code>addStateListener</code> / <code>addStatusListener</code> / <code>addLogListener</code> / <code>addExchangeListener</code> / <code>addControlListener</code> and <code>MqttLib.addCommandListener</code> ignore a repeat registration of the same instance (return <code>false</code>).</li>
+      <li><code>HardwareLib.attachRabbahMqtt()</code> is the complete bridge: it publishes the coded MDB exchange items itself and keeps the plain exchange text local. <code>MdbMqttBridge</code> in <code>samples/</code> is now a two-line wrapper around it.</li>
+      <li>mqtt-lib 2.7.1: <code>RabbahLog.log</code> drops an item identical to the previous one (same code, session and params) that arrives within 30 ms and counts it in <code>RabbahLog.dedupedItems</code>. A safety net for in-process fan-out only; two identical bus exchanges 50 ms apart are real traffic and are both kept.</li>
+    </ul>
+  </section>
+
+  <section>
+    <header><h2>New in 8.2.1: a health check that can never get stuck</h2><span class="tag ok">no app change needed</span></header>
+    <p>Field case: with direct vend turned on remotely the app's health check waited for <code>ENABLED_STATE</code>, missed the single announcement and stayed on the health-check screen forever.</p>
+    <ul>
+      <li><strong>The reported state is held.</strong> Any <code>stateListener</code> / <code>addStateListener</code> / <code>statusListener</code> registered at any time receives the current state immediately, in every state, with direct vend on or off.</li>
+      <li><strong>Re-announced on every real bus transition.</strong> With direct vend ON the listener fires <code>ENABLED_STATE</code> again on each INACTIVE, DISABLED, ENABLED step, so the app can simply re-apply it.</li>
+      <li><strong>5-second heartbeat under direct vend.</strong> While direct vend is ON and the bus is still INACTIVE or DISABLED, <code>ENABLED_STATE</code> is re-sent to the state listeners every 5 s until the bus is really ENABLED / VEND or direct vend goes off. Local listeners only; <code>VMC_STATUS</code> over MQTT stays event-driven.</li>
+      <li><code>HardwareLib.currentState</code> returns the same reported state; the real bus state is the new <code>HardwareLib.busState</code> and <code>VMC_STATUS.busState</code>.</li>
+      <li>Control listeners (dashboard, React Native bridge) get <code>VMC_STATUS</code> and <code>SETTINGS_JSON</code> on registration.</li>
+    </ul>
+  </section>
+
+  <section>
+    <header><h2>New in 8.2.1: session commands answered in every state</h2><span class="tag ok">reader restart case</span></header>
+    <p>Field case: after a reader restart the machine kept sending SESSION COMPLETE (13 04) and the reader logged it UNHANDLED forever, because it was no longer in VEND_STATE.</p>
+    <ul>
+      <li>VEND CANCEL / VEND SUCCESS / VEND FAILURE / SESSION COMPLETE (13 01..04) are ACKed in every state. Outside VEND_STATE nothing else happens, except that a stray SESSION COMPLETE arms END SESSION for the next POLL so the machine can close its side. No VendListener callback, state unchanged.</li>
+      <li>RESET wipes every per-session flag (session begin / end / cancel pending, approve pending, request received, cooldown), so nothing from the previous session survives a machine restart.</li>
+      <li>With direct vend ON the reader answers READER ENABLE (14 01) with ACK and READER CANCEL (14 02) with CAN while still INACTIVE, without changing state. With direct vend OFF the INACTIVE state stays spec-strict.</li>
+    </ul>
+  </section>
+
+  <section>
+    <header><h2>Since 8.0.0: hardware-lib 8.2.0 and 8.1.0</h2><span class="tag ok">additive, operator switches</span></header>
+    <div class="item">
+      <h3>8.2.0: force session end after vend</h3>
+      <p>Persisted setting <strong>force session end</strong>, default OFF. When ON, as soon as <strong>VEND SUCCESS</strong> is acknowledged the reader arms SESSION CANCEL REQUEST for the next POLL; the machine answers SESSION COMPLETE and the session closes with END SESSION as usual. A failed vend keeps the spec flow. Dashboard <strong>Force End</strong> toggle, remote <code>setForceSessionEnd:on|off</code>, Kotlin <code>HardwareLib.setForceSessionEnd(Boolean)</code>, <code>getSettings</code> key <code>forceSessionEndAfterVend</code>.</p>
+    </div>
+    <div class="item">
+      <h3>8.1.0: RS232 rules fire the VendListener</h3>
+      <p>A rule may carry <code>"event"</code>: <code>vendRequest</code>, <code>vendSuccess</code>, <code>vendFailure</code> or <code>vendCancel</code>. On match the same three callbacks fire: <code>onVendRequest(amount, minorUnits, -1)</code>, then exactly one <code>onVendSuccess</code> or <code>onVendFailure</code>. Rules without <code>event</code> behave as before.</p>
+    </div>
+    <div class="item">
+      <h3>8.1.0: ready feedback on several inputs, direct vend reports ENABLED_STATE</h3>
+      <p><code>PulseLib.setReadyFeedbackChannels(mapOf(0 to 1, 2 to 0))</code> or remote <code>setReadyFeedback:0=1,2=0</code>: every listed input must show its ready value before a pulse train goes out. With <code>setDirectVend(true)</code> the state listener and <code>VMC_STATUS.state</code> say <code>ENABLED_STATE</code> while the bus is INACTIVE or DISABLED.</p>
+    </div>
+  </section>
+
+  <section>
+    <header><h2>Since 2.6.0: mqtt-lib 2.7.0</h2><span class="tag ok">no code change</span></header>
+    <p>Field case D-0130: the status topic flipped online/offline every 3 seconds, two live sessions sharing one client id kicking each other.</p>
+    <ul>
+      <li><strong>Stable client id per process</strong> (<code>&lt;deviceId&gt;-&lt;random&gt;</code>, reused on every reconnect). A <code>clientId</code> the app passes in <code>MqttConfig</code> is used exactly as given; never share one id between two live clients.</li>
+      <li><strong>Graceful stop sends DISCONNECT</strong> after the retained <code>offline</code>.</li>
+      <li><strong>Reconnect backoff with jitter</strong>: 3, 6, 12, 24, 48, 60 s; back to 3 s after a session lasts 30 s.</li>
+      <li><strong>Connection counters</strong> since app start: <code>[mqtt] reconnected ...</code> and <code>MQTT_STATS:{...}</code> on every connect, a WARNING after three short sessions, command <code>mqttStats</code>, <code>version</code> prints the client id and the counters, dashboard link badge.</li>
+    </ul>
+  </section>
+
+  <section>
+    <header><h2>Verify after deploy</h2><span class="tag">dashboard passthrough</span></header>
+    <div class="twrap"><table>
+      <thead><tr><th>Send</th><th>Expect</th></tr></thead>
+      <tbody>
+        <tr><td><code>version</code></td><td><code>[remote] mqtt-lib 2.7.1, hardware-lib 8.2.1 - client id D-xxxx-..., sessions=1 losses=0 failed attempts=0</code></td></tr>
+        <tr><td><code>getSettings</code></td><td><code>SETTINGS_JSON</code> containing <code>forceSessionEndAfterVend</code> and <code>readyFeedbackChannels</code></td></tr>
+        <tr><td><code>setDirectVend:on</code> then <code>status</code></td><td><code>VMC_STATUS</code> with <code>"state":"ENABLED_STATE"</code> and the real <code>busState</code></td></tr>
+        <tr><td><code>mqttStats</code></td><td><code>MQTT_STATS:{...}</code> and the link badge turns green</td></tr>
+        <tr><td>backend logs after one sale</td><td>each exchange once; VEND APPROVED once</td></tr>
+      </tbody>
+    </table></div>
+    <p>If <code>version</code> still reports 8.2.0, 8.1.0, 8.0.0 or 2.7.0, 2.6.0, an old AAR is still in <code>libs/</code>.</p>
+  </section>
+
+  <section>
+    <header><h2>Known limits</h2><span class="tag warn">read before the field test</span></header>
+    <ul>
+      <li>Not yet run on a real CM30. Compiled, API-checked with javap and dex-checked. First field checks: D-0961 for the duplicates, the direct-vend health check, a reader restart mid-session.</li>
+      <li>The dashboard's Ready FB control is still single-channel. Use <code>setReadyFeedback:0=1,2=0</code> on the passthrough bar for multi-input.</li>
+      <li>Force End acts on VEND SUCCESS only. A machine that sends neither VEND SUCCESS nor VEND FAILURE after approval needs a different fix, a timeout; send a log of one sale if you see that.</li>
+      <li>RS232 has no approve or deny command. The app answers the machine with bytes, as before.</li>
+    </ul>
+  </section>
+</main>
