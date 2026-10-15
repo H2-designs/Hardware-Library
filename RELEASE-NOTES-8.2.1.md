@@ -25,7 +25,7 @@ Date: 15 October 2026. Replaces v8.2.0 (8 October). Cumulative against the fleet
 | `libs/CM30-HardwareLibrary-1.0.9.aar` | unchanged |
 | `AAR-Update-latest.zip` | the three AARs + AAR-HANDOFF-README.md + API-REFERENCE.md + PULSE-README.md |
 | `MDB-Slave-2-v2.17.0-build104-debug.apk` | demo/test app on the new libraries |
-| `Hardware-Dashboard-win32-x64-v8.2.1.zip` | Windows dashboard (Force End toggle, link-health badge) |
+| `Hardware-Dashboard-win32-x64-v8.2.1.zip` | Windows dashboard: device tabs, log recording to disk, History and Export (uploaded again 15 Oct afternoon - re-download if you took it in the morning) |
 
 ```gradle
 implementation files('libs/mqtt-lib-2.7.1.aar')
@@ -81,6 +81,14 @@ UNHANDLED forever, because the reader was no longer in VEND_STATE.
 
 With direct vend ON the reader answers READER ENABLE (14 01) with ACK and READER CANCEL (14 02) with CAN while still
 INACTIVE, without changing state. With direct vend OFF the INACTIVE state stays spec-strict as before.
+
+### Dashboard: device tabs, log recording, History, Export (dashboard only, nothing on the device)
+
+- Picking a device opens a tab; every open tab keeps its own log buffer and cached settings / VMC state and
+  keeps being recorded in the background (unread counter on the tab). Open tabs survive a restart.
+- **Record** toggle (default ON): one text file per device per day under
+  `%APPDATA%\Hardware Dashboard\logs\<deviceId>\`. **History** reads them back offline with a filter and
+  export. **Export** saves the tab on screen as .txt.
 
 ### Docs
 

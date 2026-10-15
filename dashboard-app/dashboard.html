@@ -375,6 +375,55 @@
   #pubPayload { flex: 3; min-width: 260px; }
   #pubSend { border-color: #2a5a3a; color: #6fe89a; }
 
+  /* device tabs - one per watched device, each with its own log buffer */
+  #tabs {
+    display: flex; align-items: flex-end; gap: 4px; padding: 6px 16px 0; background: #0e1217;
+    border-bottom: 1px solid #232a33; flex-shrink: 0; overflow-x: auto; min-height: 34px;
+  }
+  .tab {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 6px; font-size: 12px;
+    border: 1px solid #232a33; border-bottom: none; border-radius: 7px 7px 0 0; background: #12161c;
+    color: #9fb3c8; cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  .tab:hover { background: #171d25; }
+  .tab.active { background: #1a2029; color: #d7e0ea; border-color: #2c3440; font-weight: 600; }
+  .tab .pdot { width: 7px; height: 7px; border-radius: 50%; background: #4c5a6b; flex-shrink: 0; }
+  .tab .pdot.on { background: #6fe89a; }
+  .tab .pdot.off { background: #e86f6f; }
+  .tab .unread { font-size: 10px; color: #e8c766; background: #2a2410; border-radius: 8px; padding: 0 6px; }
+  .tab .x { color: #56657a; font-size: 13px; line-height: 1; padding: 0 2px; }
+  .tab .x:hover { color: #e86f6f; }
+  #tabs .hint { color: #56657a; font-size: 11px; padding: 0 4px 8px; }
+
+  /* log recording + export + history */
+  #exportBtn { border-color: #2a3f5a; color: #6fb3e8; }
+  #historyBtn { border-color: #4a3a1a; color: #e8c766; }
+  #historyOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    align-items: center; justify-content: center; z-index: 11;
+  }
+  #historyOverlay.open { display: flex; }
+  #historyPanel {
+    background: #12161c; border: 1px solid #2c3440; border-radius: 10px;
+    width: min(1100px, 96vw); height: 88vh; display: flex; flex-direction: column;
+  }
+  #historyPanel header { background: transparent; border-bottom: 1px solid #232a33; }
+  #historyPanel header h1 { color: #e8c766; }
+  #historyBar {
+    display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #232a33; align-items: center; flex-wrap: wrap;
+  }
+  #historyBar input {
+    background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px;
+    padding: 6px 9px; font-size: 12.5px; font-family: inherit;
+  }
+  #hFilter { flex: 1; min-width: 200px; }
+  #historyLog {
+    flex: 1; overflow: auto; padding: 10px 16px; font-size: 12.5px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word; color: #c9d3de;
+  }
+  #historyLog .hl { color: #e8c766; }
+  #historyPath { color: #56657a; font-size: 11px; padding: 6px 16px; border-top: 1px solid #232a33; word-break: break-all; }
+
   /* passthrough command bar (subheader) */
   #ptCmd {
     background: #1c2129; color: #d7e0ea; border: 1px solid #2c3440; border-radius: 6px;
@@ -507,9 +556,16 @@
     </label>
     <button id="versionBtn" title="version - the device reports its mqtt-lib and hardware-lib versions (mqtt-lib 2.3.0+)">Version</button>
     <button id="explorerBtn" title="Live tree of EVERY topic on the broker, with raw publish to any topic">Topics</button>
-    <button id="clearBtn">Clear</button>
+    <button id="clearBtn" title="Clears this tab's log on screen and in memory (the recorded file on disk is kept)">Clear</button>
+    <span class="divider"></span>
+    <label class="tswitch" title="Record every line of every open tab to disk: one text file per device per day under the dashboard's logs folder (History button shows them, also with no connection). Default ON.">
+      <input type="checkbox" id="recordToggle" checked><span class="slider"></span><span class="tlabel">Record</span>
+    </label>
+    <button id="exportBtn" title="Save this tab's log (everything held in memory, up to the buffer limit) as a .txt file">Export</button>
+    <button id="historyBtn" title="Open recorded logs from disk: pick device and day, filter, export - works offline">History</button>
     <span id="count">0 lines</span>
   </header>
+  <div id="tabs"></div>
   <div id="subheader">
     <span class="pgroup mode-mdb">
     <span id="vmcStatus" class="vmc-nodata"><span class="dot"></span><span id="vmcStatusText">no VMC data yet</span></span>
@@ -542,6 +598,29 @@
         <input id="pubPayload" placeholder="payload, e.g. ping" spellcheck="false">
         <button id="pubSend">PUBLISH</button>
       </div>
+    </div>
+  </div>
+
+  <div id="historyOverlay">
+    <div id="historyPanel">
+      <header>
+        <h1>LOG HISTORY</h1>
+        <span class="label">Recorded on this PC while the dashboard was open - one file per device per day. Reads from disk, no connection needed.</span>
+        <button id="historyCloseBtn" style="margin-left:auto">Close</button>
+      </header>
+      <div id="historyBar">
+        <span class="label">device:</span>
+        <select id="hDevice"></select>
+        <span class="label">day:</span>
+        <select id="hDay"></select>
+        <button id="hLoadBtn">Load</button>
+        <input id="hFilter" placeholder="filter lines (case-insensitive), e.g. VEND or 13 04" spellcheck="false">
+        <button id="hExportBtn" title="Save the lines shown (after the filter) as a .txt file">Export</button>
+        <button id="hFolderBtn" title="Open the logs folder in Explorer">Open folder</button>
+        <span id="hCount" class="label" style="margin-left:auto"></span>
+      </div>
+      <div id="historyLog">(pick a device and a day, then Load)</div>
+      <div id="historyPath"></div>
     </div>
   </div>
 
@@ -700,6 +779,7 @@
       : (f ? shown + '/' + ids.length + ' match' : '(' + ids.length + ' devices)');
     deviceSelectEl.value = currentDeviceId || '';
     if (!deviceSelectEl.value) ph.selected = true;
+    scheduleTabsRender();
   }
   deviceFilterEl.addEventListener('input', rebuildDeviceOptions);
   deviceFilterEl.addEventListener('keydown', (e) => {
@@ -729,16 +809,46 @@
    * different device aren't meaningful mixed together) and re-syncs the config/settings panels
    * from whichever device is now selected, since two machines can easily have different configs. */
   function selectDevice(id) {
+    if (!id) return;
+    openTab(id); // a selected device always has a tab; the tab keeps its buffer when you switch away
     if (currentDeviceId === id) return;
+    if (currentDeviceId) {
+      const prev = devState(currentDeviceId);
+      prev.lineCount = lineCount;
+      prev.hiddenCount = hiddenCount;
+    }
     currentDeviceId = id;
     localStorage.setItem(LAST_DEVICE_KEY, id);
     deviceSelectEl.value = id;
-    logEl.innerHTML = '';
-    lineCount = 0;
-    countEl.textContent = '0 lines';
-    addLine('-- watching device: ' + id + ' --');
+    const st = devState(id);
+    st.unread = 0;
+    renderDeviceLog(id);
+    if (!st.rows.length) addLine('-- watching device: ' + id + ' --');
+    restoreSnapshots(id);
+    renderTabs();
     deviceLinked = false;
     markDeviceLinked();
+  }
+
+  /** Drops a tab. If it was the active one, the neighbour takes over (or nothing is selected). */
+  function closeTab(id) {
+    const i = openTabs.indexOf(id);
+    if (i === -1) return;
+    openTabs.splice(i, 1);
+    saveTabs();
+    if (currentDeviceId === id) {
+      currentDeviceId = null;
+      const next = openTabs[i] || openTabs[i - 1];
+      if (next) { selectDevice(next); return; }
+      logEl.innerHTML = '';
+      lineCount = 0; hiddenCount = 0;
+      countEl.textContent = '0 lines';
+      deviceSelectEl.value = '';
+      deviceLinked = false;
+      clearTimeout(pingTimer);
+      setStatus('linking', 'no tab open - pick a device');
+    }
+    renderTabs();
   }
 
   deviceSelectEl.onchange = (e) => selectDevice(e.target.value);
@@ -1276,16 +1386,17 @@
 
   /** One compact item -> one decoded sentence. Unknown codes (older viewer cache, newer
    * device) still render as [SCHEMA/code] p0 | p1 — logs are never dropped. */
-  function addCompactLine(json) {
+  function addCompactLine(json, devId) {
+    const id = devId || currentDeviceId;
     let item;
     try {
       item = JSON.parse(json);
     } catch (e) {
-      addLine(json); // not actually JSON — show it raw rather than lose it
+      addLine(json, undefined, id); // not actually JSON — show it raw rather than lose it
       return;
     }
     const p = Array.isArray(item.p) ? item.p : [];
-    const book = codebooks[currentDeviceId];
+    const book = codebooks[id];
     const entry = book && book[item.s] && book[item.s][item.m];
     let text;
     if (entry) {
@@ -1295,12 +1406,12 @@
       }
     } else {
       text = '[' + item.s + '/' + item.m + '] ' + p.join(' | ');
-      if (client.connected && currentDeviceId && !book) {
-        client.publish(ptTopicFor(currentDeviceId), 'getCodebook');
+      if (client.connected && id && !book) {
+        client.publish(ptTopicFor(id), 'getCodebook');
       }
     }
     if (item.i) text += '   #' + item.i; // session id — same tag across one whole vend
-    addLine(text, item.k === 'e' ? 'err' : (item.k === 'd' ? '' : 'rx'));
+    addLine(text, item.k === 'e' ? 'err' : (item.k === 'd' ? '' : 'rx'), id);
   }
 
   /** Sets the two mode dropdowns to whatever the device actually reports, from a "SETTINGS_JSON:"
@@ -1415,34 +1526,76 @@
     return text.indexOf('other peripheral') !== -1 || text.indexOf('OTHER PERIPHERAL') !== -1;
   }
 
-  function addLine(text, cls) {
-    if (cashlessOnlyEl && cashlessOnlyEl.checked && isOtherPeripheralLine(text)) {
+  function fmtTs(d) {
+    return d.toLocaleTimeString('en-GB', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  }
+  function rowEl(r) {
+    const row = document.createElement('div');
+    row.className = 'line';
+    const ts = document.createElement('span');
+    ts.className = 'ts';
+    ts.textContent = r.ts;
+    const msg = document.createElement('span');
+    msg.className = 'msg ' + (r.cls || (r.text.startsWith('--') ? 'info' : r.text.startsWith('RX') ? 'rx' : ''));
+    msg.textContent = r.text;
+    row.appendChild(ts);
+    row.appendChild(msg);
+    return row;
+  }
+  function isHiddenLine(text) {
+    return cashlessOnlyEl && cashlessOnlyEl.checked && isOtherPeripheralLine(text);
+  }
+
+  /** [devId] = which device's buffer the line belongs to (default: the one on screen). Lines
+   * for a background tab are stored, counted as unread and recorded, but not drawn. Lines with
+   * no device at all (mqtt errors before any tab) go straight to the screen. */
+  function addLine(text, cls, devId) {
+    const id = devId || currentDeviceId;
+    const now = new Date();
+    const r = { ts: fmtTs(now), text: text, cls: cls };
+    if (id) {
+      const st = devState(id);
+      st.rows.push(r);
+      if (st.rows.length > DEV_ROWS_MAX) st.rows.splice(0, st.rows.length - DEV_ROWS_MAX);
+      recordLine(id, now, text);
+      if (id !== currentDeviceId) {
+        st.unread++;
+        scheduleTabsRender();
+        return;
+      }
+    }
+    if (isHiddenLine(text)) {
       hiddenCount++;
       countEl.textContent = lineCount + ' lines' + (hiddenCount ? '  (' + hiddenCount + ' hidden)' : '');
       return;
     }
-    const row = document.createElement('div');
-    row.className = 'line';
-
-    const ts = document.createElement('span');
-    ts.className = 'ts';
-    ts.textContent = new Date().toLocaleTimeString('en-GB', { hour12: false }) +
-      '.' + String(new Date().getMilliseconds()).padStart(3, '0');
-
-    const msg = document.createElement('span');
-    msg.className = 'msg ' + (cls || (text.startsWith('--') ? 'info' : text.startsWith('RX') ? 'rx' : ''));
-    msg.textContent = text;
-
-    row.appendChild(ts);
-    row.appendChild(msg);
-    logEl.appendChild(row);
+    logEl.appendChild(rowEl(r));
+    while (logEl.childElementCount > RENDER_MAX) logEl.removeChild(logEl.firstChild);
     logEl.scrollTop = logEl.scrollHeight;
-
     lineCount++;
     countEl.textContent = lineCount + ' lines' + (hiddenCount ? '  (' + hiddenCount + ' hidden)' : '');
   }
 
+  /** Redraws the screen from [id]'s buffer (last RENDER_MAX visible rows). */
+  function renderDeviceLog(id) {
+    const st = devState(id);
+    logEl.innerHTML = '';
+    lineCount = 0; hiddenCount = 0;
+    const frag = document.createDocumentFragment();
+    const visible = [];
+    for (const r of st.rows) {
+      if (isHiddenLine(r.text)) { hiddenCount++; continue; }
+      visible.push(r);
+    }
+    for (const r of visible.slice(-RENDER_MAX)) frag.appendChild(rowEl(r));
+    lineCount = visible.length;
+    logEl.appendChild(frag);
+    logEl.scrollTop = logEl.scrollHeight;
+    countEl.textContent = lineCount + ' lines' + (hiddenCount ? '  (' + hiddenCount + ' hidden)' : '');
+  }
+
   document.getElementById('clearBtn').onclick = () => {
+    if (currentDeviceId) devState(currentDeviceId).rows = [];
     logEl.innerHTML = '';
     lineCount = 0;
     hiddenCount = 0;
@@ -1507,14 +1660,15 @@
       if (id) {
         if (!deviceScheme[id]) deviceScheme[id] = bulkScheme;
         registerDevice(id);
-        if (id === currentDeviceId) {
-          markDeviceLinked();
+        if (id === currentDeviceId || openTabs.indexOf(id) !== -1) {
+          devState(id).linked = true;
+          if (id === currentDeviceId) markDeviceLinked();
           try {
             const items = JSON.parse(text).logs || [];
-            addLine('-- bulk upload: ' + items.length + ' item(s) --');
-            for (const item of items) addCompactLine(JSON.stringify(item));
+            addLine('-- bulk upload: ' + items.length + ' item(s) --', undefined, id);
+            for (const item of items) addCompactLine(JSON.stringify(item), id);
           } catch (e) {
-            addLine('-- bulk parse error: ' + e.message + ' --');
+            addLine('-- bulk parse error: ' + e.message + ' --', undefined, id);
           }
         }
       }
@@ -1529,27 +1683,39 @@
     if (!fromDevice) return;
     if (!deviceScheme[fromDevice]) deviceScheme[fromDevice] = scheme;
     registerDevice(fromDevice);
-    if (fromDevice !== currentDeviceId) return; // presence noted, but not who we're watching
+    const isCurrent = fromDevice === currentDeviceId;
+    if (!isCurrent && openTabs.indexOf(fromDevice) === -1) return; // presence noted, not a tab we watch
+    const st = devState(fromDevice);
+    st.linked = true;
 
-    markDeviceLinked(); // any real message at all proves the selected device is alive
-    syncHwToggleFrom(text); // attach/detach confirmations flip the HW switch to device truth
+    if (isCurrent) {
+      markDeviceLinked(); // any real message at all proves the selected device is alive
+      syncHwToggleFrom(text); // attach/detach confirmations flip the HW switch to device truth
+    }
     if (text === 'PONG') {
       return; // just a heartbeat reply, nothing to show
     }
+    // Control-plane snapshots are cached per device so a tab shows its own values the moment
+    // you switch to it; only the device on screen drives the controls right now.
     if (text.startsWith('CONFIG_JSON:')) {
-      applyConfigSnapshot(text.slice('CONFIG_JSON:'.length));
+      st.config = text.slice('CONFIG_JSON:'.length);
+      if (isCurrent) applyConfigSnapshot(st.config);
       return; // kept out of the scrolling log — it's just a config sync, not a real MDB exchange
     }
     if (text.startsWith('SETTINGS_JSON:')) {
-      applySettingsSnapshot(text.slice('SETTINGS_JSON:'.length));
+      st.settings = text.slice('SETTINGS_JSON:'.length);
+      if (isCurrent) applySettingsSnapshot(st.settings);
       return; // same reasoning — a settings sync, not a real MDB exchange
     }
     if (text.startsWith('VMC_STATUS:')) {
-      applyVmcStatus(text.slice('VMC_STATUS:'.length));
+      st.vmc = text.slice('VMC_STATUS:'.length);
+      st.vmcAt = Date.now();
+      if (isCurrent) applyVmcStatus(st.vmc); else scheduleTabsRender();
       return; // a periodic heartbeat, not a real MDB exchange — kept out of the scrolling log
     }
     if (text.startsWith('MQTT_STATS:')) {
-      applyLinkStats(text.slice('MQTT_STATS:'.length));
+      st.stats = text.slice('MQTT_STATS:'.length);
+      if (isCurrent) applyLinkStats(st.stats);
       return; // link-health sync, shown in the badge, not in the scrolling log
     }
     if (text.startsWith('CODEBOOK_JSON:')) {
@@ -1557,17 +1723,17 @@
       return; // decode plumbing, not a log line
     }
     if (text.startsWith('RABBAH_LOG:')) {
-      addCompactLine(text.slice('RABBAH_LOG:'.length));
+      addCompactLine(text.slice('RABBAH_LOG:'.length), fromDevice);
       return; // decoded into a sentence by the codebook
     }
     // The production app publishes the compact envelope as BARE JSON (no RABBAH_LOG: prefix)
     // on devices/<code>/logs - same decoder, different framing.
     if (text.startsWith('{') && text.includes('"m"') && text.includes('"s"')) {
-      addCompactLine(text);
+      addCompactLine(text, fromDevice);
       return;
     }
-    handleConfigAck(text);
-    addLine(text);
+    if (isCurrent) handleConfigAck(text);
+    addLine(text, undefined, fromDevice);
   });
 
   // EVERY dashboard command - buttons, config panel, passthrough bar - goes to the selected
@@ -1828,7 +1994,224 @@
     sendCommand('setPeripheralVisibility:' + (e.target.checked ? 'off' : 'on'),
       e.target.checked ? 'Other peripherals: hidden (device stops sending them)'
                        : 'Other peripherals: SHOWN (device now sends them)');
+    if (currentDeviceId) renderDeviceLog(currentDeviceId); // the view filter changed - redraw from the buffer
   };
+
+  // ======================= per-device state, tabs, recording, export, history =======================
+  // Every device with a tab keeps: its log rows (ring buffer), the last control snapshots it
+  // sent (settings / config / VMC status / link stats) and an unread counter. Switching tabs is
+  // a redraw from that state - nothing is lost and nothing is mixed between machines.
+  const DEV_ROWS_MAX = 5000;   // rows kept in memory per device
+  const RENDER_MAX = 2000;     // rows drawn on screen per device (older ones stay in memory + on disk)
+  const deviceStates = {};
+  function devState(id) {
+    return deviceStates[id] || (deviceStates[id] = {
+      rows: [], lineCount: 0, hiddenCount: 0, unread: 0, linked: false,
+      settings: null, config: null, vmc: null, vmcAt: 0, stats: null,
+    });
+  }
+
+  /** Puts the controls back to what [id] last reported, so the tab you switch to never shows
+   * the previous machine's toggles. Fresh values follow from the getSettings markDeviceLinked sends. */
+  function restoreSnapshots(id) {
+    const st = devState(id);
+    if (st.settings) applySettingsSnapshot(st.settings);
+    if (st.config) applyConfigSnapshot(st.config);
+    clearTimeout(vmcStatusStaleTimer);
+    if (st.vmc && Date.now() - st.vmcAt < VMC_STATUS_STALE_MS) applyVmcStatus(st.vmc);
+    else setVmcStatus('vmc-nodata', st.vmc ? 'no VMC data — last report ' + Math.round((Date.now() - st.vmcAt) / 1000) + ' s ago' : 'no VMC data yet');
+    if (st.stats) applyLinkStats(st.stats);
+    else { linkStatusEl.className = ''; linkStatusTextEl.textContent = 'link: no data'; linkStatusEl.title = ''; }
+  }
+
+  // ---- tabs ----
+  const TABS_KEY = 'cm30-tabs';
+  const tabsEl = document.getElementById('tabs');
+  let openTabs = [];
+  try { openTabs = JSON.parse(localStorage.getItem(TABS_KEY) || '[]').filter((x) => typeof x === 'string' && x); } catch (e) { openTabs = []; }
+  function saveTabs() { localStorage.setItem(TABS_KEY, JSON.stringify(openTabs)); }
+  function openTab(id) {
+    if (openTabs.indexOf(id) !== -1) return;
+    openTabs.push(id);
+    saveTabs();
+    renderTabs();
+  }
+  let tabsRenderTimer = null;
+  function scheduleTabsRender() {
+    if (tabsRenderTimer) return;
+    tabsRenderTimer = setTimeout(() => { tabsRenderTimer = null; renderTabs(); }, 250);
+  }
+  function vmcShort(st) {
+    if (!st.vmc) return '';
+    try { return (JSON.parse(st.vmc).state || '').replace('_STATE', ''); } catch (e) { return ''; }
+  }
+  function renderTabs() {
+    tabsEl.innerHTML = '';
+    if (!openTabs.length) {
+      const h = document.createElement('span');
+      h.className = 'hint';
+      h.textContent = 'no tabs - pick a device in the dropdown to open one; every open tab keeps its own log and is recorded';
+      tabsEl.appendChild(h);
+      return;
+    }
+    for (const id of openTabs) {
+      const st = devState(id);
+      const t = document.createElement('span');
+      t.className = 'tab' + (id === currentDeviceId ? ' active' : '');
+      const dot = document.createElement('span');
+      dot.className = 'pdot' + (devicePresence[id] === true ? ' on' : devicePresence[id] === false ? ' off' : '');
+      t.appendChild(dot);
+      const name = document.createElement('span');
+      const vs = vmcShort(st);
+      name.textContent = id + (vs ? ' · ' + vs : '');
+      t.appendChild(name);
+      if (st.unread && id !== currentDeviceId) {
+        const u = document.createElement('span');
+        u.className = 'unread';
+        u.textContent = st.unread > 999 ? '999+' : String(st.unread);
+        t.appendChild(u);
+      }
+      const x = document.createElement('span');
+      x.className = 'x';
+      x.textContent = '×';
+      x.title = 'close tab (the recorded file on disk is kept)';
+      x.onclick = (e) => { e.stopPropagation(); closeTab(id); };
+      t.appendChild(x);
+      t.title = id + (devicePresence[id] === true ? ' - online' : devicePresence[id] === false ? ' - offline (retained status)' : '') +
+        (st.rows.length ? ' - ' + st.rows.length + ' lines in memory' : '') + (st.unread ? ' - ' + st.unread + ' new' : '');
+      t.onclick = () => selectDevice(id);
+      tabsEl.appendChild(t);
+    }
+  }
+
+  // ---- recording to disk ----
+  // One text file per device per day: <userData>/logs/<deviceId>/<YYYY-MM-DD>.txt, each line
+  // "HH:MM:SS.mmm  text". Written in small batches so a busy bus never blocks the page.
+  const nodeFs = require('fs');
+  const nodePath = require('path');
+  const { ipcRenderer } = require('electron');
+  let LOGS_DIR = null;
+  ipcRenderer.invoke('logs-dir').then((d) => { LOGS_DIR = d; }).catch(() => {});
+  const recordToggle = document.getElementById('recordToggle');
+  recordToggle.checked = localStorage.getItem('cm30-record') !== 'off';
+  recordToggle.onchange = () => {
+    localStorage.setItem('cm30-record', recordToggle.checked ? 'on' : 'off');
+    addLine('-- recording to disk: ' + (recordToggle.checked ? 'ON' : 'OFF') + (LOGS_DIR ? ' (' + LOGS_DIR + ')' : '') + ' --');
+  };
+  function isoDay(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function safeName(s) { return String(s).replace(/[^A-Za-z0-9._-]/g, '_'); }
+  const pendingWrites = {}; // file -> [lines]
+  function recordLine(id, now, text) {
+    if (!recordToggle.checked || !LOGS_DIR) return;
+    const file = nodePath.join(LOGS_DIR, safeName(id), isoDay(now) + '.txt');
+    (pendingWrites[file] || (pendingWrites[file] = [])).push(fmtTs(now) + '  ' + text);
+  }
+  function flushRecords() {
+    for (const file of Object.keys(pendingWrites)) {
+      const lines = pendingWrites[file];
+      delete pendingWrites[file];
+      try {
+        nodeFs.mkdirSync(nodePath.dirname(file), { recursive: true });
+        nodeFs.appendFileSync(file, lines.join('\n') + '\n', 'utf8');
+      } catch (e) { /* disk full / locked - keep the page alive, the line is still on screen */ }
+    }
+  }
+  setInterval(flushRecords, 700);
+  window.addEventListener('beforeunload', flushRecords);
+
+  // ---- export the live buffer ----
+  document.getElementById('exportBtn').onclick = async () => {
+    if (!currentDeviceId) { addLine('-- export: no device tab selected --'); return; }
+    const st = devState(currentDeviceId);
+    if (!st.rows.length) { addLine('-- export: nothing to export for ' + currentDeviceId + ' --'); return; }
+    const now = new Date();
+    const name = safeName(currentDeviceId) + '-' + isoDay(now) + '-' + fmtTs(now).replace(/[:.]/g, '') + '.txt';
+    const header = '# Hardware Dashboard log export - device ' + currentDeviceId + ' - ' + now.toString() + ' - ' + st.rows.length + ' lines\n';
+    const text = header + st.rows.map((r) => r.ts + '  ' + r.text).join('\n') + '\n';
+    try {
+      const p = await ipcRenderer.invoke('save-text', name, text);
+      addLine(p ? '-- exported ' + st.rows.length + ' lines to ' + p + ' --' : '-- export cancelled --');
+    } catch (e) { addLine('-- export failed: ' + e.message + ' --', 'err'); }
+  };
+
+  // ---- history: read recorded files back, offline ----
+  const historyOverlay = document.getElementById('historyOverlay');
+  const hDevice = document.getElementById('hDevice');
+  const hDay = document.getElementById('hDay');
+  const hFilter = document.getElementById('hFilter');
+  const historyLog = document.getElementById('historyLog');
+  const historyPath = document.getElementById('historyPath');
+  const hCount = document.getElementById('hCount');
+  let hLines = [];     // the loaded file, split into lines
+  let hShown = [];     // after the filter
+  let hFile = null;
+  function listDirs(p) {
+    try { return nodeFs.readdirSync(p, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort(); } catch (e) { return []; }
+  }
+  function listDays(dev) {
+    try { return nodeFs.readdirSync(nodePath.join(LOGS_DIR, dev)).filter((f) => f.endsWith('.txt')).map((f) => f.slice(0, -4)).sort().reverse(); } catch (e) { return []; }
+  }
+  function fillSelect(sel, items, keep) {
+    sel.innerHTML = '';
+    if (!items.length) {
+      const o = document.createElement('option'); o.value = ''; o.textContent = '(none)'; o.disabled = true; o.selected = true; sel.appendChild(o);
+      return;
+    }
+    for (const it of items) { const o = document.createElement('option'); o.value = it; o.textContent = it; sel.appendChild(o); }
+    sel.value = (keep && items.indexOf(keep) !== -1) ? keep : items[0];
+  }
+  function refreshHistoryLists() {
+    flushRecords(); // today's file is complete up to this second
+    if (!LOGS_DIR) { fillSelect(hDevice, []); fillSelect(hDay, []); return; }
+    fillSelect(hDevice, listDirs(LOGS_DIR), hDevice.value || (currentDeviceId && safeName(currentDeviceId)));
+    fillSelect(hDay, hDevice.value ? listDays(hDevice.value) : [], hDay.value);
+  }
+  hDevice.onchange = () => fillSelect(hDay, hDevice.value ? listDays(hDevice.value) : []);
+  function renderHistory() {
+    const q = hFilter.value.trim().toLowerCase();
+    hShown = q ? hLines.filter((l) => l.toLowerCase().indexOf(q) !== -1) : hLines;
+    const cap = 20000;
+    historyLog.textContent = hShown.length ? hShown.slice(-cap).join('\n') : (hLines.length ? '(no line matches the filter)' : '(empty file)');
+    hCount.textContent = hShown.length + ' / ' + hLines.length + ' lines' + (hShown.length > cap ? ' (showing last ' + cap + ')' : '');
+    historyLog.scrollTop = historyLog.scrollHeight;
+  }
+  document.getElementById('hLoadBtn').onclick = () => {
+    if (!hDevice.value || !hDay.value) { historyLog.textContent = '(nothing recorded yet - leave Record ON while the dashboard runs)'; return; }
+    flushRecords();
+    hFile = nodePath.join(LOGS_DIR, hDevice.value, hDay.value + '.txt');
+    try {
+      hLines = nodeFs.readFileSync(hFile, 'utf8').split('\n').filter((l) => l.length);
+    } catch (e) { hLines = []; historyLog.textContent = '(cannot read ' + hFile + ': ' + e.message + ')'; return; }
+    historyPath.textContent = hFile;
+    renderHistory();
+  };
+  let hFilterTimer = null;
+  hFilter.addEventListener('input', () => { clearTimeout(hFilterTimer); hFilterTimer = setTimeout(renderHistory, 150); });
+  document.getElementById('hExportBtn').onclick = async () => {
+    if (!hShown.length) return;
+    const name = (hDevice.value || 'device') + '-' + (hDay.value || 'log') + (hFilter.value.trim() ? '-filtered' : '') + '.txt';
+    try {
+      const p = await ipcRenderer.invoke('save-text', name, hShown.join('\n') + '\n');
+      if (p) historyPath.textContent = 'exported ' + hShown.length + ' lines to ' + p;
+    } catch (e) { historyPath.textContent = 'export failed: ' + e.message; }
+  };
+  document.getElementById('hFolderBtn').onclick = () => { if (LOGS_DIR) ipcRenderer.invoke('open-path', LOGS_DIR); };
+  document.getElementById('historyBtn').onclick = () => { refreshHistoryLists(); historyOverlay.classList.add('open'); };
+  document.getElementById('historyCloseBtn').onclick = () => historyOverlay.classList.remove('open');
+
+  // ---- restore last session's tabs (last, so every helper above already exists) ----
+  renderTabs();
+  // Tabs remembered from last time come back at once (their devices register when they speak).
+  for (const id of openTabs) { knownDeviceIds.add(id); }
+  rebuildDeviceOptions();
+  // registerDevice() auto-selects the remembered device when it shows up; until then the first
+  // remembered tab is on screen so the layout is never empty.
+  if (openTabs.length && !currentDeviceId) {
+    const remembered = localStorage.getItem(LAST_DEVICE_KEY);
+    selectDevice(openTabs.indexOf(remembered) !== -1 ? remembered : openTabs[0]);
+  }
 </script>
 </body>
 </html>

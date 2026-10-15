@@ -74,7 +74,7 @@
         <tr><td><code>libs/CM30-HardwareLibrary-1.0.9.aar</code></td><td>unchanged</td></tr>
         <tr><td><code>AAR-Update-latest.zip</code></td><td>the three AARs + AAR-HANDOFF-README.md + API-REFERENCE.md + PULSE-README.md</td></tr>
         <tr><td><code>MDB-Slave-2-v2.17.0-build104-debug.apk</code></td><td>demo/test app on the new libraries</td></tr>
-        <tr><td><code>Hardware-Dashboard-win32-x64-v8.2.1.zip</code></td><td>Windows dashboard (Force End toggle, link-health badge)</td></tr>
+        <tr><td><code>Hardware-Dashboard-win32-x64-v8.2.1.zip</code></td><td>Windows dashboard: device tabs, log recording to disk, History and Export (uploaded again 15 Oct afternoon; re-download if you took it in the morning)</td></tr>
       </tbody>
     </table></div>
 <pre><code>implementation files('libs/mqtt-lib-2.7.1.aar')
@@ -111,6 +111,15 @@ implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
       <li>VEND CANCEL / VEND SUCCESS / VEND FAILURE / SESSION COMPLETE (13 01..04) are ACKed in every state. Outside VEND_STATE nothing else happens, except that a stray SESSION COMPLETE arms END SESSION for the next POLL so the machine can close its side. No VendListener callback, state unchanged.</li>
       <li>RESET wipes every per-session flag (session begin / end / cancel pending, approve pending, request received, cooldown), so nothing from the previous session survives a machine restart.</li>
       <li>With direct vend ON the reader answers READER ENABLE (14 01) with ACK and READER CANCEL (14 02) with CAN while still INACTIVE, without changing state. With direct vend OFF the INACTIVE state stays spec-strict.</li>
+    </ul>
+  </section>
+
+  <section>
+    <header><h2>Dashboard: device tabs, log recording, History, Export</h2><span class="tag ok">dashboard only, nothing on the device</span></header>
+    <ul>
+      <li>Picking a device opens a <strong>tab</strong>; every open tab keeps its own log buffer and cached settings / VMC state and keeps being recorded while another tab is on screen (unread counter on the tab). Open tabs survive a restart. Commands go to the tab on screen only.</li>
+      <li><strong>Record</strong> toggle (default ON): every line of every open tab is appended to a text file on the PC, one file per device per day under <code>%APPDATA%\Hardware Dashboard\logs\&lt;deviceId&gt;\</code>.</li>
+      <li><strong>History</strong> reads those files back with no connection: pick device and day, filter, export the shown lines. <strong>Export</strong> saves the tab on screen as .txt.</li>
     </ul>
   </section>
 
