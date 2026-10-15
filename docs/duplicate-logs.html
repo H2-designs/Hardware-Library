@@ -1,0 +1,111 @@
+<title>Duplicate Logs Explained</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+<style>
+  h1 { margin-bottom: 6px; }
+  h2 { margin-top: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  h3 { margin-top: 6px; }
+  main > * + * { margin-top: 0; }
+  main { gap: 14px; }
+  pre { white-space: pre; }
+  ol, ul { display: flex; flex-direction: column; gap: 6px; }
+</style>
+<main>
+<h1>Why log lines were duplicated, and how 8.2.1 / 2.7.1 stops it</h1>
+<p>Hardware-Library, 15 October 2026. Applies to hardware-lib 8.2.1 + mqtt-lib 2.7.1 (release v8.2.1). Companion to <code>AAR-HANDOFF-README.md</code> (sections "8.2.1 / mqtt-lib 2.7.1" and "Register listeners ONCE").</p>
+<h2>1. What was seen</h2>
+<p>Two different symptoms, same family of cause.</p>
+<p><strong>Case A - on the device screen (8 October 2026).</strong> Every exchange appeared once in the library's own words and then ten more times in the app's own format:</p>
+<pre><code>SETUP CONFIG rx=11 00 03 10 02 00 26 tx=READER CONFIG DATA level=3
+[V/113] 11 00 03 10 02 00 26 | READER CONFIG DATA | 3
+[V/113] 11 00 03 10 02 00 26 | READER CONFIG DATA | 3
+... (x10)</code></pre>
+<p><strong>Case B - on the backend (field case D-0961, 15 October 2026).</strong> One sale produced VEND APPROVED four times within 20 ms, most other exchanges twice, and a stream of plain-text lines filed under <code>device.log.unknown_source</code> that said the same thing as the coded items next to them.</p>
+<p>The dashboard, which reads the same MQTT stream, showed each exchange once in case A and the copies in case B. That difference is the first clue: case A was duplicated before MQTT (in the app's own log view), case B on the way to MQTT.</p>
+<h2>2. How one exchange travels</h2>
+<pre><code>VMC ──POLL──&gt; MDB bus thread ──&gt; engine answers ONCE ──&gt; deliver(event)   (one call per exchange)
+                                                              │
+                 ┌────────────────────────────────────────────┼──────────────────────────────┐
+                 │                                            │                              │
+          logListener(s)                              exchangeListener(s)              controlListener(s)
+          plain text line                             structured MdbExchangeEvent       SETTINGS_JSON / VMC_STATUS
+          "VEND APPROVED rx=12 tx=VEND APPROVED"      code 122, params, sessionId       (not log lines)
+                 │                                            │
+         app's on-screen log                        a BRIDGE turns it into ONE coded RabbahLog item
+                                                              │
+                                                    RabbahLog.log(event, params)
+                                                              │
+                                                    MqttLib outbound queue ──&gt; broker ──&gt; backend</code></pre>
+<p>Three facts about this pipeline decide everything below:</p>
+<ol><li>The engine calls <code>deliver()</code> exactly once per exchange. It answers one POLL with one reply; it cannot produce two VEND APPROVED for one POLL. A duplicate is never the bus and never the engine.</li><li>Every listener feed is a list. <code>addExchangeListener</code>, <code>addLogListener</code>, <code>addStateListener</code>, <code>addControlListener</code>, <code>addRs232EventListener</code> and <code>MqttLib.addCommandListener</code> each hold a list, and <code>deliver()</code> calls every entry in the list. N entries = N copies of every event.</li><li>Whatever is registered as a bridge publishes to the backend. Two bridges = two wire items per exchange.</li></ol>
+<h2>3. Root cause 1: the same listener registered many times (case A)</h2>
+<p>Before 8.2.1 the listener lists were plain <code>CopyOnWriteArrayList.add(...)</code>. Nothing deduplicated them and nothing removed entries by itself. The fleet app registered its exchange listener from an Activity (<code>onCreate</code> / <code>onResume</code>), so every screen rotation, every return from background and every Activity recreation added one more entry with the same code. After ten recreations the list held ten entries, and <code>deliver()</code> faithfully called all ten.</p>
+<p>Why the dashboard still showed one line: the library's own bridge (<code>attachRabbahMqtt()</code>) was guarded by a boolean and registered once, so the MQTT stream carried one coded item per exchange. Only the app's own listener had multiplied.</p>
+<p>How to recognise it: the copies are in the app's format, not the library's; the count grows over the app's uptime and resets on restart; the dashboard shows one line.</p>
+<h2>4. Root cause 2: two bridges publishing the same exchange (case B)</h2>
+<p>The sample <code>MdbMqttBridge.kt</code> was copied into the fleet app. It registered an exchange listener that turned every <code>MdbExchangeEvent</code> into a coded <code>RabbahLog</code> item. Independently of that, <code>HardwareLib.attachRabbahMqtt()</code> also ran, either from mqtt-lib's auto-attach on the first broker connection or from the dashboard's HW toggle (<code>attachHardware</code>). Before 8.2.1 <code>attachRabbahMqtt()</code> forwarded exchanges as plain text log lines, not coded items, which is where <code>device.log.unknown_source</code> came from: the same exchange, once as text from the library's bridge and once as a coded item from the app's bridge.</p>
+<p>Then root cause 1 multiplied it. The app's bridge was attached per Activity, so its listener sat in the list twice; with the library bridge next to it one VEND APPROVED became four wire items inside the same <code>deliver()</code> loop. That is why the four copies were 20 ms apart and not 50 or 100 ms: they were produced in one pass over one listener list, not by the machine polling again. Real repeats on an MDB bus are at POLL cadence, 50 to 100 ms or more, and carry different timestamps from the engine.</p>
+<p>How to recognise it: copies on the backend as well as on the device; identical code, params and session id; spacing of a few milliseconds; plain-text twins of coded items.</p>
+<h2>5. What 8.2.1 / 2.7.1 changed (three guards, all inside the libraries)</h2>
+<p><strong>Guard 1 - a listener instance can only be registered once.</strong> Every <code>add*Listener</code> and <code>MqttLib.addCommandListener</code> now uses <code>addIfAbsent</code> and returns <code>false</code> when that exact instance is already in the list. A bridge or Activity that calls <code>attach()</code> on every recreation no longer stacks publishers. (A new lambda object on every call is still a new instance; see section 6.)</p>
+<p><strong>Guard 2 - <code>attachRabbahMqtt()</code> is the complete bridge, and the only one you need.</strong> Since 8.2.1 it registers an exchange forwarder that publishes each MDB exchange as ONE coded <code>RabbahLog</code> item (through reflection into mqtt-lib: <code>MdbLogEvent.valueOf</code>, <code>RabbahLog.log</code>, <code>RabbahLog.setSessionId</code>), and it keeps the plain-text twin of that exchange local: while <code>deliver()</code> is dispatching an exchange it sets a <code>deliveringExchange</code> flag, and the bridge's log-line listener skips lines that arrive under that flag. Result: one coded item per exchange on the wire, no <code>unknown_source</code> text twin, and nothing left for an app-side bridge to do. The sample <code>MdbMqttBridge</code> is now a two-line wrapper: <code>attach() = HardwareLib.attachRabbahMqtt()</code>, <code>detach() = HardwareLib.detachRabbahMqtt()</code>. <code>attachRabbahMqtt()</code> is idempotent (a boolean plus guard 1) and <code>detachRabbahMqtt()</code> removes exactly the listeners attach registered, nothing else.</p>
+<p><strong>Guard 3 - <code>RabbahLog</code> drops an exact duplicate within 30 ms (mqtt-lib 2.7.1).</strong> The key is <code>schemaCode | sessionId | params</code>. An item identical to the previous one that arrives within 30 ms is not enqueued and <code>RabbahLog.dedupedItems</code> is incremented. This is a safety net for in-process fan-out only, which is why the window is 30 ms and not wider: two identical exchanges 50 ms apart are real bus traffic (a VMC re-polling) and the backend must see both. A rising <code>dedupedItems</code> counter after 8.2.1 means the app still wires a second publisher.</p>
+<h2>6. What the app must do (checklist for the Android engineer)</h2>
+<ol><li>Swap both AARs: <code>hardware-lib-8.2.1.aar</code>, <code>mqtt-lib-2.7.1.aar</code>. No API change.</li><li>Delete any exchange or log forwarder the app has of its own. Keep exactly one call to <code>HardwareLib.attachRabbahMqtt()</code> (or <code>MdbMqttBridge.attach()</code>, same thing). Calling it again is harmless.</li><li>Never run <code>attachLogSink</code> and <code>attachRabbahMqtt</code> together. <code>attachLogSink</code> is for a custom transport instead of mqtt-lib, not in addition to it.</li><li>Register the app's own listeners ONCE per process, in the Application class or a singleton. Listener slots are process-wide, not per screen.</li><li>If a screen must listen, keep the lambda in a field and call the matching <code>remove...Listener(sameReference)</code> in <code>onDestroy</code> / <code>onPause</code>. Guard 1 only recognises the same instance; a fresh lambda created in <code>onCreate</code> is a new instance every time and will be added again.</li><li>The single-slot vars (<code>HardwareLib.exchangeListener = ...</code>, <code>logListener = ...</code>, <code>stateListener = ...</code>) replace instead of adding. They are safe to assign again, but they are one slot each.</li></ol>
+<h2>7. How to tell which duplicate you are looking at</h2>
+<div class="twrap"><table><thead><tr><th>Symptom</th><th>Where</th><th>Spacing</th><th>Cause</th><th>Fix</th></tr></thead><tbody><tr><td>N copies in the app's own format, library line once, dashboard once</td><td>device screen only</td><td>same instant</td><td>listener registered N times (root cause 1)</td><td>register once; remove with the same reference</td></tr><tr><td>2 to 4 copies of the same coded item, plus plain-text twins as <code>unknown_source</code></td><td>backend and device</td><td>a few ms, inside 20 ms</td><td>two bridges, each possibly registered twice (root cause 2)</td><td>one <code>attachRabbahMqtt()</code>, delete the app bridge</td></tr><tr><td>2 identical items 50 to 100 ms apart with the engine's own different timestamps</td><td>backend</td><td>POLL cadence</td><td>the machine really repeated the exchange</td><td>nothing; this is bus truth and is kept</td></tr><tr><td><code>RabbahLog.dedupedItems</code> rising on 8.2.1</td><td>code / debugger</td><td>-</td><td>an extra publisher still wired</td><td>find the second <code>RabbahLog.log</code> caller or listener registration</td></tr></tbody></table></div>
+<h2>8. Verify after deploying 8.2.1</h2>
+<ol><li><code>version</code> on the dashboard passthrough answers <code>mqtt-lib 2.7.1, hardware-lib 8.2.1</code>.</li><li>Run one sale. On the backend each exchange appears once and VEND APPROVED appears once.</li><li>No <code>device.log.unknown_source</code> lines that repeat a coded item.</li><li>On the device screen, each exchange appears once in the library's words and once per app listener that is deliberately registered.</li><li>Rotate the screen or recreate the Activity ten times and repeat step 2. Counts must not grow.</li></ol>
+<p>Not yet run on a real CM30. Compiled, javap-checked, dex-checked. D-0961 is the first field check.</p>
+<h2>9. Questions that came up</h2>
+<p><strong>If one VEND APPROVED is sent once but two publishers each take 50 ms, does the 30 ms window miss it?</strong> No. The 30 ms window is not what fixes the problem. Guards 1 and 2 remove the second publisher, so one exchange reaches <code>RabbahLog.log</code> once and there is nothing to deduplicate. Guard 3 is only there for the in-process fan-out that produced the 20 ms copies, and all entries of one listener list are called in the same millisecond.</p>
+<p><strong>Why not a wider window?</strong> Because identical exchanges 50 ms apart are legitimate on an MDB bus. Hiding them would make the backend's view of the machine wrong to cover a bug that is already fixed upstream.</p>
+<p><strong>Why did the engine not have this problem?</strong> It never calls <code>deliver()</code> twice for one exchange. Duplication can only start after <code>deliver()</code>, in the listener lists and the bridges, which is exactly where the guards are.</p>
+<p><strong>Does the dashboard show duplicates?</strong> Only in case B. The dashboard reads the MQTT stream, so what it shows is what the backend receives. In case A the dashboard is the proof that the library stream is clean.</p>
+</main>
