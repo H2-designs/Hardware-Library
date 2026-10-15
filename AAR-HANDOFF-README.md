@@ -50,9 +50,10 @@ Not yet run on a real CM30 - compiled and API-checked.
 
 Also in 8.2.1, two field cases (15 October 2026):
 
-- **READER ENABLE (14 01) and READER CANCEL (14 02) are answered in INACTIVE too** (ACK / CAN, no state change), so
-  a machine that sends READER ENABLE before its setup is finished, or re-sends it after a RESET, no longer sees an
-  unanswered command and retries forever.
+- **READER ENABLE (14 01) and READER CANCEL (14 02) are answered in INACTIVE when direct vend is ON** (ACK / CAN,
+  no state change). A direct-vend machine that sends READER ENABLE before its setup is finished, or re-sends it
+  after a RESET, no longer sees an unanswered command and retries forever. With direct vend OFF, INACTIVE stays
+  spec-strict and READER ENABLE is answered once setup is complete (DISABLED), as before.
 - **SESSION COMPLETE (13 04) and the other vend-group commands are answered in EVERY state.** A machine that was
   mid-session when the reader restarted keeps sending SESSION COMPLETE afterwards; before 8.2.1 that was UNHANDLED in
   INACTIVE / DISABLED / ENABLED and the machine never closed its side. Now: 13 04 -> ACK, then END SESSION on the next
@@ -73,9 +74,9 @@ ANY state is ACKed and jumps to INACTIVE. Everything not listed for a state goes
 | SETUP MAX/MIN 11 01 | ACK (L1: -> DISABLED) | ACK (retry) | - | - |
 | EXPANSION REQUEST ID 17 00 | PERIPHERAL ID (L2: -> DISABLED; L3 stays) | PERIPHERAL ID (retry, L2+) | - | - |
 | EXPANSION ENABLE OPTIONS 17 04 | ACK (L3: -> DISABLED) | ACK (retry, L3) | - | - |
-| READER ENABLE 14 01 | ACK (8.2.1; stays INACTIVE) | ACK -> ENABLED, auto mode arms SESSION BEGIN | ACK, re-arms in auto mode | ACK |
+| READER ENABLE 14 01 | ACK only with direct vend ON (8.2.1; stays INACTIVE) | ACK -> ENABLED, auto mode arms SESSION BEGIN | ACK, re-arms in auto mode | ACK |
 | READER DISABLE 14 00 | ACK | ACK | ACK -> DISABLED | ACK, session closes with END SESSION on the next POLL |
-| READER CANCEL 14 02 | CAN (8.2.1) | CAN | CAN | CAN, session cancelled per cancel mode, onVendFailure if a vend was open |
+| READER CANCEL 14 02 | CAN only with direct vend ON (8.2.1) | CAN | CAN | CAN, session cancelled per cancel mode, onVendFailure if a vend was open |
 | VEND REQUEST 13 00 | only with direct vend ON: ACK -> VEND, onVendRequest | same | with direct vend ON or Always Idle declared: ACK -> VEND | ACK, onVendRequest; approveVend / cancelVend decide the next POLL |
 | VEND CANCEL 13 01 | ACK only (8.2.1) | ACK only (8.2.1) | ACK only (8.2.1) | ACK; next POLL sends the cancel mode reply; onVendFailure (CANCELLED_BY_VMC) |
 | VEND SUCCESS 13 02 | ACK only (8.2.1) | ACK only (8.2.1) | ACK only (8.2.1) | ACK; onVendSuccess; with Force End ON arms SESSION CANCEL REQUEST |
