@@ -215,11 +215,21 @@ Demo/test APK: **MDB-Slave-2 v2.16.0 build 103** bundles hardware-lib 8.2.0 + mq
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.
 
-### Health check that can never get stuck (8.2.1)
+### Health check that can never get stuck (8.2.1) - no app change needed
 
 Field case: with direct vend turned on remotely, the app's health check waited for an ENABLED_STATE event, missed it
-(registered after it fired) and stayed on the health-check screen forever. Since 8.2.1 the state is held and
-replayed, so the check can be written like this and cannot miss anything:
+(registered after it fired) and stayed on the health-check screen forever. Since 8.2.1 the library guarantees the
+existing check sees the state, whatever way it looks for it:
+
+- any `stateListener` / `addStateListener` / `statusListener` / `controlListener` registered at ANY time gets the
+  current state immediately (VMC_STATUS and SETTINGS_JSON for control listeners);
+- with direct vend ON every real bus transition re-announces ENABLED_STATE;
+- **while direct vend is ON and the bus is still INACTIVE/DISABLED, ENABLED_STATE is re-sent to the state listeners
+  every 5 s** until the bus becomes really ENABLED/VEND or direct vend goes off - so a listener with any timeout,
+  registered in any order, sees it within 5 s (local listeners only; VMC_STATUS over MQTT stays event-driven);
+- `HardwareLib.currentState` returns the same reported state (`busState` = the real one).
+
+If the check is ever rewritten, this is the shape that needs none of the above:
 
 ```kotlin
 fun waitForReader(onReady: () -> Unit) {
@@ -233,8 +243,7 @@ fun waitForReader(onReady: () -> Unit) {
 }
 ```
 
-Do not time out the check on "no event"; poll `HardwareLib.currentState` or wait for the listener - both carry the
-same reported state. If the screen must show the real bus state as well, read `HardwareLib.busState` or
+Polling `HardwareLib.currentState` and waiting for the listener carry the same reported state. If the screen must show the real bus state as well, read `HardwareLib.busState` or
 `VMC_STATUS.busState`.
 
 ## Android: what changes from 8.0.0 to 8.1.0 / 2.7.0 (nothing mandatory)
