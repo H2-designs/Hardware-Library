@@ -23,7 +23,7 @@ App: **rs232-sample-v1.4.apk** ("RS232 Test"). Library: hardware-lib 7.13.0.
 | powers up / connects | `rx=A0 04 00 03 43 4F 4E E5 matched=CONNECT` | `A1 05 00 02 4F 4B A2` (Device Ready) |
 | every ~30 s | `rx=A0 06 00 02 48 42 .. matched=HEARTBEAT` | `A1 06 00 02 4F 4B D3` (Heartbeat OK) |
 | customer starts a vend | `matched=PAYMENT_REQUEST price=999` + `>> VEND REQUEST price=999` | `SUCCESS` frame (bench table auto-approves) |
-| makes the coffee | `matched=PRODUCTION_OK` (or `PRODUCTION_FAIL`) | nothing (per protocol) |
+| makes the coffee | `matched=PRODUCTION_OK` (or `PRODUCTION_FAIL`) | `A1 03 00 02 4F 4B A4` (making-result ACK, protocol v2) |
 | cancels | `matched=CANCEL` | nothing |
 
 Success = machine stays online (heartbeats answered), a vend runs end-to-end,

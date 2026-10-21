@@ -134,8 +134,8 @@ Rules without `event` behave exactly as before.
 ```json
 {"setRs232Rules":[
   {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
-  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"","event":"vendSuccess"},
-  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"","event":"vendFailure"},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"A1 03 00 02 4F 4B A4","event":"vendSuccess"},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"A1 03 00 02 4F 4B A4","event":"vendFailure"},
   {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"","event":"vendCancel"}
 ]}
 ```
@@ -262,8 +262,8 @@ failed production after a paid sale was just a log line.
 ```json
 {"setRs232Rules":[
   {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
-  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"","event":"vendSuccess"},
-  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"","event":"vendFailure"},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"A1 03 00 02 4F 4B A4","event":"vendSuccess"},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"A1 03 00 02 4F 4B A4","event":"vendFailure"},
   {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"","event":"vendCancel"}
 ]}
 ```

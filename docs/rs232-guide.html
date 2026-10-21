@@ -184,8 +184,8 @@
  {"name":"CONNECT",         "rx":"A0 04 00 03 43 4F 4E E5",             "tx":"A1 05 00 02 4F 4B A2"},
  {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"", "amountStart":4, "amountEnd":-1},
  {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"", "amountStart":5, "amountEnd":-1},
- {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":""},
- {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":""},
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"A1 03 00 02 4F 4B A4"},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":"A1 03 00 02 4F 4B A4"},
  {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":""}
 ]</code></pre>
 
@@ -211,8 +211,8 @@
  {"name":"HEARTBEAT",       "rx":"A0 06 00 02 48 42 ??",                "tx":"A1 06 00 02 4F 4B A1"},
  {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"A1 02 00 07 53 55 43 43 45 53 53 E7", "amountStart":4, "amountEnd":-1},
  {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"A1 02 00 07 53 55 43 43 45 53 53 E7", "amountStart":5, "amountEnd":-1},
- {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":""},
- {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":""},
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"A1 03 00 02 4F 4B A4"},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":"A1 03 00 02 4F 4B A4"},
  {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":""}
 ]</code></pre>
 
@@ -220,7 +220,7 @@
   <b>SUCCESS</b> = <code>A1 02 00 07 53 55 43 43 45 53 53 E7</code> ·
   <b>FAILED</b> = <code>A1 02 00 06 46 41 49 4C 45 44 A6</code>. Per the vendor's reference
   implementation, the reader replies only where the protocol defines a response — connect,
-  heartbeat, and payment; production results and CANCEL are notifications (toast-only on the
+  heartbeat, payment and (protocol v2) the making result: PRODUCTION_OK / PRODUCTION_FAIL reply with the fixed ACK <code>A1 03 00 02 4F 4B A4</code> straight from the rule; CANCEL stays a notification (toast-only on the
   reference reader), so their <code>tx</code> stays empty and your
   <code>exchangeListener</code> handles them. <b>HEARTBEAT must sit above PAYMENT_TYPED</b>:
   both start <code>A0 06</code>, and first-match-wins ordering is what keeps a heartbeat from
@@ -265,7 +265,7 @@
       <div class="who"><span class="dir rx">machine →</span></div>
       <div class="msg"><div class="hex">A0 03 00 07 53 55 43 43 45 53 53 E7</div>
         <div class="note">production result ("SUCCESS" / "FAILED") — the machine reports after
-        making the coffee; no reply is defined. Rules <b>PRODUCTION_OK / PRODUCTION_FAIL</b>
+        making the coffee. <b>Protocol v2: the reader MUST ACK it</b> with <span class="mono">A1 03 00 02 4F 4B A4</span> ("OK", command 03 echoed, CRC A4) - the rules <b>PRODUCTION_OK / PRODUCTION_FAIL</b> carry that <code>tx</code> and send it themselves; they also
         log it and reach your <code>exchangeListener</code> (FAILED = refund the charge).</div></div>
     </div>
     <div class="lrow">
@@ -296,8 +296,8 @@
  {"name":"HEARTBEAT",       "rx":"A0 06 00 02 48 42 ??",    "tx":"A1 06 00 02 4F 4B A1"},
  {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"", "amountStart":4, "amountEnd":-1, "event":"vendRequest"},
  {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"", "amountStart":5, "amountEnd":-1, "event":"vendRequest"},
- {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"", "event":"vendSuccess"},
- {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":"", "event":"vendFailure"},
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"A1 03 00 02 4F 4B A4", "event":"vendSuccess"},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":"A1 03 00 02 4F 4B A4", "event":"vendFailure"},
  {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":"", "event":"vendCancel"}
 ]</code></pre>
   <pre class="code"><code>HardwareLib.vendListener = object : HardwareLib.VendListener {
