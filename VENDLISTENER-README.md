@@ -233,19 +233,36 @@ In code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, 
 
 ## 8. Bench test, no machine needed
 
-From the dashboard passthrough bar, with the demo app or your app on the device, `open` first, then one line at a
-time. Each `simulateExchange` runs the frame through the real engine. Watch the app's log for the callbacks.
+`HardwareLib.simulateExchange(hex)` pushes a frame through the log and exchange pipeline only (decode, codebook,
+listeners, dashboard). It does NOT run the MDB state machine, so it never fires the VendListener. Use it to prove
+the plumbing (`simulateExchange:10 10` shows code 111 on the dashboard), not the handler.
+
+To exercise the handler itself without a machine, use the RS232 path. `Rs232Lib.simulateFrame(hex)` runs the rule
+matcher, and a rule's `event` calls the SAME VendListener the MDB engine uses, with the same reasons. Load this
+one-off table (the port does not have to be open; replies are only logged):
 
 ```
-simulateExchange:10 10                 -> RESET, state INACTIVE
-setDirectVend:on                       -> so a VEND REQUEST is accepted without the handshake
-simulateExchange:13 00 02 BC 00 00 D1  -> VEND REQUEST 7.00 item 0: expect onVendRequest(7.0, 700, 0)
-vendApprove                            -> expect "[app] approveVend armed"
-simulateExchange:13 02 00 00 15        -> VEND SUCCESS: expect onVendSuccess
+{"setRs232Rules":[
+ {"name":"T_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
+ {"name":"T_OK",     "rx":"A0 03 00 02 4F 4B A5","tx":"","event":"vendSuccess"},
+ {"name":"T_FAIL",   "rx":"A0 03 00 02 4E 4F A0","tx":"","event":"vendFailure"},
+ {"name":"T_CANCEL", "rx":"A0 08 00 02 43 41 A8","tx":"","event":"vendCancel"}
+]}
 ```
 
-Repeat with `13 01 14` instead of VEND SUCCESS for CANCELLED_BY_VMC, `13 03 16` for FAILED, `13 04 17` followed by a
-POLL for SESSION_ENDED, and `10 10` for RESET. Each must produce exactly one onVendFailure with that reason and the
-money action from section 1. The last byte of every frame is the MDB checksum (sum of the bytes, low 8 bits).
+Then, one line at a time from the dashboard passthrough bar, watching the app log:
 
-Not yet run on a real CM30: the first field sale is the real test.
+| send | listener gets | reason | money action expected |
+|---|---|---|---|
+| `rs232Simulate:A0 01 00 03 37 30 30 95` | onVendRequest(7.00, 700, -1) | - | authorize |
+| `rs232Simulate:A0 03 00 02 4F 4B A5` | onVendSuccess | - | capture |
+| request again, then `rs232Simulate:A0 03 00 02 4E 4F A0` | onVendFailure | FAILED | reverse |
+| request again, then `rs232Simulate:A0 08 00 02 43 41 A8` | onVendFailure | CANCELLED_BY_VMC | void |
+| request again, then another request | onVendFailure for the first | SESSION_ENDED | reverse if approved, else void |
+| request again, then `close` (HardwareLib.stop) | onVendFailure | RESET | reverse if approved, else void |
+| request again, then app `cancelVend()` | nothing | CANCELLED_BY_APP recorded | handled at the call |
+
+`vendStats` afterwards must show requests=6, successes=1, failures=4 with one of each reason, app cancels=1,
+STUCK callbacks=0. On MDB the engine fires the identical callbacks from the bus, so a handler that passes this table
+is correct for both protocols. The first real sale on a CM30 remains the final test; nothing since 8.1.0 has run on
+one.

@@ -58,7 +58,7 @@
 </style>
 <main>
 <h1>Implementation guide - putting hardware-lib into the Android app</h1>
-<p>hardware-lib 8.2.2 + mqtt-lib 2.7.1, 22 October 2026. This is the one document to follow when wiring the libraries into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper: <code>API-REFERENCE.md</code> (every function), <code>AAR-HANDOFF-README.md</code> (what changed per release), <code>PULSE-README.md</code>, <code>DUPLICATE-LOGS-README.md</code>, <code>VENDLISTENER-README.md</code> (the listener in full, with the fixes and the counters), <code>samples/</code>.</p>
+<p>hardware-lib 8.2.2 + mqtt-lib 2.7.1, 22 October 2026. This is the one document to follow when wiring the libraries into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper: <code>API-REFERENCE.md</code> (every function), <code>AAR-HANDOFF-README.md</code> (what changed per release), <code>PULSE-README.md</code>, <code>DUPLICATE-LOGS-README.md</code>, <code>VENDLISTENER-README.md</code> (the listener in full, with the fixes and the counters), <code>SESSION-ENDED-README.md</code>, <code>samples/</code>.</p>
 <h2>1. What the library does, and what stays in the app</h2>
 <p>The library is the reader on the vending machine's bus. It does the whole protocol by itself: handshake, session, vend request, approve or deny, dispense result, session close, resets, and every machine deviation we have met in the field (persisted settings, never app code). It talks to the backend and the dashboard over mqtt-lib.</p>
 <p>The app does three things and nothing else:</p>
