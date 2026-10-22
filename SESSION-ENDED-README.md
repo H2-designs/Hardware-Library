@@ -56,10 +56,11 @@ just left. The same applies to RESET, the other reason where the dispense result
 override fun onVendFailure() {
     val reason = HardwareLib.lastVendFailureReason      // first line, one global slot
     when (reason) {
-        HardwareLib.VendFailureReason.FAILED,
+        HardwareLib.VendFailureReason.CANCELLED_BY_VMC -> if (approved) gateway.reverse() else gateway.voidHold()  // the machine cancelled
+        HardwareLib.VendFailureReason.FAILED -> gateway.reverse()                                                 // product not dispensed
         HardwareLib.VendFailureReason.SESSION_ENDED,
-        HardwareLib.VendFailureReason.RESET -> if (approved) gateway.reverse() else gateway.voidHold()
-        else -> gateway.voidHold()                     // CANCELLED_BY_VMC
+        HardwareLib.VendFailureReason.RESET -> if (approved) gateway.reverse() else gateway.voidHold()            // result unknown
+        HardwareLib.VendFailureReason.CANCELLED_BY_APP, null -> gateway.voidHold()                               // not delivered since 8.2.2
     }
     ui.resetToIdle()
 }

@@ -107,11 +107,15 @@ object PaymentFlow : HardwareLib.VendListener {
         val reason = HardwareLib.lastVendFailureReason        // read it HERE, one global slot
         scope.launch {
             when (reason) {
-                HardwareLib.VendFailureReason.FAILED,           // VEND FAILURE after approval: product NOT dispensed
-                HardwareLib.VendFailureReason.SESSION_ENDED,    // machine closed the session with the vend open
-                HardwareLib.VendFailureReason.RESET ->          // bus RESET / stop() with the vend open
+                HardwareLib.VendFailureReason.CANCELLED_BY_VMC ->  // the MACHINE cancelled: VEND CANCEL 13 01 / READER CANCEL 14 02
                     if (approved) gateway.reverse() else gateway.voidHold()
-                else ->                                         // CANCELLED_BY_VMC: customer cancel / selection timeout
+                HardwareLib.VendFailureReason.FAILED ->            // VEND FAILURE after approval: product NOT dispensed
+                    gateway.reverse()
+                HardwareLib.VendFailureReason.SESSION_ENDED,       // machine closed the session with the vend open
+                HardwareLib.VendFailureReason.RESET ->             // bus RESET / stop() with the vend open
+                    if (approved) gateway.reverse() else gateway.voidHold()
+                HardwareLib.VendFailureReason.CANCELLED_BY_APP,    // never delivered since 8.2.2 (your own cancelVend)
+                null ->
                     gateway.voidHold()
             }
             approved = false

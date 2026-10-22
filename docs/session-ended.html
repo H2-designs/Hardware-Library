@@ -80,10 +80,11 @@ POLL tx=END SESSION</code></pre>
 <pre><code>override fun onVendFailure() {
     val reason = HardwareLib.lastVendFailureReason      // first line, one global slot
     when (reason) {
-        HardwareLib.VendFailureReason.FAILED,
+        HardwareLib.VendFailureReason.CANCELLED_BY_VMC -&gt; if (approved) gateway.reverse() else gateway.voidHold()  // the machine cancelled
+        HardwareLib.VendFailureReason.FAILED -&gt; gateway.reverse()                                                 // product not dispensed
         HardwareLib.VendFailureReason.SESSION_ENDED,
-        HardwareLib.VendFailureReason.RESET -&gt; if (approved) gateway.reverse() else gateway.voidHold()
-        else -&gt; gateway.voidHold()                     // CANCELLED_BY_VMC
+        HardwareLib.VendFailureReason.RESET -&gt; if (approved) gateway.reverse() else gateway.voidHold()            // result unknown
+        HardwareLib.VendFailureReason.CANCELLED_BY_APP, null -&gt; gateway.voidHold()                               // not delivered since 8.2.2
     }
     ui.resetToIdle()
 }</code></pre>

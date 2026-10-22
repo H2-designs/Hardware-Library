@@ -60,7 +60,7 @@
 <h1>VendListener - how to implement it, and how to fix the usual mistakes</h1>
 <p>hardware-lib 8.2.2, 22 October 2026. The payment hook is three callbacks. This document is the complete, copy-ready implementation plus the fix for every mistake we have seen in the field. Companion files: <code>IMPLEMENTATION-README.md</code> (the whole app), <code>API-REFERENCE.md</code>, <code>DUPLICATE-LOGS-README.md</code>.</p>
 <h2>1. The contract in one table</h2>
-<div class="twrap"><table><thead><tr><th>callback</th><th>fires when</th><th>reason in <code>lastVendFailureReason</code></th><th>money action</th></tr></thead><tbody><tr><td><code>onVendRequest(amount, minorUnits, itemNumber)</code></td><td>the customer picked an item; the machine waits for your answer</td><td>-</td><td>authorize <code>minorUnits</code>, then <code>approveVend()</code> or <code>cancelVend()</code></td></tr><tr><td><code>onVendSuccess(itemNumber)</code></td><td>the machine confirmed the product came out</td><td>-</td><td>capture</td></tr><tr><td><code>onVendFailure()</code></td><td>the machine cancelled (VEND CANCEL / READER CANCEL / RS232 CANCEL)</td><td>CANCELLED_BY_VMC</td><td>void the hold (reverse if you had approved)</td></tr><tr><td><code>onVendFailure()</code></td><td>VEND FAILURE after your approval: product not dispensed</td><td>FAILED</td><td>reverse</td></tr><tr><td><code>onVendFailure()</code></td><td>the machine closed the session with the vend still open, no success / failure / cancel</td><td>SESSION_ENDED</td><td>reverse if approved, else void</td></tr><tr><td><code>onVendFailure()</code></td><td>bus RESET or <code>stop()</code> with the vend open</td><td>RESET</td><td>reverse if approved, else void</td></tr><tr><td>nothing</td><td>your own <code>cancelVend()</code> (8.2.2)</td><td>CANCELLED_BY_APP is recorded, no callback</td><td>you already handled it</td></tr></tbody></table></div>
+<div class="twrap"><table><thead><tr><th>callback</th><th>fires when</th><th>reason in <code>lastVendFailureReason</code></th><th>money action</th></tr></thead><tbody><tr><td><code>onVendRequest(amount, minorUnits, itemNumber)</code></td><td>the customer picked an item; the machine waits for your answer</td><td>-</td><td>authorize <code>minorUnits</code>, then <code>approveVend()</code> or <code>cancelVend()</code></td></tr><tr><td><code>onVendSuccess(itemNumber)</code></td><td>the machine confirmed the product came out</td><td>-</td><td>capture</td></tr><tr><td><code>onVendFailure()</code></td><td><strong>the machine cancelled</strong>: VEND CANCEL 13 01, READER CANCEL 14 02, or an RS232 rule with <code>event: vendCancel</code>. Customer pressed cancel, or the selection timed out</td><td>CANCELLED_BY_VMC</td><td>void the hold; reverse if you had already approved</td></tr><tr><td><code>onVendFailure()</code></td><td>VEND FAILURE after your approval: product not dispensed</td><td>FAILED</td><td>reverse</td></tr><tr><td><code>onVendFailure()</code></td><td>the machine closed the session with the vend still open, no success / failure / cancel</td><td>SESSION_ENDED</td><td>reverse if approved, else void</td></tr><tr><td><code>onVendFailure()</code></td><td>bus RESET or <code>stop()</code> with the vend open</td><td>RESET</td><td>reverse if approved, else void</td></tr><tr><td>nothing</td><td>your own <code>cancelVend()</code> (8.2.2)</td><td>CANCELLED_BY_APP is recorded, no callback</td><td>you already handled it</td></tr></tbody></table></div>
 <p>Every VEND REQUEST the machine ends gives exactly one <code>onVendSuccess</code> or one <code>onVendFailure</code>. Your own cancel is the only silent end, because you caused it.</p>
 <h2>2. The implementation, Kotlin</h2>
 <p>One object for the whole process, registered once at boot (<code>HardwareLib.vendListener = PaymentFlow</code>). Every callback returns immediately; the gateway work runs on a coroutine. A small <code>Sale</code> record holds what we know about the vend that is open right now, so the failure handler can decide between void and reverse without guessing.</p>
@@ -121,11 +121,14 @@
         scope.launch {
             val hold = s?.hold
             when (reason) {
-                HardwareLib.VendFailureReason.FAILED,
-                HardwareLib.VendFailureReason.SESSION_ENDED,
-                HardwareLib.VendFailureReason.RESET -&gt;
+                HardwareLib.VendFailureReason.CANCELLED_BY_VMC -&gt;       // the MACHINE cancelled (VEND CANCEL / READER CANCEL / RS232 CANCEL)
                     if (hold != null) { if (s.approved) gateway.reverse(hold) else gateway.voidHold(hold) }
-                else -&gt;                                   // CANCELLED_BY_VMC (and anything unknown)
+                HardwareLib.VendFailureReason.FAILED -&gt;                 // VEND FAILURE after approval: product not dispensed
+                    hold?.let { gateway.reverse(it) }
+                HardwareLib.VendFailureReason.SESSION_ENDED,            // session closed with the vend open: result unknown
+                HardwareLib.VendFailureReason.RESET -&gt;                  // RESET / stop() with the vend open: result unknown
+                    if (hold != null) { if (s.approved) gateway.reverse(hold) else gateway.voidHold(hold) }
+                HardwareLib.VendFailureReason.CANCELLED_BY_APP, null -&gt; // never delivered since 8.2.2; keep the branch for completeness
                     hold?.let { gateway.voidHold(it) }
             }
             ui.resetToIdle()
@@ -167,10 +170,18 @@
         Sale s; synchronized (this) { s = sale; if (s != null) { s.closed = true; sale = null; } }
         io.execute(() -&gt; {
             GatewayHold hold = s == null ? null : s.hold;
-            boolean dispenseUnknown = reason == HardwareLib.VendFailureReason.FAILED
-                || reason == HardwareLib.VendFailureReason.SESSION_ENDED
-                || reason == HardwareLib.VendFailureReason.RESET;
-            if (hold != null) { if (dispenseUnknown &amp;&amp; s.approved) gateway.reverse(hold); else gateway.voidHold(hold); }
+            if (hold != null) {
+                if (reason == HardwareLib.VendFailureReason.CANCELLED_BY_VMC) {          // the machine cancelled
+                    if (s.approved) gateway.reverse(hold); else gateway.voidHold(hold);
+                } else if (reason == HardwareLib.VendFailureReason.FAILED) {            // product not dispensed
+                    gateway.reverse(hold);
+                } else if (reason == HardwareLib.VendFailureReason.SESSION_ENDED
+                        || reason == HardwareLib.VendFailureReason.RESET) {              // result unknown
+                    if (s.approved) gateway.reverse(hold); else gateway.voidHold(hold);
+                } else {                                                                 // CANCELLED_BY_APP: never delivered since 8.2.2
+                    gateway.voidHold(hold);
+                }
+            }
             ui.resetToIdle();
         });
     }
@@ -189,8 +200,12 @@
 Mdb.onVendSuccess(async () =&gt; { const s = sale; if (!s) return; s.closed = true; sale = null; if (s.hold) await gateway.capture(s.hold); ui.thanks(); });
 Mdb.onVendFailure(async ({ reason }) =&gt; {
   const s = sale; if (s) { s.closed = true; sale = null; }
-  const dispenseUnknown = reason === 'FAILED' || reason === 'SESSION_ENDED' || reason === 'RESET';
-  if (s?.hold) { if (dispenseUnknown &amp;&amp; s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); }
+  if (s?.hold) {
+    if (reason === 'CANCELLED_BY_VMC') { if (s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); } // the machine cancelled
+    else if (reason === 'FAILED') await gateway.reverse(s.hold);                                                              // product not dispensed
+    else if (reason === 'SESSION_ENDED' || reason === 'RESET') { if (s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); }
+    else await gateway.voidHold(s.hold);                                                                                       // CANCELLED_BY_APP: never delivered since 8.2.2
+  }
   ui.reset();
 });</code></pre>
 <h2>5. The mistakes, and the fix for each</h2>

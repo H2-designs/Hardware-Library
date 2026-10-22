@@ -127,11 +127,15 @@ implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
         val reason = HardwareLib.lastVendFailureReason        // read it HERE, one global slot
         scope.launch {
             when (reason) {
-                HardwareLib.VendFailureReason.FAILED,           // VEND FAILURE after approval: product NOT dispensed
-                HardwareLib.VendFailureReason.SESSION_ENDED,    // machine closed the session with the vend open
-                HardwareLib.VendFailureReason.RESET -&gt;          // bus RESET / stop() with the vend open
+                HardwareLib.VendFailureReason.CANCELLED_BY_VMC -&gt;  // the MACHINE cancelled: VEND CANCEL 13 01 / READER CANCEL 14 02
                     if (approved) gateway.reverse() else gateway.voidHold()
-                else -&gt;                                         // CANCELLED_BY_VMC: customer cancel / selection timeout
+                HardwareLib.VendFailureReason.FAILED -&gt;            // VEND FAILURE after approval: product NOT dispensed
+                    gateway.reverse()
+                HardwareLib.VendFailureReason.SESSION_ENDED,       // machine closed the session with the vend open
+                HardwareLib.VendFailureReason.RESET -&gt;             // bus RESET / stop() with the vend open
+                    if (approved) gateway.reverse() else gateway.voidHold()
+                HardwareLib.VendFailureReason.CANCELLED_BY_APP,    // never delivered since 8.2.2 (your own cancelVend)
+                null -&gt;
                     gateway.voidHold()
             }
             approved = false

@@ -10,7 +10,7 @@ copy-ready implementation plus the fix for every mistake we have seen in the fie
 |---|---|---|---|
 | `onVendRequest(amount, minorUnits, itemNumber)` | the customer picked an item; the machine waits for your answer | - | authorize `minorUnits`, then `approveVend()` or `cancelVend()` |
 | `onVendSuccess(itemNumber)` | the machine confirmed the product came out | - | capture |
-| `onVendFailure()` | the machine cancelled (VEND CANCEL / READER CANCEL / RS232 CANCEL) | CANCELLED_BY_VMC | void the hold (reverse if you had approved) |
+| `onVendFailure()` | **the machine cancelled**: VEND CANCEL 13 01, READER CANCEL 14 02, or an RS232 rule with `event: vendCancel`. Customer pressed cancel, or the selection timed out | CANCELLED_BY_VMC | void the hold; reverse if you had already approved |
 | `onVendFailure()` | VEND FAILURE after your approval: product not dispensed | FAILED | reverse |
 | `onVendFailure()` | the machine closed the session with the vend still open, no success / failure / cancel | SESSION_ENDED | reverse if approved, else void |
 | `onVendFailure()` | bus RESET or `stop()` with the vend open | RESET | reverse if approved, else void |
@@ -83,11 +83,14 @@ object PaymentFlow : HardwareLib.VendListener {
         scope.launch {
             val hold = s?.hold
             when (reason) {
-                HardwareLib.VendFailureReason.FAILED,
-                HardwareLib.VendFailureReason.SESSION_ENDED,
-                HardwareLib.VendFailureReason.RESET ->
+                HardwareLib.VendFailureReason.CANCELLED_BY_VMC ->       // the MACHINE cancelled (VEND CANCEL / READER CANCEL / RS232 CANCEL)
                     if (hold != null) { if (s.approved) gateway.reverse(hold) else gateway.voidHold(hold) }
-                else ->                                   // CANCELLED_BY_VMC (and anything unknown)
+                HardwareLib.VendFailureReason.FAILED ->                 // VEND FAILURE after approval: product not dispensed
+                    hold?.let { gateway.reverse(it) }
+                HardwareLib.VendFailureReason.SESSION_ENDED,            // session closed with the vend open: result unknown
+                HardwareLib.VendFailureReason.RESET ->                  // RESET / stop() with the vend open: result unknown
+                    if (hold != null) { if (s.approved) gateway.reverse(hold) else gateway.voidHold(hold) }
+                HardwareLib.VendFailureReason.CANCELLED_BY_APP, null -> // never delivered since 8.2.2; keep the branch for completeness
                     hold?.let { gateway.voidHold(it) }
             }
             ui.resetToIdle()
@@ -145,10 +148,18 @@ public final class PaymentFlow implements HardwareLib.VendListener {
         Sale s; synchronized (this) { s = sale; if (s != null) { s.closed = true; sale = null; } }
         io.execute(() -> {
             GatewayHold hold = s == null ? null : s.hold;
-            boolean dispenseUnknown = reason == HardwareLib.VendFailureReason.FAILED
-                || reason == HardwareLib.VendFailureReason.SESSION_ENDED
-                || reason == HardwareLib.VendFailureReason.RESET;
-            if (hold != null) { if (dispenseUnknown && s.approved) gateway.reverse(hold); else gateway.voidHold(hold); }
+            if (hold != null) {
+                if (reason == HardwareLib.VendFailureReason.CANCELLED_BY_VMC) {          // the machine cancelled
+                    if (s.approved) gateway.reverse(hold); else gateway.voidHold(hold);
+                } else if (reason == HardwareLib.VendFailureReason.FAILED) {            // product not dispensed
+                    gateway.reverse(hold);
+                } else if (reason == HardwareLib.VendFailureReason.SESSION_ENDED
+                        || reason == HardwareLib.VendFailureReason.RESET) {              // result unknown
+                    if (s.approved) gateway.reverse(hold); else gateway.voidHold(hold);
+                } else {                                                                 // CANCELLED_BY_APP: never delivered since 8.2.2
+                    gateway.voidHold(hold);
+                }
+            }
             ui.resetToIdle();
         });
     }
@@ -172,8 +183,12 @@ Mdb.onVendRequest(async ({ amount, minorUnits, itemNumber }) => {
 Mdb.onVendSuccess(async () => { const s = sale; if (!s) return; s.closed = true; sale = null; if (s.hold) await gateway.capture(s.hold); ui.thanks(); });
 Mdb.onVendFailure(async ({ reason }) => {
   const s = sale; if (s) { s.closed = true; sale = null; }
-  const dispenseUnknown = reason === 'FAILED' || reason === 'SESSION_ENDED' || reason === 'RESET';
-  if (s?.hold) { if (dispenseUnknown && s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); }
+  if (s?.hold) {
+    if (reason === 'CANCELLED_BY_VMC') { if (s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); } // the machine cancelled
+    else if (reason === 'FAILED') await gateway.reverse(s.hold);                                                              // product not dispensed
+    else if (reason === 'SESSION_ENDED' || reason === 'RESET') { if (s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); }
+    else await gateway.voidHold(s.hold);                                                                                       // CANCELLED_BY_APP: never delivered since 8.2.2
+  }
   ui.reset();
 });
 ```
