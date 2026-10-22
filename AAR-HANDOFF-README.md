@@ -28,7 +28,7 @@ Companion files: IMPLEMENTATION-README.md (the end-to-end guide for the Android 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
 
-### 8.2.2 - the app's own cancelVend() is no longer echoed as onVendFailure (22 October 2026)
+### 8.2.2 - the app's own cancelVend() is no longer echoed as onVendFailure (22 October 2026, RELEASED as v8.2.2)
 
 Until 8.2.1 `HardwareLib.cancelVend()` (and the dashboard's `cancelVend` command) closed the open vend AND fired
 `onVendFailure` with reason CANCELLED_BY_APP - the app heard its own cancel back. The fleet app does not want that:
@@ -41,6 +41,17 @@ Everything the MACHINE does still reaches the listener exactly once: VEND CANCEL
 VEND FAILURE (FAILED), a session closed with the vend open (SESSION_ENDED), RESET / stop() (RESET). So the contract
 is now: every VEND REQUEST ends in exactly one onVendSuccess or onVendFailure, **unless the app ended it itself with
 cancelVend**, in which case the app already knows. Not yet run on a real CM30.
+
+### The MQTT log stream is OFF at every start (8.2.2)
+
+Field case D-0554: a device left with the dashboard **Logs** toggle on kept publishing every plain report line to
+the backend, which files them as `device.log.unknown_source`, thousands per day. Until 8.2.1 the switch was
+persisted, so one debugging session stayed on forever. Since 8.2.2 the stream starts OFF at every app start and is
+never restored from persistence: the dashboard Logs toggle (`setMqttLogging:on`) turns it on for the current run
+only, and the device answers `[mdb] MQTT log publishing enabled (until the next app restart)`. Coded exchange items,
+control lines (VMC_STATUS, SETTINGS_JSON, MQTT_STATS, VEND_STATS) and remote commands are never gated by it. The
+**HW** toggle (attachHardware) was never persisted; an app restart drops it unless the app attaches itself at boot.
+To silence a device on the old library today, send `setMqttLogging:off` once.
 
 ### 8.2.2 - vend counters and the stuck-listener counter (22 October 2026, no code change)
 
@@ -233,7 +244,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.17.0 build 104** bundles hardware-lib 8.2.1 + mqtt-lib 2.7.1.
+Demo/test APK: **MDB-Slave-2 v2.18.0 build 105** bundles hardware-lib 8.2.2 + mqtt-lib 2.7.1.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

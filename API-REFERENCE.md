@@ -97,7 +97,7 @@ Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `ve
 | `setDirectVend(Boolean)` / `isDirectVend` | ON: a VEND REQUEST is accepted in INACTIVE / DISABLED / ENABLED (machines that skip the handshake); the state listener reports ENABLED_STATE while the bus is INACTIVE/DISABLED. | `setDirectVend:on|off` | `directVend` |
 | `setForceSessionEnd(Boolean)` / `isForceSessionEnd` | ON: after every VEND SUCCESS the reader sends SESSION CANCEL REQUEST on the next POLL, for machines that never send SESSION COMPLETE. Failed vends keep the spec flow. | `setForceSessionEnd:on|off` | `forceSessionEndAfterVend` |
 | `setMdbLevel(1|2|3)` | handshake variant, level byte in READER CONFIG DATA, which Begin Session / Peripheral ID payload is sent. | `setMdbLevel:N` | `mdbLevel` |
-| `setMqttLogging(Boolean)` / `isMqttLoggingEnabled` | stream the log lines over MQTT or not (default OFF; control lines always flow). | `setMqttLogging:on|off` | `mqttLogsEnabled` |
+| `setMqttLogging(Boolean)` / `isMqttLoggingEnabled` | stream the plain log lines over MQTT or not. OFF at every app start since 8.2.2 (per-run, never restored); control lines and coded items always flow. | `setMqttLogging:on|off` | `mqttLogsEnabled` |
 | `setPollVisibility` / `setUnhandledVisibility` / `setPeripheralVisibility` / `setEmptySessionVisibility` | log-debug switches: idle POLL/ACK, commands we could not answer, traffic for other peripherals, empty auto-mode session cycles. | `set...Visibility:on|off` | `showPollTraffic`, `showUnhandledCmd`, `showOtherPeripheral`, `showEmptySessions` |
 | `currentSettingsJson(): String` | everything above as one JSON. | `getSettings` | |
 
