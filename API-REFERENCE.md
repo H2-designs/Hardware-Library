@@ -23,7 +23,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 | `init(context): Boolean` | Loads persisted settings and payloads, re-drives pulse polarity and the ready gate, registers the remote-command listener if mqtt-lib is initialised. Idempotent. |
 | `start(): Boolean` | Opens the CM30 MDB port and starts the bus loop. State resets to INACTIVE and is announced at once. Remote: `open`. |
 | `stop(): Boolean` | Closes the port, resets to INACTIVE, closes any open vend with reason RESET. Remote: `close`. |
-| `VERSION` | `"8.2.1"`. Remote `version` reports it together with mqtt-lib. |
+| `VERSION` | `"8.2.2"`. Remote `version` reports it together with mqtt-lib. |
 
 ### The payment hook - `vendListener`
 
@@ -39,7 +39,7 @@ HardwareLib.vendListener = object : HardwareLib.VendListener {
 |---|---|
 | `onVendRequest(amount, minorUnits, itemNumber)` | the customer picked an item. `minorUnits` is the exact integer price (use it for money), `amount` the decimal for display, both already scaled from READER_CONFIG_DATA. `itemNumber` is -1 when omitted. |
 | `onVendSuccess(itemNumber)` | the machine confirmed the product came out. Capture here. |
-| `onVendFailure()` | exactly once for every request that did not reach success: machine cancel, dispense failure, session ended with the vend open, your own cancel, reset. Reason in `lastVendFailureReason`. |
+| `onVendFailure()` | exactly once for every request that did not reach success: machine cancel, dispense failure, session ended with the vend open, reset. NOT for your own `cancelVend()` (8.2.2: no echo). Reason in `lastVendFailureReason`. |
 
 Rules: return immediately and do gateway work on your own thread (each callback runs on its own thread; one
 running longer than 3 s logs a warning); every request ends in exactly one of success / failure; the interface is
@@ -47,7 +47,7 @@ three methods and Java implementers must override all three.
 
 | member | what it does |
 |---|---|
-| `lastVendFailureReason: VendFailureReason?` | `CANCELLED_BY_VMC`, `CANCELLED_BY_APP`, `FAILED`, `SESSION_ENDED`, `RESET`. Read inside `onVendFailure`; one global slot, never cleared. |
+| `lastVendFailureReason: VendFailureReason?` | `CANCELLED_BY_VMC`, `FAILED`, `SESSION_ENDED`, `RESET` inside `onVendFailure`; `CANCELLED_BY_APP` is only recorded after your own `cancelVend()` (no callback since 8.2.2). One global slot, never cleared. |
 
 ### Vend actions
 
@@ -55,7 +55,7 @@ three methods and Java implementers must override all three.
 |---|---|---|
 | `beginSession(): Boolean` | Arms BEGIN SESSION for the next POLL - the "card tap" in manual session mode. In auto mode never needed. | `beginSession` |
 | `approveVend(): Boolean` | Arms VEND APPROVED at the requested price. `false` when no VEND REQUEST is pending (a late approval can never charge the next customer). | `vendApprove` |
-| `cancelVend(): Boolean` | Cancels the live session on the next POLL with the standing cancel mode. Works before or after a request. `false` when no session is live. Fires `onVendFailure` (CANCELLED_BY_APP) if a vend was open. | `cancelVend` |
+| `cancelVend(): Boolean` | Cancels the live session on the next POLL with the standing cancel mode. Works before or after a request. `false` when no session is live. An open vend is closed silently - no `onVendFailure` (8.2.2), `lastVendFailureReason` = CANCELLED_BY_APP. | `cancelVend` |
 | `cancelVend(response): Boolean` | Same, sending exactly `SESSION_CANCEL_REQUEST` or `VEND_DENIED` this once. | `cancelVend:sessionCancel` / `:vendDenied` |
 
 ### State

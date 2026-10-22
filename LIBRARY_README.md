@@ -499,7 +499,7 @@ HardwareLib.vendListener = object : HardwareLib.VendListener {
     override fun onVendFailure() {                // 8.0.0: THE non-success outcome - fires exactly once
         // for every VEND REQUEST that did not reach onVendSuccess: machine cancel, dispense
         // failure, session ended with the vend still open (machines that send no cancel/failure),
-        // your own cancelVend(), reset. Dismiss the payment UI, void the hold, refund if you had
+        // reset - NOT your own cancelVend() (8.2.2). Dismiss the payment UI, void the hold, refund if you had
         // approved. HardwareLib.lastVendFailureReason tells you which case it was.
         scope.launch { paymentGateway.cancelUiAndVoid(); if (approved) paymentGateway.refund(); resetUiToIdle() } }
 }

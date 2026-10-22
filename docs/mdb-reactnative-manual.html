@@ -210,7 +210,7 @@ const subs = [
         This is the capture point.</li>
     <li><strong>onVendFailure</strong> &mdash; every end of a vend that is not a success, exactly once
         (hardware-lib 8.0.0): machine cancel, dispense failure, session ended with the vend still open,
-        your own cancel, reset. <code>reason</code> says which. Dismiss the payment UI, void the hold,
+        reset. Not your own <code>cancelVend()</code> (8.2.2: no echo). <code>reason</code> says which. Dismiss the payment UI, void the hold,
         refund if you had approved. <code>onSessionEnded</code> is no longer emitted.</li>
   </ul>
   <p>
@@ -310,7 +310,7 @@ await Mdb.isMachineReady();                 // digital-in check now - sendPulse 
     <tr><th>Event</th><th>Payload</th><th>When</th></tr>
     <tr><td><span class="pill event">onVendRequest</span></td><td><code>{ amount, minorUnits, itemNumber }</code></td><td>Customer picked an item; the machine is waiting for approve/deny.</td></tr>
     <tr><td><span class="pill event">onVendSuccess</span></td><td><code>{ itemNumber }</code></td><td>Product physically dispensed &mdash; capture the payment.</td></tr>
-    <tr><td><span class="pill event">onVendFailure</span></td><td><code>{ reason }</code></td><td>Every non-success end of a vend, exactly once (8.0.0): CANCELLED_BY_VMC, CANCELLED_BY_APP, FAILED, SESSION_ENDED, RESET &mdash; reset UI, void, refund if approved.</td></tr>
+    <tr><td><span class="pill event">onVendFailure</span></td><td><code>{ reason }</code></td><td>Every non-success end of a vend the MACHINE causes, exactly once (8.0.0): CANCELLED_BY_VMC, FAILED, SESSION_ENDED, RESET &mdash; reset UI, void, refund if approved. Your own <code>cancelVend()</code> does not come back as an event (8.2.2).</td></tr>
     <tr><td><span class="pill event">onLog</span></td><td><code>{ line, showOnScreen }</code></td><td>Every engine log line. Never render <code>showOnScreen: false</code> lines into a growing list.</td></tr>
     <tr><td><span class="pill event">onStatus</span></td><td><code>{ json }</code></td><td>VMC status &mdash; instantly on every state change, plus a recentActivity flip (event-driven, no periodic heartbeat).</td></tr>
     <tr><td><span class="pill event">onRemoteCommand</span></td><td><code>{ command }</code></td><td>A dashboard command the MDB engine did not recognize &mdash; your app's own custom commands arrive here.</td></tr>

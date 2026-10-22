@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.7.1 + hardware-lib 8.2.1
+# AAR update — mqtt-lib 2.7.1 + hardware-lib 8.2.2
 
 Companion files: API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: API-REFERENCE.md (every public function of HardwareLib / Rs232L
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.7.1.aar` (replaces 2.6.0 / 2.7.0)
-   - `hardware-lib-8.2.1.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.2.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.7.1.aar')
-   implementation files('libs/hardware-lib-8.2.1.aar')
+   implementation files('libs/hardware-lib-8.2.2.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -27,6 +27,20 @@ Companion files: API-REFERENCE.md (every public function of HardwareLib / Rs232L
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.2 - the app's own cancelVend() is no longer echoed as onVendFailure (22 October 2026)
+
+Until 8.2.1 `HardwareLib.cancelVend()` (and the dashboard's `cancelVend` command) closed the open vend AND fired
+`onVendFailure` with reason CANCELLED_BY_APP - the app heard its own cancel back. The fleet app does not want that:
+it has already voided the hold and reset its screen when it calls cancelVend. Since 8.2.2 a cancel the app asked for
+closes the vend **silently**: the deny reply still goes out on the next POLL, `lastVendFailureReason` still records
+CANCELLED_BY_APP for anyone who reads it, but **no onVendFailure fires**. Log line:
+`[mdb] vend closed by cancelVend - no onVendFailure (the app's own decision)`.
+
+Everything the MACHINE does still reaches the listener exactly once: VEND CANCEL / READER CANCEL (CANCELLED_BY_VMC),
+VEND FAILURE (FAILED), a session closed with the vend open (SESSION_ENDED), RESET / stop() (RESET). So the contract
+is now: every VEND REQUEST ends in exactly one onVendSuccess or onVendFailure, **unless the app ended it itself with
+cancelVend**, in which case the app already knows. Not yet run on a real CM30.
 
 ### 8.2.1 / mqtt-lib 2.7.1 - every exchange reaches the backend exactly once (15 October 2026, no code change)
 
@@ -379,12 +393,12 @@ The listener is exactly three functions, and `onVendFailure()` is THE non-succes
 |---|---|
 | `onVendRequest(amount, minorUnits, item)` | customer selected an item - authorize, then `approveVend()` / `cancelVend()` |
 | `onVendSuccess(item)` | machine confirmed the product was dispensed - capture |
-| `onVendFailure()` | EVERY other end of a vend, exactly once: machine cancel (13 01 / 14 02), dispense failure (13 03), session ended with the vend still open (no cancel/failure at all), your own cancelVend(), bus RESET / stop() |
+| `onVendFailure()` | EVERY other end of a vend, exactly once: machine cancel (13 01 / 14 02), dispense failure (13 03), session ended with the vend still open (no cancel/failure at all), bus RESET / stop(). NOT your own cancelVend() (8.2.2: no echo - you asked for it, you are not told again) |
 
 Guarantee: every VEND REQUEST ends in exactly one of onVendSuccess or onVendFailure, never both, never
 neither. Reset the payment UI, dismiss the gateway popup and void the hold in `onVendFailure`; refund
 there too if you had already called `approveVend()`. When the app needs to know WHICH case it was,
-read `HardwareLib.lastVendFailureReason` (CANCELLED_BY_VMC / CANCELLED_BY_APP / FAILED /
+read `HardwareLib.lastVendFailureReason` (CANCELLED_BY_VMC / FAILED /
 SESSION_ENDED / RESET) inside the callback.
 
 ```kotlin

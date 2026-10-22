@@ -133,16 +133,25 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.1 / mqtt-lib&nbsp;2.7.1.
+    hardware-lib&nbsp;8.2.2 / mqtt-lib&nbsp;2.7.1.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.1 / 2.7.1 &mdash; 15 October 2026</span>What changed in 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.2 / 2.7.1 &mdash; 22 October 2026</span>What changed in 8.2.2, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>8.2.2 &mdash; the app's own cancelVend() is no longer echoed as onVendFailure</h3>
+    <p>Until 8.2.1 <code class="cmd">HardwareLib.cancelVend()</code> (and the dashboard's <code class="cmd">cancelVend</code>
+    command) closed the open vend and fired <code>onVendFailure</code> with reason CANCELLED_BY_APP, so the app heard
+    its own cancel back. Since 8.2.2 a cancel the app asked for closes the vend <strong>silently</strong>: the deny reply
+    still goes out on the next POLL, <code class="cmd">lastVendFailureReason</code> still records CANCELLED_BY_APP, but no
+    callback fires (log: <code>[mdb] vend closed by cancelVend - no onVendFailure</code>). Everything the machine does
+    still reaches the listener exactly once: VEND CANCEL / READER CANCEL (CANCELLED_BY_VMC), VEND FAILURE (FAILED), a
+    session closed with the vend open (SESSION_ENDED), RESET / stop() (RESET). Not yet run on a real CM30.</p>
 
     <h3>8.2.1 / mqtt-lib 2.7.1 &mdash; every exchange reaches the backend exactly once</h3>
     <p>Field case D-0961: VEND APPROVED arrived 4x within 20 ms on the backend, most exchanges 2x. Causes in the
@@ -271,6 +280,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.2</strong><br>mqtt-lib 2.7.1</td><td>22 Oct 2026</td><td>The app's own <code>cancelVend()</code> (and the dashboard's <code>cancelVend</code>) no longer fires <code>onVendFailure</code>: the open vend is closed silently, the deny reply still goes out, <code>lastVendFailureReason</code> records CANCELLED_BY_APP. Machine-side ends (CANCELLED_BY_VMC / FAILED / SESSION_ENDED / RESET) unchanged, exactly once.</td><td>Remove any "ignore CANCELLED_BY_APP" branch; nothing else.</td></tr>
         <tr><td><strong>hardware-lib 8.2.1</strong><br>mqtt-lib 2.7.1<br>demo APK build 104</td><td>15 Oct 2026</td><td>Every exchange reaches the backend exactly once (D-0961): add*Listener / <code>MqttLib.addCommandListener</code> ignore a repeat registration of the same instance, <code>attachRabbahMqtt()</code> is the complete bridge and publishes the coded exchange items itself (samples <code>MdbMqttBridge</code> = two-line wrapper), <code>RabbahLog.log</code> drops an identical item within 30 ms (<code>dedupedItems</code>). Health check that can never get stuck: reported state held and replayed to any state/status/control listener on registration, re-announced on every real bus transition, 5 s heartbeat to the state listeners while direct vend is ON and the bus is INACTIVE/DISABLED; <code>currentState</code> = reported state, new <code>busState</code> = real. SESSION COMPLETE / VEND CANCEL / SUCCESS / FAILURE ACKed in every state, stray SESSION COMPLETE &rarr; END SESSION on the next POLL, RESET wipes every per-session flag. READER ENABLE / CANCEL answered in INACTIVE when direct vend is ON. New docs: API-REFERENCE.md, PULSE-README.md, samples/PulsePaymentSample.kt. Dashboard: device tabs, log recording to disk, History (offline) and Export.</td><td>None. Swap the AARs. Register listeners once; drop any custom bridge next to <code>attachRabbahMqtt</code>.</td></tr>
         <tr><td><strong>hardware-lib 8.2.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 103</td><td>8 Oct 2026</td><td>Force session end after vend: persisted setting (<code>setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong> toggle, SETTINGS_JSON <code>forceSessionEndAfterVend</code>, Kotlin <code>HardwareLib.setForceSessionEnd</code>). When ON the reader arms SESSION CANCEL REQUEST for the POLL after every VEND SUCCESS, so a VMC that never sends SESSION COMPLETE still closes the session; skipped when SESSION COMPLETE already arrived. END SESSION now clears every per-session flag (forced cancel, stale approve, pending request).</td><td>None required. Turn it on per machine from the dashboard.</td></tr>
         <tr><td><strong>hardware-lib 8.1.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 102</td><td>7 Oct 2026</td><td>RS232 rules carry <code>"event"</code> (vendRequest / vendSuccess / vendFailure / vendCancel) and fire the same three-callback VendListener as MDB. Ready-feedback gate over several digital inputs (<code>setReadyFeedbackChannels</code>, <code>setReadyFeedback:0=1,2=0</code>, SETTINGS_JSON <code>readyFeedbackChannels</code>). Direct vend ON reports ENABLED_STATE on the state listener while the bus is INACTIVE/DISABLED (<code>VMC_STATUS.busState</code> = real). mqtt-lib: stable per-process client id (fixes a late Will overwriting a fresh <code>online</code>, field case D-0130), DISCONNECT on stop, reconnect backoff 3-60 s with jitter, connection counters, takeover WARNING, <code>mqttStats</code>, counters in <code>version</code>; dashboard link badge. <a href="#v810">Details</a>.</td><td>None required. Optional: add <code>event</code> to RS232 rules, use the multi-input gate.</td></tr>
@@ -586,7 +596,7 @@ HardwareLib.stop()</pre>
     <h2><span class="eyebrow">04</span>Vend actions & the payment flow</h2>
 
     <h3><code>HardwareLib.vendListener</code> — the payment hook</h3>
-    <p>Three callbacks - <code>onVendRequest</code>, <code>onVendSuccess</code>, <code>onVendFailure</code> - and that is the whole listener (8.0.0). <strong><code>onVendFailure</code> is THE non-success outcome: it fires exactly once for every VEND REQUEST that does not reach <code>onVendSuccess</code> - machine cancel, dispense failure, your own cancel, reset, and machines that just end the session with no VEND CANCEL / VEND FAILURE at all. Every vend ends in exactly one of the two.</strong> Each fires on its own callback thread (7.24.0: a callback that blocks - e.g. waiting for a payment gateway inside <code>onVendRequest</code> - no longer stalls logs, exchange events or later callbacks; <code>onVendFailure</code> reaches you even while your request handler is stuck, and any callback running longer than 3 s is reported as a warning line). Historically all callbacks shared one queue
+    <p>Three callbacks - <code>onVendRequest</code>, <code>onVendSuccess</code>, <code>onVendFailure</code> - and that is the whole listener (8.0.0). <strong><code>onVendFailure</code> is THE non-success outcome: it fires exactly once for every VEND REQUEST that does not reach <code>onVendSuccess</code> - machine cancel, dispense failure, reset, and machines that just end the session with no VEND CANCEL / VEND FAILURE at all. Every vend the machine ends is reported exactly once. The one exception (8.2.2): your own <code>cancelVend()</code> closes the vend silently - you asked for it, you are not told again.</strong> Each fires on its own callback thread (7.24.0: a callback that blocks - e.g. waiting for a payment gateway inside <code>onVendRequest</code> - no longer stalls logs, exchange events or later callbacks; <code>onVendFailure</code> reaches you even while your request handler is stuck, and any callback running longer than 3 s is reported as a warning line). Historically all callbacks shared one queue
     (never the bus thread itself — the bus loop only queues the event and goes straight back to
     answering the VMC, so even a slow callback can't make a response miss the machine's
     few-millisecond reply window). Still <strong>return promptly and do gateway work on your own
@@ -619,7 +629,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <span class="k">override fun</span> onVendFailure() {   <span class="c">// 8.0.0: THE non-success outcome</span>
         <span class="c">// Fires exactly once for every VEND REQUEST that did not reach onVendSuccess:</span>
         <span class="c">// machine cancel (13 01 / 14 02), dispense failure (13 03), session ended with the</span>
-        <span class="c">// vend still open (some VMCs send NO cancel/failure), your own cancelVend(), reset.</span>
+        <span class="c">// vend still open (some VMCs send NO cancel/failure), reset. NOT your own cancelVend() (8.2.2).</span>
         <span class="c">// Dismiss the payment UI, void the hold, refund if you had approved.</span>
         <span class="c">// HardwareLib.lastVendFailureReason says which case it was.</span>
         scope.launch {
