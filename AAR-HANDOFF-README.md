@@ -1,15 +1,15 @@
-# AAR update — mqtt-lib 2.7.1 + hardware-lib 8.2.2
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.2
 
 Companion files: IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
-   - `mqtt-lib-2.7.1.aar` (replaces 2.6.0 / 2.7.0)
+   - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
    - `hardware-lib-8.2.2.aar` (replace whatever version you bundle now)
 
    ```gradle
-   implementation files('libs/mqtt-lib-2.7.1.aar')
+   implementation files('libs/mqtt-lib-2.8.0.aar')
    implementation files('libs/hardware-lib-8.2.2.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
@@ -42,16 +42,19 @@ VEND FAILURE (FAILED), a session closed with the vend open (SESSION_ENDED), RESE
 is now: every VEND REQUEST ends in exactly one onVendSuccess or onVendFailure, **unless the app ended it itself with
 cancelVend**, in which case the app already knows. Not yet run on a real CM30.
 
-### The MQTT log stream is OFF at every start (8.2.2)
+### mqtt-lib 2.8.0 - the backend's log topic carries only coded items; everything else goes to `ops` (8.2.2 release)
 
-Field case D-0554: a device left with the dashboard **Logs** toggle on kept publishing every plain report line to
-the backend, which files them as `device.log.unknown_source`, thousands per day. Until 8.2.1 the switch was
-persisted, so one debugging session stayed on forever. Since 8.2.2 the stream starts OFF at every app start and is
-never restored from persistence: the dashboard Logs toggle (`setMqttLogging:on`) turns it on for the current run
-only, and the device answers `[mdb] MQTT log publishing enabled (until the next app restart)`. Coded exchange items,
-control lines (VMC_STATUS, SETTINGS_JSON, MQTT_STATS, VEND_STATS) and remote commands are never gated by it. The
-**HW** toggle (attachHardware) was never persisted; an app restart drops it unless the app attaches itself at boot.
-To silence a device on the old library today, send `setMqttLogging:off` once.
+Field case D-0554: a device with the dashboard **Logs** toggle on published every plain report line and every
+control line to `devices/<id>/logs`, and the backend filed them as `device.log.unknown_source`, thousands a day.
+Turning the toggle off is not an answer: it also stops the coded exchange items the Android/backend team needs.
+
+Since mqtt-lib 2.8.0 `MqttLib.enqueue` routes by payload: a coded log envelope (`RABBAH_LOG:{...}` or bare JSON)
+goes to the log topic as before; everything else - plain `[mdb]` / `[remote]` / `[app]` lines, the control lines
+(VMC_STATUS, SETTINGS_JSON, CONFIG_JSON, MQTT_STATS, VEND_STATS, RS232_RULES_JSON), PONG, the `version` reply - goes
+to `devices/<id>/ops` (`MqttConfig.opsTopicSuffix`, default `"ops"`, null = old behaviour). The backend never
+sees a non-JSON payload on `logs` again, whatever the toggle says. The **Logs** toggle keeps its meaning and its
+persistence. The Hardware Dashboard v8.2.2 subscribes to `ops` as well; an older dashboard would still decode the
+coded items but miss the plain lines, so update it with the libraries. No app change, no backend change.
 
 ### 8.2.2 - vend counters and the stuck-listener counter (22 October 2026, no code change)
 
@@ -244,7 +247,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.18.0 build 105** bundles hardware-lib 8.2.2 + mqtt-lib 2.7.1.
+Demo/test APK: **MDB-Slave-2 v2.18.0 build 105** bundles hardware-lib 8.2.2 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

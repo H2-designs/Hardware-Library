@@ -551,7 +551,7 @@
     <label class="tswitch" title="Hardware bridge toggle. ON = attachHardware (all hardware logs + commands wired to this dashboard). OFF = detachHardware (fully unwired; ping/version still answer; re-attach any time - an app restart also auto-attaches). Needs mqtt-lib 2.5.0+ / hardware-lib 7.19.0+ on the device.">
       <input type="checkbox" id="hwToggle"><span class="slider"></span><span class="tlabel">HW</span>
     </label>
-    <label class="tswitch" title="Remote hardware log stream toggle - PER RUN since hardware-lib 8.2.2: it is OFF at every app restart, turn it on only for a debugging session (a device left on floods the backend with unknown_source lines). ON = setMqttLogging:on (full MDB/RS232/Pulse stream). OFF = setMqttLogging:off (silence after debugging - commands, PONG, status and settings keep working). Persisted on the device; synced from SETTINGS_JSON.">
+    <label class="tswitch" title="Remote hardware log stream toggle (persisted on the device). ON = setMqttLogging:on (full MDB/RS232/Pulse stream: coded items to the backend's logs topic, plain lines to the ops channel since mqtt-lib 2.8.0). OFF = setMqttLogging:off (silence after debugging - commands, PONG, status and settings keep working). Persisted on the device; synced from SETTINGS_JSON.">
       <input type="checkbox" id="logsToggle"><span class="slider"></span><span class="tlabel">Logs</span>
     </label>
     <button id="versionBtn" title="version - the device reports its mqtt-lib and hardware-lib versions (mqtt-lib 2.3.0+)">Version</button>
@@ -1631,6 +1631,9 @@
       client.subscribe(s.prefix + '+/status');
       // Batched device logs ({"logs":[item,item,...]}) - "+" does not span the extra level.
       client.subscribe(s.prefix + '+/' + s.log + '/bulk');
+      // mqtt-lib 2.8.0: plain report lines, control lines, PONG and the version reply arrive on the
+      // ops channel; only coded RABBAH_LOG items stay on the backend's log topic.
+      client.subscribe(s.prefix + '+/ops');
     }
     pingDevice();
   });
@@ -1690,7 +1693,7 @@
 
     // Live log streams drive the decoders - with the explorer's '#' subscription live,
     // every other topic on the broker also lands in this handler, so filter strictly.
-    const scheme = SCHEMES.find((s) => topic.startsWith(s.prefix) && topic.endsWith('/' + s.log));
+    const scheme = SCHEMES.find((s) => topic.startsWith(s.prefix) && (topic.endsWith('/' + s.log) || topic.endsWith('/ops')));
     if (!scheme) return;
     const fromDevice = topic.split('/')[scheme.seg];
     if (!fromDevice) return;

@@ -1,6 +1,6 @@
 # Implementation guide - putting hardware-lib into the Android app
 
-hardware-lib 8.2.2 + mqtt-lib 2.7.1, 22 October 2026. This is the one document to follow when wiring the libraries
+hardware-lib 8.2.2 + mqtt-lib 2.8.0, 22 October 2026. This is the one document to follow when wiring the libraries
 into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper:
 `API-REFERENCE.md` (every function), `AAR-HANDOFF-README.md` (what changed per release), `PULSE-README.md`,
 `DUPLICATE-LOGS-README.md`, `VENDLISTENER-README.md` (the listener in full, with the fixes and the counters), `SESSION-ENDED-README.md`, `samples/`.
@@ -27,7 +27,7 @@ persists it on the device.
 Copy the three AARs from `AAR-Update-latest.zip` into the app's `libs/`:
 
 ```gradle
-implementation files('libs/mqtt-lib-2.7.1.aar')
+implementation files('libs/mqtt-lib-2.8.0.aar')
 implementation files('libs/hardware-lib-8.2.2.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
 ```
@@ -265,7 +265,8 @@ withContext(Dispatchers.IO) {
   (`DUPLICATE-LOGS-README.md`).
 - A local log view must skip lines with `showOnScreen == false` (per-poll noise) and must be capped; redrawing a
   growing TextView on every POLL froze the app on real hardware.
-- Do not enqueue log lines to MQTT yourself; the bridge already does.
+- Do not enqueue log lines to MQTT yourself; the bridge already does. Since mqtt-lib 2.8.0 only coded items reach the
+  backend's `logs` topic; plain lines and control lines travel on `devices/<id>/ops` for the dashboard.
 
 ## 11. Test without a machine, then verify on the bus
 
@@ -280,7 +281,7 @@ From the dashboard passthrough bar after deploy:
 
 | send | expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.7.1, hardware-lib 8.2.2 - client id ...` |
+| `version` | `[remote] mqtt-lib 2.8.0, hardware-lib 8.2.2 - client id ...` |
 | `getSettings` | `SETTINGS_JSON` with every key in section 7 |
 | `status` | `VMC_STATUS` with `state` and `busState` |
 | one real sale | each exchange once on the backend, one `onVendSuccess` in the app |

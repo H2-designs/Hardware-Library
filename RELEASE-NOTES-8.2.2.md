@@ -1,18 +1,19 @@
-# Release notes - hardware-lib 8.2.2 + mqtt-lib 2.7.1
+# Release notes - hardware-lib 8.2.2 + mqtt-lib 2.8.0
 
 Release: https://github.com/H2-designs/Hardware-Library/releases/tag/v8.2.2 (company copy: https://github.com/RabbahSystems/hardware-library/releases/tag/v8.2.2)
 Date: 22 October 2026. Replaces v8.2.1 (15 October). Cumulative against the fleet's hardware-lib 8.0.0 / mqtt-lib 2.6.0.
 
 ## TL;DR for the Android app
 
-- Swap `hardware-lib-8.2.2.aar` (mqtt-lib stays 2.7.1) and rebuild. No API change.
+- Swap both AARs: `hardware-lib-8.2.2.aar` and `mqtt-lib-2.8.0.aar`. Rebuild. No API change.
 - **One behaviour change you must know:** your own `cancelVend()` no longer comes back as `onVendFailure`. Delete any
   branch that handled CANCELLED_BY_APP; handle the decline where you call `cancelVend()`.
 - **One thing to check in your handler:** reverse the charge on FAILED, SESSION_ENDED and RESET when you had approved,
   not only on FAILED. `VENDLISTENER-README.md` has the complete handler; `SESSION-ENDED-README.md` explains why.
 - New: `vendStats` counters (dashboard **Vend** button), including how many times a listener callback got stuck.
-- The MQTT log stream is OFF at every app start (D-0554 flood of `device.log.unknown_source`); the dashboard Logs toggle
-  is per-run now. Send `setMqttLogging:off` once to devices still on the old library.
+- mqtt-lib 2.8.0: the backend's `logs` topic carries only coded items; plain lines and control lines move to
+  `devices/<id>/ops`. The `device.log.unknown_source` flood (D-0554) stops without touching the Logs toggle.
+  Update the dashboard to v8.2.2 with it.
 - RS232 Loyalsuns protocol v2: PRODUCTION_OK / PRODUCTION_FAIL rules now ACK the making result. Rule table only.
 
 ## Files
@@ -20,14 +21,14 @@ Date: 22 October 2026. Replaces v8.2.1 (15 October). Cumulative against the flee
 | file | version |
 |---|---|
 | `libs/hardware-lib-8.2.2.aar` | 8.2.2 (fleet has 8.0.0) |
-| `libs/mqtt-lib-2.7.1.aar` | 2.7.1, unchanged since v8.2.1 (fleet has 2.6.0) |
+| `libs/mqtt-lib-2.8.0.aar` | 2.8.0 (fleet has 2.6.0) |
 | `libs/CM30-HardwareLibrary-1.0.9.aar` | unchanged |
 | `AAR-Update-latest.zip` | the three AARs + AAR-HANDOFF-README, IMPLEMENTATION-README, VENDLISTENER-README, SESSION-ENDED-README, DUPLICATE-LOGS-README, API-REFERENCE, PULSE-README |
 | `MDB-Slave-2-v2.18.0-build105-debug.apk` | demo/test app on 8.2.2 / 2.7.1 |
 | `Hardware-Dashboard-win32-x64-v8.2.2.zip` | Windows dashboard: Vend button for the counters, plus everything from v8.2.1 (device tabs, log recording, History, Export) |
 
 ```gradle
-implementation files('libs/mqtt-lib-2.7.1.aar')
+implementation files('libs/mqtt-lib-2.8.0.aar')
 implementation files('libs/hardware-lib-8.2.2.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
 ```
@@ -44,16 +45,19 @@ callback. Log: `[mdb] vend closed by cancelVend - no onVendFailure (the app's ow
 Everything the machine does still reaches the listener exactly once: VEND CANCEL / READER CANCEL (CANCELLED_BY_VMC),
 VEND FAILURE (FAILED), a session closed with the vend open (SESSION_ENDED), RESET / stop() (RESET).
 
-### The MQTT log stream is OFF at every start (8.2.2)
+### mqtt-lib 2.8.0 - the backend's log topic carries only coded items; everything else goes to `ops` (8.2.2 release)
 
-Field case D-0554: a device left with the dashboard **Logs** toggle on kept publishing every plain report line to
-the backend, which files them as `device.log.unknown_source`, thousands per day. Until 8.2.1 the switch was
-persisted, so one debugging session stayed on forever. Since 8.2.2 the stream starts OFF at every app start and is
-never restored from persistence: the dashboard Logs toggle (`setMqttLogging:on`) turns it on for the current run
-only, and the device answers `[mdb] MQTT log publishing enabled (until the next app restart)`. Coded exchange items,
-control lines (VMC_STATUS, SETTINGS_JSON, MQTT_STATS, VEND_STATS) and remote commands are never gated by it. The
-**HW** toggle (attachHardware) was never persisted; an app restart drops it unless the app attaches itself at boot.
-To silence a device on the old library today, send `setMqttLogging:off` once.
+Field case D-0554: a device with the dashboard **Logs** toggle on published every plain report line and every
+control line to `devices/<id>/logs`, and the backend filed them as `device.log.unknown_source`, thousands a day.
+Turning the toggle off is not an answer: it also stops the coded exchange items the Android/backend team needs.
+
+Since mqtt-lib 2.8.0 `MqttLib.enqueue` routes by payload: a coded log envelope (`RABBAH_LOG:{...}` or bare JSON)
+goes to the log topic as before; everything else - plain `[mdb]` / `[remote]` / `[app]` lines, the control lines
+(VMC_STATUS, SETTINGS_JSON, CONFIG_JSON, MQTT_STATS, VEND_STATS, RS232_RULES_JSON), PONG, the `version` reply - goes
+to `devices/<id>/ops` (`MqttConfig.opsTopicSuffix`, default `"ops"`, null = old behaviour). The backend never
+sees a non-JSON payload on `logs` again, whatever the toggle says. The **Logs** toggle keeps its meaning and its
+persistence. The Hardware Dashboard v8.2.2 subscribes to `ops` as well; an older dashboard would still decode the
+coded items but miss the plain lines, so update it with the libraries. No app change, no backend change.
 
 ### Vend counters - `vendStats`
 
@@ -102,9 +106,9 @@ connection counters (`mqttStats`, dashboard link badge), RabbahLog 30 ms dedupe.
 
 | send | expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.7.1, hardware-lib 8.2.2 - client id D-xxxx-..., sessions=1 ...` |
+| `version` | `[remote] mqtt-lib 2.8.0, hardware-lib 8.2.2 - client id D-xxxx-..., sessions=1 ...` (arrives on the ops channel) |
 | `vendStats` | `[vend stats] requests=0 ... STUCK callbacks=0 ... listener registered` |
-| restart the app, then `getSettings` | `mqttLogsEnabled: false` whatever it was before |
+| backend logs after one sale | each exchange once, and NO `device.log.unknown_source` entries from this device |
 | `getSettings` | `SETTINGS_JSON` with `forceSessionEndAfterVend`, `directVend`, `readyFeedbackChannels` |
 | one sale declined by the app | `[mdb] vend closed by cancelVend - no onVendFailure`, no failure callback in the app |
 | one sale the machine cancels | one `onVendFailure`, reason CANCELLED_BY_VMC |
