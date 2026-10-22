@@ -1,0 +1,216 @@
+<title>VendListener Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+<style>
+  h1 { margin-bottom: 6px; }
+  h2 { margin-top: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  h3 { margin-top: 6px; }
+  main > * + * { margin-top: 0; }
+  main { gap: 14px; }
+  pre { white-space: pre; }
+  ol, ul { display: flex; flex-direction: column; gap: 6px; }
+</style>
+<main>
+<h1>VendListener - how to implement it, and how to fix the usual mistakes</h1>
+<p>hardware-lib 8.2.2, 22 October 2026. The payment hook is three callbacks. This document is the complete, copy-ready implementation plus the fix for every mistake we have seen in the field. Companion files: <code>IMPLEMENTATION-README.md</code> (the whole app), <code>API-REFERENCE.md</code>, <code>DUPLICATE-LOGS-README.md</code>.</p>
+<h2>1. The contract in one table</h2>
+<div class="twrap"><table><thead><tr><th>callback</th><th>fires when</th><th>reason in <code>lastVendFailureReason</code></th><th>money action</th></tr></thead><tbody><tr><td><code>onVendRequest(amount, minorUnits, itemNumber)</code></td><td>the customer picked an item; the machine waits for your answer</td><td>-</td><td>authorize <code>minorUnits</code>, then <code>approveVend()</code> or <code>cancelVend()</code></td></tr><tr><td><code>onVendSuccess(itemNumber)</code></td><td>the machine confirmed the product came out</td><td>-</td><td>capture</td></tr><tr><td><code>onVendFailure()</code></td><td>the machine cancelled (VEND CANCEL / READER CANCEL / RS232 CANCEL)</td><td>CANCELLED_BY_VMC</td><td>void the hold (reverse if you had approved)</td></tr><tr><td><code>onVendFailure()</code></td><td>VEND FAILURE after your approval: product not dispensed</td><td>FAILED</td><td>reverse</td></tr><tr><td><code>onVendFailure()</code></td><td>the machine closed the session with the vend still open, no success / failure / cancel</td><td>SESSION_ENDED</td><td>reverse if approved, else void</td></tr><tr><td><code>onVendFailure()</code></td><td>bus RESET or <code>stop()</code> with the vend open</td><td>RESET</td><td>reverse if approved, else void</td></tr><tr><td>nothing</td><td>your own <code>cancelVend()</code> (8.2.2)</td><td>CANCELLED_BY_APP is recorded, no callback</td><td>you already handled it</td></tr></tbody></table></div>
+<p>Every VEND REQUEST the machine ends gives exactly one <code>onVendSuccess</code> or one <code>onVendFailure</code>. Your own cancel is the only silent end, because you caused it.</p>
+<h2>2. The implementation, Kotlin</h2>
+<p>One object for the whole process, registered once at boot (<code>HardwareLib.vendListener = PaymentFlow</code>). Every callback returns immediately; the gateway work runs on a coroutine. A small <code>Sale</code> record holds what we know about the vend that is open right now, so the failure handler can decide between void and reverse without guessing.</p>
+<pre><code>object PaymentFlow : HardwareLib.VendListener {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lock = Any()
+
+    /** The vend that is open now. null = nothing open. */
+    private class Sale(val minorUnits: Int, val item: Int) {
+        var hold: GatewayHold? = null      // authorization result, once we have it
+        var approved = false               // did we call approveVend() and did it arm
+        var closed = false                 // success or failure already handled
+    }
+    @Volatile private var sale: Sale? = null
+
+    // ---------------------------------------------------------------- 1. request
+    override fun onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {
+        val s = Sale(minorUnits, itemNumber)
+        synchronized(lock) { sale = s }          // a new request replaces any stale record
+        ui.showPaying(amount)
+        scope.launch {
+            val hold = try { gateway.authorize(minorUnits) } catch (t: Throwable) { null }
+            synchronized(lock) {
+                if (sale !== s || s.closed) {            // the machine ended this vend while we were at the gateway
+                    hold?.let { gateway.voidHold(it) }   // onVendFailure already ran (or will) - just release the money
+                    return@launch
+                }
+                s.hold = hold
+                if (hold == null) {
+                    s.closed = true
+                    sale = null
+                    HardwareLib.cancelVend()              // silent: no onVendFailure comes back (8.2.2)
+                    ui.resetToIdle()
+                    return@launch
+                }
+                s.approved = HardwareLib.approveVend()    // false = the machine cancelled / timed out first
+                if (!s.approved) {
+                    gateway.voidHold(hold)                // the machine will never dispense; onVendFailure handles the UI
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- 2. success
+    override fun onVendSuccess(itemNumber: Int) {
+        val s = synchronized(lock) { sale?.also { it.closed = true; sale = null } } ?: return
+        scope.launch {
+            s.hold?.let { gateway.capture(it) }          // approved and dispensed: take the money
+            ui.showThanks()
+        }
+    }
+
+    // ---------------------------------------------------------------- 3. every machine-side failure
+    override fun onVendFailure() {
+        val reason = HardwareLib.lastVendFailureReason   // read HERE, it is one global slot
+        val s = synchronized(lock) { sale?.also { it.closed = true; sale = null } }
+        scope.launch {
+            val hold = s?.hold
+            when (reason) {
+                HardwareLib.VendFailureReason.FAILED,
+                HardwareLib.VendFailureReason.SESSION_ENDED,
+                HardwareLib.VendFailureReason.RESET -&gt;
+                    if (hold != null) { if (s.approved) gateway.reverse(hold) else gateway.voidHold(hold) }
+                else -&gt;                                   // CANCELLED_BY_VMC (and anything unknown)
+                    hold?.let { gateway.voidHold(it) }
+            }
+            ui.resetToIdle()
+            log("vend failed: $reason approved=${s?.approved} hold=${hold != null}")
+        }
+    }
+}</code></pre>
+<p>What each piece protects against:</p>
+<ul><li><strong><code>sale !== s</code> check after the gateway returns.</strong> The machine can cancel while the card is being read. By the time <code>authorize</code> returns, <code>onVendFailure</code> may already have run. Without the check the app would approve a dead vend (the library refuses, <code>approveVend</code> returns false) and then forget to void the hold.</li><li><strong><code>approved</code> flag.</strong> The only way to know whether to reverse or void. The library does not know what the gateway did; the app does.</li><li><strong><code>closed</code> flag.</strong> Makes success and failure idempotent. If a gateway callback and a bus callback race, the money operation runs once.</li><li><strong>Reading the reason first thing.</strong> The next failure overwrites the slot.</li><li><strong><code>else</code> branch.</strong> A future reason value lands on void, never on nothing.</li></ul>
+<h2>3. The implementation, Java</h2>
+<p>The interface has default no-op methods in Kotlin, but Java implementers must override all three. Same logic, same flags:</p>
+<pre><code>public final class PaymentFlow implements HardwareLib.VendListener {
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private volatile Sale sale;
+
+    @Override public void onVendRequest(double amount, int minorUnits, int itemNumber) {
+        final Sale s = new Sale(minorUnits, itemNumber);
+        sale = s;
+        ui.showPaying(amount);
+        io.execute(() -&gt; {
+            GatewayHold hold = gateway.authorize(minorUnits);
+            synchronized (this) {
+                if (sale != s || s.closed) { if (hold != null) gateway.voidHold(hold); return; }
+                s.hold = hold;
+                if (hold == null) { s.closed = true; sale = null; HardwareLib.INSTANCE.cancelVend(); ui.resetToIdle(); return; }
+                s.approved = HardwareLib.INSTANCE.approveVend();
+                if (!s.approved) gateway.voidHold(hold);
+            }
+        });
+    }
+
+    @Override public void onVendSuccess(int itemNumber) {
+        Sale s; synchronized (this) { s = sale; if (s == null) return; s.closed = true; sale = null; }
+        io.execute(() -&gt; { if (s.hold != null) gateway.capture(s.hold); ui.showThanks(); });
+    }
+
+    @Override public void onVendFailure() {
+        HardwareLib.VendFailureReason reason = HardwareLib.INSTANCE.getLastVendFailureReason();
+        Sale s; synchronized (this) { s = sale; if (s != null) { s.closed = true; sale = null; } }
+        io.execute(() -&gt; {
+            GatewayHold hold = s == null ? null : s.hold;
+            boolean dispenseUnknown = reason == HardwareLib.VendFailureReason.FAILED
+                || reason == HardwareLib.VendFailureReason.SESSION_ENDED
+                || reason == HardwareLib.VendFailureReason.RESET;
+            if (hold != null) { if (dispenseUnknown &amp;&amp; s.approved) gateway.reverse(hold); else gateway.voidHold(hold); }
+            ui.resetToIdle();
+        });
+    }
+}</code></pre>
+<h2>4. React Native</h2>
+<p>Same three events; the reason arrives in the payload. Keep the same <code>sale</code> record in JavaScript.</p>
+<pre><code>Mdb.onVendRequest(async ({ amount, minorUnits, itemNumber }) =&gt; {
+  const s = (sale = { minorUnits, hold: null, approved: false, closed: false });
+  const hold = await gateway.authorize(minorUnits).catch(() =&gt; null);
+  if (sale !== s || s.closed) { if (hold) await gateway.voidHold(hold); return; }
+  s.hold = hold;
+  if (!hold) { s.closed = true; sale = null; await Mdb.cancelVend(); ui.reset(); return; }   // silent (8.2.2)
+  s.approved = await Mdb.approveVend();
+  if (!s.approved) await gateway.voidHold(hold);
+});
+Mdb.onVendSuccess(async () =&gt; { const s = sale; if (!s) return; s.closed = true; sale = null; if (s.hold) await gateway.capture(s.hold); ui.thanks(); });
+Mdb.onVendFailure(async ({ reason }) =&gt; {
+  const s = sale; if (s) { s.closed = true; sale = null; }
+  const dispenseUnknown = reason === 'FAILED' || reason === 'SESSION_ENDED' || reason === 'RESET';
+  if (s?.hold) { if (dispenseUnknown &amp;&amp; s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); }
+  ui.reset();
+});</code></pre>
+<h2>5. The mistakes, and the fix for each</h2>
+<div class="twrap"><table><thead><tr><th>symptom in the field</th><th>what the code did</th><th>fix</th></tr></thead><tbody><tr><td>customer charged, no product, no refund, on machines that just close the session</td><td>reversed only on FAILED</td><td>reverse on FAILED, SESSION_ENDED and RESET when approved (section 2)</td></tr><tr><td>hold left on the card after a customer cancel</td><td>nothing in onVendFailure for CANCELLED_BY_VMC</td><td>void on every other reason</td></tr><tr><td>app's own decline shows a "vend failed" screen</td><td>handled CANCELLED_BY_APP in onVendFailure</td><td>since 8.2.2 there is no callback; handle the decline where <code>cancelVend()</code> is called</td></tr><tr><td><code>approveVend IGNORED - no VEND REQUEST pending</code>, money captured anyway</td><td>ignored the Boolean</td><td>if <code>approveVend()</code> returns false the machine will not dispense: void, never capture</td></tr><tr><td>vend approved after the machine had cancelled, hold never voided</td><td>gateway result applied to a stale request</td><td>the <code>sale !== s</code> check after <code>authorize</code></td></tr><tr><td>logs and callbacks freeze during card read</td><td>gateway called inside the callback</td><td>every callback returns at once; work on your own thread (the library warns after 3 s)</td></tr><tr><td>onVendRequest fires N times per selection on the device screen</td><td>listener assigned in an Activity, or the same lambda added per screen</td><td>one assignment at boot in Application; <code>remove...Listener</code> with the same reference if a screen must listen</td></tr><tr><td>wrong reason read, or always RESET</td><td>read <code>lastVendFailureReason</code> later, after another failure</td><td>read it as the first line of onVendFailure</td></tr><tr><td>payment screen stays open after a reset mid-vend</td><td>no RESET branch</td><td>RESET is a failure like any other: void or reverse, reset the UI</td></tr><tr><td><code>amount</code> sent to the gateway, off by rounding</td><td>used the Double</td><td>send <code>minorUnits</code>, the exact integer; <code>amount</code> is display only</td></tr><tr><td>RS232 machine: PRODUCTION_FAIL after payment, no refund</td><td>matched the rule name in <code>exchangeListener</code> instead of the listener</td><td>give the rule <code>"event":"vendFailure"</code>; it arrives as onVendFailure with FAILED</td></tr><tr><td>health check waits forever for ENABLED, app never reaches the listener at all</td><td>listener registered after the only state event</td><td>8.2.1+: state is replayed on registration and re-sent every 5 s under direct vend; nothing to change</td></tr></tbody></table></div>
+<h2>6. What the library guarantees, so you do not have to</h2>
+<ul><li>Exactly one success or failure per machine-ended request, delivered on a callback thread, never on the bus thread, even while your request handler is blocked.</li><li><code>approveVend()</code> cannot charge the next customer: it only arms when a request is pending and is dropped when the session ends.</li><li>A late VEND SUCCESS / FAILURE / SESSION COMPLETE after a reader restart is answered in every state; a stray SESSION COMPLETE never leaves the machine hanging.</li><li>Settings that change the flow (direct vend, force session end, cancel mode, session mode) never change the three callbacks or their order.</li></ul>
+<h2>7. Counters - is the listener alive, and where do vends end?</h2>
+<p>Since 8.2.2 the library counts every vend event since app start. From the dashboard send <code>vendStats</code> (the <strong>Vend</strong> button) and read one line:</p>
+<pre><code>[vend stats] requests=41 successes=37 failures=4 (CANCELLED_BY_VMC=3 SESSION_ENDED=1) · app cancels=2 · approve ignored=0
+             · STUCK callbacks=0 · threw=0 · no listener=0 · listener registered · vend open=false · since 86400 s</code></pre>
+<p>How to read it against the mistakes in section 5:</p>
+<div class="twrap"><table><thead><tr><th>counter</th><th>healthy</th><th>what a bad value means</th></tr></thead><tbody><tr><td><code>requests</code> = <code>successes</code> + <code>failures</code> + <code>app cancels</code></td><td>yes</td><td>a vend is open right now (<code>vend open=true</code>), or an event was dropped</td></tr><tr><td><code>STUCK callbacks</code></td><td>0</td><td>a callback blocked for more than 3 s; <code>last onVendRequest</code> = the gateway is called inside the callback (section 5, row "freeze")</td></tr><tr><td><code>approve ignored</code></td><td>0</td><td>the gateway answers slower than the machine's selection timeout; the hold must be voided every time</td></tr><tr><td><code>no listener</code></td><td>0</td><td><code>HardwareLib.vendListener</code> was never set, or set after the first request</td></tr><tr><td><code>SESSION_ENDED</code> rising</td><td>-</td><td>this machine closes sessions without a result; the handler must reverse on it (section 5, row 1)</td></tr><tr><td><code>CANCELLED_BY_VMC</code> high</td><td>-</td><td>customers cancel or the selection times out while the card is read; look at gateway latency</td></tr><tr><td><code>listener NOT REGISTERED</code></td><td>never</td><td>the app skipped the assignment at boot</td></tr></tbody></table></div>
+<p>In code: <code>HardwareLib.vendStatsJson()</code>, <code>vendRequestCount</code>, <code>vendSuccessCount</code>, <code>vendFailureCount</code>, <code>vendFailuresByReason</code>, <code>vendCallbackStuckCount</code>.</p>
+<h2>8. Bench test, no machine needed</h2>
+<p>From the dashboard passthrough bar, with the demo app or your app on the device, <code>open</code> first, then one line at a time. Each <code>simulateExchange</code> runs the frame through the real engine. Watch the app's log for the callbacks.</p>
+<pre><code>simulateExchange:10 10                 -&gt; RESET, state INACTIVE
+setDirectVend:on                       -&gt; so a VEND REQUEST is accepted without the handshake
+simulateExchange:13 00 02 BC 00 00 D1  -&gt; VEND REQUEST 7.00 item 0: expect onVendRequest(7.0, 700, 0)
+vendApprove                            -&gt; expect "[app] approveVend armed"
+simulateExchange:13 02 00 00 15        -&gt; VEND SUCCESS: expect onVendSuccess</code></pre>
+<p>Repeat with <code>13 01 14</code> instead of VEND SUCCESS for CANCELLED_BY_VMC, <code>13 03 16</code> for FAILED, <code>13 04 17</code> followed by a POLL for SESSION_ENDED, and <code>10 10</code> for RESET. Each must produce exactly one onVendFailure with that reason and the money action from section 1. The last byte of every frame is the MDB checksum (sum of the bytes, low 8 bits).</p>
+<p>Not yet run on a real CM30: the first field sale is the real test.</p>
+</main>

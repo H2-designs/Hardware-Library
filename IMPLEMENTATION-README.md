@@ -3,7 +3,7 @@
 hardware-lib 8.2.2 + mqtt-lib 2.7.1, 22 October 2026. This is the one document to follow when wiring the libraries
 into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper:
 `API-REFERENCE.md` (every function), `AAR-HANDOFF-README.md` (what changed per release), `PULSE-README.md`,
-`DUPLICATE-LOGS-README.md`, `samples/`.
+`DUPLICATE-LOGS-README.md`, `VENDLISTENER-README.md` (the listener in full, with the fixes and the counters), `samples/`.
 
 ## 1. What the library does, and what stays in the app
 
@@ -285,6 +285,7 @@ From the dashboard passthrough bar after deploy:
 | `status` | `VMC_STATUS` with `state` and `busState` |
 | one real sale | each exchange once on the backend, one `onVendSuccess` in the app |
 | `mqttStats` | link badge green |
+| `vendStats` | `[vend stats] requests=.. successes=.. failures=.. STUCK callbacks=0 .. listener registered` |
 
 ## 12. Troubleshooting
 

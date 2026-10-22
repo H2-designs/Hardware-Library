@@ -42,6 +42,15 @@ VEND FAILURE (FAILED), a session closed with the vend open (SESSION_ENDED), RESE
 is now: every VEND REQUEST ends in exactly one onVendSuccess or onVendFailure, **unless the app ended it itself with
 cancelVend**, in which case the app already knows. Not yet run on a real CM30.
 
+### 8.2.2 - vend counters and the stuck-listener counter (22 October 2026, no code change)
+
+Remote `vendStats` (dashboard **Vend** button) answers `VEND_STATS:{...}`: vend requests, successes, failures and
+failures per reason, app cancels, ignored approves, and `callbackStuck` - how many times a VendListener callback was
+still running after 3 s, with the callback's name and when. The watchdog line now reads
+`[mdb] WARNING: VendListener.onVendRequest has been running for 3000 ms (stuck #N) ...`. Since app start, not
+persisted. Code: `HardwareLib.vendStatsJson()` and the `vend*Count` properties. Full key list in
+`API-REFERENCE.md`, "Vend counters".
+
 ### 8.2.1 / mqtt-lib 2.7.1 - every exchange reaches the backend exactly once (15 October 2026, no code change)
 
 Field case D-0961: the backend showed VEND APPROVED four times within 20 ms and other exchanges twice. The MDB engine

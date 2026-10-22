@@ -49,6 +49,25 @@ three methods and Java implementers must override all three.
 |---|---|
 | `lastVendFailureReason: VendFailureReason?` | `CANCELLED_BY_VMC`, `FAILED`, `SESSION_ENDED`, `RESET` inside `onVendFailure`; `CANCELLED_BY_APP` is only recorded after your own `cancelVend()` (no callback since 8.2.2). One global slot, never cleared. |
 
+### Vend counters - `vendStats` (8.2.2)
+
+Since app start, never persisted, like the mqtt-lib link counters. Remote `vendStats` answers
+`VEND_STATS:{...}` and a one-line `[remote] vend stats: ...` summary; the dashboard has a **Vend** button for it.
+
+| key | meaning |
+|---|---|
+| `vendRequests` / `vendSuccesses` / `vendFailures` | callbacks delivered to the listener (requests count even with no listener) |
+| `vendFailuresByReason` | `{"CANCELLED_BY_VMC":n,"CANCELLED_BY_APP":0,"FAILED":n,"SESSION_ENDED":n,"RESET":n}` |
+| `appCancels` | `cancelVend()` calls that closed an open vend (silent since 8.2.2) |
+| `approveIgnored` | `approveVend()` with no request pending (machine cancelled / timed out first) |
+| `callbackStuck` | **the stuck-listener counter**: a callback still running after 3 s; `lastStuckCallback` names it, `lastStuckAgoSec` when |
+| `callbackThrew` / `noListener` | a callback threw / an event had nobody registered |
+| `lastRequestAgoSec`, `lastFailureReason`, `vendOpen`, `listenerRegistered`, `sinceSec` | the current picture |
+
+Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `vendFailureCount`,
+`vendFailuresByReason`, `vendCallbackStuckCount`. The watchdog log line now names the callback and the count:
+`[mdb] WARNING: VendListener.onVendRequest has been running for 3000 ms (stuck #2) ...`.
+
 ### Vend actions
 
 | function | what it does | remote |
@@ -214,7 +233,7 @@ open | close | beginSession | vendApprove | cancelVend[:sessionCancel|:vendDenie
 setCancelMode:sessionCancel|vendDenied | setSessionMode:auto|manual | setAutoBeginCooldown:0-50
 setDirectVend:on|off | setForceSessionEnd:on|off | setMdbLevel:1|2|3 | setMqttLogging:on|off
 setPollVisibility:on|off | setUnhandledVisibility:on|off | setPeripheralVisibility:on|off | setEmptySessionVisibility:on|off
-getSettings | getConfig | setConfig:NAME:hex | resetConfig:NAME | {"setConfig":{...}} | {"resetConfig":[...]} | simulateExchange:HEX
+getSettings | vendStats | getConfig | setConfig:NAME:hex | resetConfig:NAME | {"setConfig":{...}} | {"resetConfig":[...]} | simulateExchange:HEX
 initPulse:true|false | sendPulse:w,p,c | setReadyFeedback:[yes,]value[,channel]|ch=val,ch=val|on|off | checkMachineReady
 rs232Open[:baud[,dataBits,stopBits,parity]] | rs232Close | rs232Send:HEX | rs232SendFrame:HEADER;DATAHEX | rs232SendAscii:HEADER;TEXT
 rs232Simulate:HEX | rs232Crc:on|off | rs232Gap:MS | getRs232Rules | clearRs232Rules | {"setRs232Rules":[...]}

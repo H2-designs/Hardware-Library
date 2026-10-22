@@ -571,6 +571,7 @@
     <span id="vmcStatus" class="vmc-nodata"><span class="dot"></span><span id="vmcStatusText">no VMC data yet</span></span>
     <span id="linkStatus" title="MQTT link health from the device (mqtt-lib 2.7.0): sessions since app start, connection losses, failed retries. Updated on every reconnect and by the Link button (mqttStats)."><span class="dot"></span><span id="linkStatusText">link: no data</span></span>
     <button id="linkBtn" title="mqttStats - the device reports its MQTT client id, session count, losses and retries">Link</button>
+    <button id="vendStatsBtn" title="vendStats (hardware-lib 8.2.2) - vend requests / successes / failures by reason, app cancels, ignored approves, stuck listener callbacks, since app start">Vend</button>
     <span class="divider"></span>
     <label class="checkbox-label"><input type="checkbox" id="pollVisibilityCheck"> Show POLL/ACK traffic</label>
     <label class="checkbox-label"><input type="checkbox" id="unhandledVisibilityCheck"> Show unhandled commands</label>
@@ -1487,6 +1488,18 @@
       '\nnext retry delay: ' + d.nextRetryDelayMs + ' ms';
   }
   document.getElementById('linkBtn').addEventListener('click', () => sendCommand('mqttStats', 'Link stats'));
+  document.getElementById('vendStatsBtn').addEventListener('click', () => sendCommand('vendStats', 'Vend stats'));
+  /** VEND_STATS:{...} from hardware-lib 8.2.2 - shown as one readable line in the log, not a raw JSON blob. */
+  function formatVendStats(json) {
+    let d; try { d = JSON.parse(json); } catch (e) { return '[vend stats] ' + json; }
+    const by = d.vendFailuresByReason || {};
+    const reasons = Object.keys(by).filter((k) => by[k] > 0).map((k) => k + '=' + by[k]).join(' ');
+    return '[vend stats] requests=' + d.vendRequests + ' successes=' + d.vendSuccesses + ' failures=' + d.vendFailures +
+      (reasons ? ' (' + reasons + ')' : '') + ' · app cancels=' + d.appCancels + ' · approve ignored=' + d.approveIgnored +
+      ' · STUCK callbacks=' + d.callbackStuck + (d.lastStuckCallback ? ' (last ' + d.lastStuckCallback + ', ' + d.lastStuckAgoSec + ' s ago)' : '') +
+      ' · threw=' + d.callbackThrew + ' · no listener=' + d.noListener + ' · listener ' + (d.listenerRegistered ? 'registered' : 'NOT REGISTERED') +
+      ' · vend open=' + d.vendOpen + ' · since ' + d.sinceSec + ' s';
+  }
 
   function applyVmcStatus(json) {
     let data;
@@ -1712,6 +1725,10 @@
       st.vmcAt = Date.now();
       if (isCurrent) applyVmcStatus(st.vmc); else scheduleTabsRender();
       return; // a periodic heartbeat, not a real MDB exchange — kept out of the scrolling log
+    }
+    if (text.startsWith('VEND_STATS:')) {
+      addLine(formatVendStats(text.slice('VEND_STATS:'.length)), 'info', fromDevice);
+      return;
     }
     if (text.startsWith('MQTT_STATS:')) {
       st.stats = text.slice('MQTT_STATS:'.length);
