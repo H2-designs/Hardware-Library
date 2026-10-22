@@ -1,0 +1,209 @@
+<title>Implementation Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+<style>
+  h1 { margin-bottom: 6px; }
+  h2 { margin-top: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  h3 { margin-top: 6px; }
+  main > * + * { margin-top: 0; }
+  main { gap: 14px; }
+  pre { white-space: pre; }
+  ol, ul { display: flex; flex-direction: column; gap: 6px; }
+</style>
+<main>
+<h1>Implementation guide - putting hardware-lib into the Android app</h1>
+<p>hardware-lib 8.2.2 + mqtt-lib 2.7.1, 22 October 2026. This is the one document to follow when wiring the libraries into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper: <code>API-REFERENCE.md</code> (every function), <code>AAR-HANDOFF-README.md</code> (what changed per release), <code>PULSE-README.md</code>, <code>DUPLICATE-LOGS-README.md</code>, <code>samples/</code>.</p>
+<h2>1. What the library does, and what stays in the app</h2>
+<p>The library is the reader on the vending machine's bus. It does the whole protocol by itself: handshake, session, vend request, approve or deny, dispense result, session close, resets, and every machine deviation we have met in the field (persisted settings, never app code). It talks to the backend and the dashboard over mqtt-lib.</p>
+<p>The app does three things and nothing else:</p>
+<ol><li>starts the libraries once at boot;</li><li>implements the three-callback <code>VendListener</code>: authorize the card on a vend request, capture on success, void or reverse on failure;</li><li>calls <code>approveVend()</code> or <code>cancelVend()</code> with the result of the authorization.</li></ol>
+<p>Everything else (which MDB level, session mode, direct vend, force session end, hex payloads, RS232 rules, pulse polarity) is a per-machine setting that an operator sets from the dashboard or the backend, and the library persists it on the device.</p>
+<h2>2. Files and Gradle</h2>
+<p>Copy the three AARs from <code>AAR-Update-latest.zip</code> into the app's <code>libs/</code>:</p>
+<pre><code>implementation files('libs/mqtt-lib-2.7.1.aar')
+implementation files('libs/hardware-lib-8.2.2.aar')
+implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
+<ul><li><code>minSdk</code> 30 (the CM30 runs Android 11), ABI armeabi-v7a.</li><li>No ProGuard rules in the app: both AARs ship their own consumer keep rules.</li><li>The broker password goes into <code>local.properties</code> and reaches the app through <code>BuildConfig</code> (see <code>source/MdbSlaveApp/app/build.gradle</code> for the four <code>buildConfigField</code> lines). Never in source, never in git.</li></ul>
+<h2>3. Startup, once per process</h2>
+<p>Put this in the <code>Application</code> class (or a singleton called from it), never in an Activity. Listeners are process-wide.</p>
+<pre><code>class PaymentApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID).takeLast(6).uppercase()
+
+        // 1. transport (optional - everything below works without it, logs just stay on the device)
+        MqttLib.init(MqttConfig(
+            topicPrefix = "devices", deviceId = deviceId,
+            brokerHost = BuildConfig.MQTT_HOST, brokerPort = BuildConfig.MQTT_PORT,
+            username = BuildConfig.MQTT_USERNAME.ifEmpty { null }, password = BuildConfig.MQTT_PASSWORD.ifEmpty { null },
+            logTopicSuffix = "logs", commandTopicSuffix = "cmd", statusTopicSuffix = "status"
+        ))
+        MqttLib.start()
+
+        // 2. the ONE bridge between the libraries - idempotent, never add your own forwarder next to it
+        HardwareLib.attachRabbahMqtt()
+
+        // 3. the engine: persistence first, then the payment hook, then the bus
+        HardwareLib.init(applicationContext)
+        HardwareLib.vendListener = PaymentFlow          // section 4
+        HardwareLib.addStateListener(PaymentFlow::onState)
+        HardwareLib.start()
+    }
+}</code></pre>
+<p>Order matters in one place: <code>init</code> publishes the first settings snapshot through the bridge, so attach before init. <code>HardwareLib.init</code> is also what loads the persisted settings and payloads; an app that skips it runs with defaults and forgets every operator setting at the next restart.</p>
+<p>Without MQTT: drop steps 1 and 2. Nothing throws, the MDB engine runs fully offline.</p>
+<h2>4. The payment flow - <code>VendListener</code></h2>
+<p>Three callbacks, and that is the whole listener. Each runs on its own callback thread: return at once and do gateway work on your own coroutine or thread (a callback running longer than 3 s logs a warning).</p>
+<pre><code>object PaymentFlow : HardwareLib.VendListener {
+    private val scope = CoroutineScope(Dispatchers.IO)
+    @Volatile private var approved = false      // did WE approve the vend that is open now
+
+    override fun onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {
+        approved = false
+        ui.showPaying(amount)
+        scope.launch {
+            val hold = gateway.authorize(minorUnits)          // exact integer minor units - never the Double
+            if (hold != null) {
+                approved = HardwareLib.approveVend()            // false = the machine already cancelled / timed out
+                if (!approved) gateway.voidHold(hold)
+            } else {
+                ui.resetToIdle()
+                HardwareLib.cancelVend()                        // no callback comes back for this (8.2.2)
+            }
+        }
+    }
+
+    override fun onVendSuccess(itemNumber: Int) {               // product came out
+        scope.launch { gateway.capture(); ui.showThanks() }
+    }
+
+    override fun onVendFailure() {                              // every end the MACHINE caused, exactly once
+        val reason = HardwareLib.lastVendFailureReason        // read it HERE, one global slot
+        scope.launch {
+            when (reason) {
+                HardwareLib.VendFailureReason.FAILED,           // VEND FAILURE after approval: product NOT dispensed
+                HardwareLib.VendFailureReason.SESSION_ENDED,    // machine closed the session with the vend open
+                HardwareLib.VendFailureReason.RESET -&gt;          // bus RESET / stop() with the vend open
+                    if (approved) gateway.reverse() else gateway.voidHold()
+                else -&gt;                                         // CANCELLED_BY_VMC: customer cancel / selection timeout
+                    gateway.voidHold()
+            }
+            approved = false
+            ui.resetToIdle()
+        }
+    }
+
+    fun onState(state: String) { ui.showReader(state) }          // section 5
+}</code></pre>
+<p>The contract the code above relies on:</p>
+<ul><li><code>onVendRequest</code> carries <code>minorUnits</code> (exact integer, use it for money) and <code>amount</code> (decimal, display only). Scale factor and decimals from READER CONFIG DATA are already applied. <code>itemNumber</code> is -1 when the machine sent none (always on RS232).</li><li>Every VEND REQUEST the machine ends is reported exactly once, as <code>onVendSuccess</code> or <code>onVendFailure</code>.</li><li><strong>The one exception (8.2.2):</strong> your own <code>cancelVend()</code> closes the vend silently. You asked for it, you are not told again. <code>lastVendFailureReason</code> still records CANCELLED_BY_APP if you read it.</li><li><strong>Reversal rule:</strong> reverse the charge whenever you had approved and the vend did not reach <code>onVendSuccess</code>. That is three reasons, not one: FAILED, SESSION_ENDED and RESET. A handler that reverses only on FAILED leaks money on machines that close the session without any VEND FAILURE, and on resets mid-vend.</li><li><code>lastVendFailureReason</code> is one global slot written just before the callback and never cleared. Read it inside <code>onVendFailure</code>, not later.</li></ul>
+<h2>5. State, and a health check that cannot get stuck</h2>
+<p>The reader state is <code>INACTIVE_STATE</code>, <code>DISABLED_STATE</code>, <code>ENABLED_STATE</code>, <code>VEND_STATE</code>. The app shows it, nothing more. Three guarantees since 8.2.1 make a "wait for ENABLED" screen safe:</p>
+<ul><li>a state listener registered at any time receives the current state immediately;</li><li>with direct vend ON the listener reports ENABLED_STATE while the bus is still INACTIVE or DISABLED, re-announces it on every real transition and re-sends it every 5 s until the bus is really enabled;</li><li><code>HardwareLib.currentState</code> returns the same reported state; <code>busState</code> is the real one.</li></ul>
+<pre><code>fun waitForReader(onReady: () -&gt; Unit) {
+    if (HardwareLib.currentState == "ENABLED_STATE" || HardwareLib.currentState == "VEND_STATE") { onReady(); return }
+    val l: (String) -&gt; Unit = { s -&gt; if (s == "ENABLED_STATE" || s == "VEND_STATE") onReady() }
+    HardwareLib.addStateListener(l)        // replays the current state at once; remove with the SAME reference
+}</code></pre>
+<h2>6. Approve and cancel - the two calls</h2>
+<div class="twrap"><table><thead><tr><th>call</th><th>when</th><th>returns false when</th><th>what the listener sees</th></tr></thead><tbody><tr><td><code>approveVend()</code></td><td>after the gateway authorized</td><td>no VEND REQUEST is pending (machine cancelled or timed out first)</td><td>later <code>onVendSuccess</code>, or <code>onVendFailure</code> (FAILED / SESSION_ENDED / RESET)</td></tr><tr><td><code>cancelVend()</code></td><td>gateway declined, or you want to abort the session</td><td>no session live</td><td>nothing (8.2.2); the deny goes out on the next POLL</td></tr><tr><td><code>cancelVend(VEND_DENIED)</code> / <code>cancelVend(SESSION_CANCEL_REQUEST)</code></td><td>same, choosing the wire reply this once</td><td>same</td><td>nothing</td></tr><tr><td><code>beginSession()</code></td><td>manual session mode only, the "card tap"</td><td>not in ENABLED</td><td>-</td></tr></tbody></table></div>
+<p>Always log the Boolean. <code>approveVend()</code> returning false means the money must be voided, because the machine will never dispense.</p>
+<h2>7. Settings per machine</h2>
+<p>Set from the dashboard or the backend; the app may set them too, through the same functions. All persisted, all echoed in <code>SETTINGS_JSON</code> after <code>getSettings</code>.</p>
+<div class="twrap"><table><thead><tr><th>backend key</th><th>function</th><th>remote command</th><th>SETTINGS_JSON</th></tr></thead><tbody><tr><td><code>auto_session</code></td><td><code>setAutoSession(Boolean)</code></td><td>`setSessionMode:auto</td><td>manual`</td><td><code>sessionBeginMode</code></td></tr><tr><td><code>auto_begin_cooldown</code></td><td><code>setAutoBeginCooldown(0..50)</code></td><td><code>setAutoBeginCooldown:N</code></td><td><code>autoBeginCooldownPolls</code></td></tr><tr><td><code>feature_level</code> (number 1..3)</td><td><code>setMdbLevel(n)</code></td><td><code>setMdbLevel:N</code></td><td><code>mdbLevel</code></td></tr><tr><td><code>vmc_cancel_mode</code></td><td><code>setCancelMode(VEND_DENIED / SESSION_CANCEL_REQUEST)</code></td><td>`setCancelMode:vendDenied</td><td>sessionCancel`</td><td><code>vmcCancelMode</code></td></tr><tr><td><code>mdb_direct_vend</code></td><td><code>setDirectVend(Boolean)</code></td><td>`setDirectVend:on</td><td>off`</td><td><code>directVend</code></td></tr><tr><td><code>mdb_force_session_end</code></td><td><code>setForceSessionEnd(Boolean)</code></td><td>`setForceSessionEnd:on</td><td>off`</td><td><code>forceSessionEndAfterVend</code></td></tr><tr><td><code>mdb_mqtt_logging</code></td><td><code>setMqttLogging(Boolean)</code></td><td>`setMqttLogging:on</td><td>off`</td><td><code>mqttLogsEnabled</code></td></tr><tr><td><code>nearpay_ui_dismiss</code></td><td>app-side only</td><td>-</td><td>-</td></tr><tr><td><code>reader_config_info_l3</code> etc.</td><td><code>setConfigHex(name, hex)</code></td><td><code>{"setConfig":{"NAME":"hex"}}</code></td><td><code>CONFIG_JSON</code></td></tr></tbody></table></div>
+<p>What the switches mean in the field:</p>
+<ul><li><strong>Direct vend ON</strong> for machines that send VEND REQUEST without a session (log shows <code>rx=13 00 ... tx=UNHANDLED</code> with it off). The request is accepted in any state.</li><li><strong>Force session end ON</strong> for machines that never send SESSION COMPLETE after a sale: the reader sends SESSION CANCEL REQUEST after every VEND SUCCESS.</li><li><strong>Auto session</strong> for machines that expect the reader to open the session; <strong>cooldown</strong> for machines (Sielaff) that send READER ENABLE after their first POLL.</li><li><strong>Always idle</strong> is not a setting: it is bit 5 of the last byte of <code>READER_CONFIG_INFO_L3</code> (<code>20</code>), Level 3 only, and the backend must turn auto session off with it.</li></ul>
+<p>Hex payloads have locked lengths (READER_CONFIG_INFO 30 bytes, READER_CONFIG_INFO_L3 34, SESSION_BEGIN 1..35). A wrong length is rejected with an error line, never truncated.</p>
+<h2>8. RS232 machines</h2>
+<p>Same <code>VendListener</code>, same approve-or-decline decision, different wire: the machine sends serial frames, a rule table answers them. The app never parses bytes.</p>
+<pre><code>Rs232Lib.setRulesJson(RULES)            // once; persisted and hot-reloaded. Also from the dashboard: {"setRs232Rules":[...]}
+Rs232Lib.setCrcCheck(true)              // XOR protocols only
+Rs232Lib.open(baud = 9600)              // 8-N-1 defaults; the ONLY thing in the app that touches the port</code></pre>
+<p>Rules that carry <code>"event"</code> fire the VendListener exactly like MDB. The table for the Loyalsuns coffee machine (protocol v2, making result must be ACKed):</p>
+<pre><code>[
+ {"name":"CONNECT",         "rx":"A0 04 00 03 43 4F 4E E5",  "tx":"A1 05 00 02 4F 4B A2"},
+ {"name":"HEARTBEAT",       "rx":"A0 06 00 02 48 42 ??",     "tx":"A1 06 00 02 4F 4B A1"},
+ {"name":"PAYMENT_REQUEST", "rx":"A0 01 *", "tx":"", "amountStart":4, "amountEnd":-1, "event":"vendRequest"},
+ {"name":"PAYMENT_TYPED",   "rx":"A0 06 *", "tx":"", "amountStart":5, "amountEnd":-1, "event":"vendRequest"},
+ {"name":"PRODUCTION_OK",   "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"A1 03 00 02 4F 4B A4", "event":"vendSuccess"},
+ {"name":"PRODUCTION_FAIL", "rx":"A0 03 00 06 46 41 49 4C 45 44 A6",    "tx":"A1 03 00 02 4F 4B A4", "event":"vendFailure"},
+ {"name":"CANCEL",          "rx":"A0 08 00 06 43 41 4E 43 45 4C A8",    "tx":"", "event":"vendCancel"}
+]</code></pre>
+<p>The one difference from MDB: there is no <code>approveVend()</code> on RS232. The app answers the machine with bytes after the authorization, inside <code>onVendRequest</code>:</p>
+<pre><code>override fun onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {
+    scope.launch {
+        val ok = gateway.authorize(minorUnits) != null
+        Rs232Lib.sendXorAscii("A1 02", if (ok) "SUCCESS" else "FAILED")
+    }
+}</code></pre>
+<p>Then PRODUCTION_OK arrives as <code>onVendSuccess</code>, PRODUCTION_FAIL as <code>onVendFailure</code> (FAILED, reverse), CANCEL as <code>onVendFailure</code> (CANCELLED_BY_VMC, void). Rule fields, patterns (<code>??</code>, trailing <code>*</code>), price extraction (<code>amountStart/End</code> for ASCII, <code>priceHi/Lo</code> for binary) and the port commands are in <code>API-REFERENCE.md</code> section 2. For a new machine, send the vendor protocol document; the rule table is the whole integration.</p>
+<h2>9. Pulse machines</h2>
+<p>Credit is paid as coin pulses on a digital output. Set polarity once, then one blocking call per sale, never on the UI thread. Optional ready gate on the digital inputs. Full guide with a complete sample: <code>PULSE-README.md</code> and <code>samples/PulsePaymentSample.kt</code>.</p>
+<pre><code>PulseLib.initPulse(highPulse = true)                   // persisted, re-driven at every start
+PulseLib.setReadyFeedbackChannels(mapOf(0 to 1))       // optional gate: input 0 must read 1
+withContext(Dispatchers.IO) {
+    val sent = PulseLib.sendPulse(widthMs = 50, periodMs = 100, count = pulses)   // true only if every pulse went out
+    if (sent) gateway.capture() else gateway.voidHold()
+}</code></pre>
+<h2>10. Logging rules that keep the backend clean</h2>
+<ul><li>Register every listener once per process. Keep a lambda in a field and remove it with the same reference if a screen must listen. The library ignores a repeat registration of the same instance, but a new lambda is a new instance.</li><li>One <code>attachRabbahMqtt()</code>, no custom bridge next to it. Two publishers mean every exchange twice on the backend (<code>DUPLICATE-LOGS-README.md</code>).</li><li>A local log view must skip lines with <code>showOnScreen == false</code> (per-poll noise) and must be capped; redrawing a growing TextView on every POLL froze the app on real hardware.</li><li>Do not enqueue log lines to MQTT yourself; the bridge already does.</li></ul>
+<h2>11. Test without a machine, then verify on the bus</h2>
+<p>On the device, with no machine attached:</p>
+<pre><code>HardwareLib.simulateExchange("10 10")        // a fake RESET through the whole pipeline -&gt; code 111 on the dashboard
+Rs232Lib.simulateFrame("A0 01 00 06 31 35 30 30 30 30 A3")   // a fake payment request -&gt; onVendRequest(1500.00)</code></pre>
+<p>From the dashboard passthrough bar after deploy:</p>
+<div class="twrap"><table><thead><tr><th>send</th><th>expect</th></tr></thead><tbody><tr><td><code>version</code></td><td><code>[remote] mqtt-lib 2.7.1, hardware-lib 8.2.2 - client id ...</code></td></tr><tr><td><code>getSettings</code></td><td><code>SETTINGS_JSON</code> with every key in section 7</td></tr><tr><td><code>status</code></td><td><code>VMC_STATUS</code> with <code>state</code> and <code>busState</code></td></tr><tr><td>one real sale</td><td>each exchange once on the backend, one <code>onVendSuccess</code> in the app</td></tr><tr><td><code>mqttStats</code></td><td>link badge green</td></tr></tbody></table></div>
+<h2>12. Troubleshooting</h2>
+<div class="twrap"><table><thead><tr><th>what you see</th><th>cause</th><th>fix</th></tr></thead><tbody><tr><td><code>rx=13 00 ... tx=UNHANDLED</code></td><td>machine sends VEND REQUEST without a session, direct vend off</td><td><code>setDirectVend:on</code></td></tr><tr><td>health check waits forever for ENABLED</td><td>app registered its listener after the event, old library</td><td>8.2.1+ replays and heartbeats; see section 5</td></tr><tr><td><code>approveVend IGNORED - no VEND REQUEST pending</code></td><td>the machine cancelled or timed out before the gateway answered</td><td>void the hold; speed up the gateway or raise the machine's timeout</td></tr><tr><td><code>cancelVend IGNORED - no session live</code></td><td>nothing to cancel</td><td>nothing</td></tr><tr><td>onVendFailure never fires after your own cancel</td><td>correct since 8.2.2 (no echo)</td><td>handle the decline where you call cancelVend</td></tr><tr><td>session never closes after a sale</td><td>machine sends no SESSION COMPLETE</td><td><code>setForceSessionEnd:on</code></td></tr><tr><td>every line 2x or 4x on the backend</td><td>second publisher in the app</td><td>one attach, delete the app bridge</td></tr><tr><td>every line 10x on the device screen</td><td>listener registered per Activity</td><td>register once, remove with the same reference</td></tr><tr><td><code>[rs232] ... UNMATCHED</code></td><td>frame not in the rule table, or CRC check on with a non-XOR protocol</td><td>add the rule; <code>rs232Crc:off</code></td></tr><tr><td><code>sendPulse</code> returns false</td><td>polarity not set, gate not ready, bad width/period</td><td><code>initPulse</code> first; <code>checkMachineReady</code>; period &gt; width</td></tr></tbody></table></div>
+<h2>13. React Native apps</h2>
+<p>The same libraries ship inside <code>react-native-mdb</code> (package 1.3.x): <code>Mdb.initMqtt</code>, <code>Mdb.initMdb</code>, <code>Mdb.startMdb</code>, events <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure({ reason })</code>, <code>Mdb.approveVend()</code> / <code>Mdb.cancelVend()</code>. Every rule above holds unchanged; the bridge registers its listeners once. Manual: <code>docs/mdb-reactnative-manual.html</code>.</p>
+<h2>14. Before the field</h2>
+<ul><li>[ ] AARs 8.2.2 / 2.7.1 / 1.0.9 in <code>libs/</code>, <code>version</code> answers with them</li><li>[ ] <code>HardwareLib.init(applicationContext)</code> at boot, in every mode</li><li>[ ] one <code>attachRabbahMqtt()</code>, no custom bridge, listeners registered once</li><li>[ ] <code>onVendFailure</code> reverses on FAILED, SESSION_ENDED and RESET when approved, voids otherwise</li><li>[ ] <code>approveVend()</code> / <code>cancelVend()</code> return values logged</li><li>[ ] gateway work off the callback thread</li><li>[ ] machine settings applied and echoed in <code>SETTINGS_JSON</code></li><li>[ ] one real sale: each exchange once on the backend</li></ul>
+<p>Nothing since 8.1.0 has run on a real CM30. First field checks: duplicates gone, direct-vend health check, a reader restart mid-session, the force-end machine, the no-echo cancel.</p>
+</main>
