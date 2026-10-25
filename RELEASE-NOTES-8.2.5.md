@@ -27,7 +27,7 @@ hardware-lib 8.0.0 / mqtt-lib 2.6.0.
 | `libs/CM30-HardwareLibrary-1.0.9.aar` | unchanged |
 | `AAR-Update-latest.zip` | the three AARs + AAR-HANDOFF-README, IMPLEMENTATION-README, VENDLISTENER-README, CANCEL-FLOW-README, SESSION-ENDED-README, DUPLICATE-LOGS-README, API-REFERENCE, PULSE-README |
 | `react-native-mdb` 1.3.4 | bundles hardware-lib 8.2.5 + mqtt-lib 2.8.0; the `reason` union gains `'CANCELLED_BY_OPERATOR'` |
-| `Hardware-Dashboard-win32-x64-v8.2.4.zip` | Windows dashboard, unchanged since 8.2.4 (Cancel Retry and Skip 00 00 Vend toggles, Vend counters line) |
+| `Hardware-Dashboard-win32-x64-v8.2.5.zip` | Windows dashboard: Cancel Retry and Skip 00 00 Vend toggles, Vend counters line, retry MS,COUNT hint |
 | `MDB-Slave-2-v2.20.0-build107-debug.apk` | demo/test app on 8.2.5 / 2.8.0 (private release only) |
 
 ```gradle
