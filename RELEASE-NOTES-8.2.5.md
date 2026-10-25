@@ -12,6 +12,8 @@ hardware-lib 8.0.0 / mqtt-lib 2.6.0.
   (new: dashboard Vend Cancel or a remote command). Branch on the reason: CANCELLED_BY_APP needs no gateway action,
   CANCELLED_BY_OPERATOR must void the hold (reverse if you had approved). A Java `switch` without `default` must add
   the new case. Full tables: `CANCEL-FLOW-README.md`.
+- Session-cancel retry takes the count too: `setSessionCancelRetry:MS,COUNT` (count 1..10, default 3). Backend keys
+  `mdb_session_cancel_retry_ms` (0 = off) and `mdb_session_cancel_retry_count`, one number each.
 - Operator commands always answer now: `[remote]` reply lines such as the answer to `help` are no longer muted by the
   MQTT Logs switch.
 - Everything from 8.2.3 / 8.2.4 is included: session-cancel retry, skip 00 00 vend, RS232 leading-`*` patterns.
@@ -53,6 +55,20 @@ Handler rule: CANCELLED_BY_APP = you already declined, nothing at the gateway, r
 void the hold, reverse if approved, reset the UI. `vendStats` adds `operatorCancels`; `vendFailuresByReason` now
 carries all three cancel reasons. Log lines: `[app] cancelVend armed ...` / `[operator] cancelVend armed ...` followed by
 `[mdb] vend failed: CANCELLED_BY_APP|CANCELLED_BY_OPERATOR - onVendFailure fires`.
+
+### Session-cancel retry: one number for the wait, one for the count (8.2.5)
+
+`setSessionCancelRetry:MS[,COUNT]` - the wait in ms (0 = off, 300..10000) and, optionally, how many re-sends before
+the reader gives up (1..10, default 3). Both persisted; `on` / `off` stay as aliases for 1000 / 0. SETTINGS_JSON
+carries `sessionCancelRetryMs` and `sessionCancelRetryCount`. Kotlin: `setSessionCancelRetry(ms, maxRetries)`,
+`sessionCancelRetryCount`. Backend keys: `mdb_session_cancel_retry_ms` and `mdb_session_cancel_retry_count`,
+a plain number each.
+
+```
+setSessionCancelRetry:1000,3     wait 1000 ms, re-send up to 3 times (the defaults)
+setSessionCancelRetry:1500,5     wait 1500 ms, up to 5 times
+setSessionCancelRetry:0          off
+```
 
 ### `[remote]` replies are never muted
 

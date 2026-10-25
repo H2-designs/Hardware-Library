@@ -43,6 +43,21 @@ Also 8.2.5: `[remote]` reply lines (the answer to `help`, `getSettings` acknowle
 summary) are no longer muted by the MQTT Logs switch, so an operator command always answers. They travel on the
 `ops` channel since mqtt-lib 2.8.0.
 
+### Session-cancel retry: one number for the wait, one for the count (8.2.5)
+
+`setSessionCancelRetry:MS[,COUNT]` - the wait in ms (0 = off, 300..10000) and, optionally, how many re-sends before
+the reader gives up (1..10, default 3). Both persisted; `on` / `off` stay as aliases for 1000 / 0. SETTINGS_JSON
+carries `sessionCancelRetryMs` and `sessionCancelRetryCount`. Kotlin: `setSessionCancelRetry(ms, maxRetries)`,
+`sessionCancelRetryCount`. Backend keys: `mdb_session_cancel_retry_ms` and `mdb_session_cancel_retry_count`,
+a plain number each.
+
+```
+setSessionCancelRetry:1000,3     wait 1000 ms, re-send up to 3 times (the defaults)
+setSessionCancelRetry:1500,5     wait 1500 ms, up to 5 times
+setSessionCancelRetry:0          off
+```
+
+
 ### 8.2.4 - skip 00 00 vend requests (24 October 2026, no code change)
 
 Field case: a machine keeps sending VEND REQUEST with price `00 00` while the customer is still choosing, and sends

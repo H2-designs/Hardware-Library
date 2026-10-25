@@ -186,7 +186,9 @@ all echoed in `SETTINGS_JSON` after `getSettings`.
 | `mdb_direct_vend` | `setDirectVend(Boolean)` | `setDirectVend:on|off` | `directVend` |
 | `mdb_force_session_end` | `setForceSessionEnd(Boolean)` | `setForceSessionEnd:on|off` | `forceSessionEndAfterVend` |
 | none yet (8.2.3) | `setSessionCancelRetry(ms)` / `setSessionCancelRetry(Boolean)` | `setSessionCancelRetry:on|off|MS` | `sessionCancelRetryMs` |
-| none yet (8.2.4) | `setSkipZeroVend(Boolean)` | `setSkipZeroVend:on|off` | `skipZeroVend` |
+| `mdb_skip_zero_vend` | `setSkipZeroVend(Boolean)` | `setSkipZeroVend:on|off` | `skipZeroVend` |
+| `mdb_session_cancel_retry_ms` (0 = off) | `setSessionCancelRetry(ms)` | `setSessionCancelRetry:MS` | `sessionCancelRetryMs` |
+| `mdb_session_cancel_retry_count` (1..10) | `setSessionCancelRetry(ms, count)` | `setSessionCancelRetry:MS,COUNT` | `sessionCancelRetryCount` |
 | `mdb_mqtt_logging` | `setMqttLogging(Boolean)` | `setMqttLogging:on|off` | `mqttLogsEnabled` |
 | `nearpay_ui_dismiss` | app-side only | - | - |
 | `reader_config_info_l3` etc. | `setConfigHex(name, hex)` | `{"setConfig":{"NAME":"hex"}}` | `CONFIG_JSON` |

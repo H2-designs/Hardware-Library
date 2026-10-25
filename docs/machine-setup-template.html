@@ -183,6 +183,16 @@
             <div class="ctl"><label class="tog" for="forceEnd"><input type="checkbox" id="forceEnd"><span id="forceEndLabel">Off</span></label></div>
           </div>
           <div class="field" data-levels="1 2 3">
+            <div class="ftop"><div class="fname"><b>Session-cancel retry</b><span class="key">mdb_session_cancel_retry_ms · mdb_session_cancel_retry_count</span></div><span class="pill">all levels · 8.2.3+</span></div>
+            <p class="fhint">When the machine ignores a SESSION CANCEL REQUEST, the reader sends it again after the wait, up to the count. 0 ms = off (sent once, as the spec says). Default when on: 1000 ms, 3 times. Sent as <code style="font-family: var(--mono)">setSessionCancelRetry:MS,COUNT</code>.</p>
+            <div class="ctl"><input class="numin" type="number" id="retryMs" value="0" min="0" max="10000" step="100" aria-label="Session-cancel retry wait in milliseconds"><span class="unit">ms · 0 = off · 300 to 10000</span><input class="numin" type="number" id="retryCount" value="3" min="1" max="10" step="1" aria-label="Session-cancel retry count"><span class="unit">re-sends · 1 to 10</span></div>
+          </div>
+          <div class="field" data-levels="1 2 3">
+            <div class="ftop"><div class="fname"><b>Skip 00 00 vend</b><span class="key">mdb_skip_zero_vend</span></div><span class="pill">all levels · 8.2.4+</span></div>
+            <p class="fhint">On: a VEND REQUEST whose price is 00 00 is acknowledged and ignored, no payment is started. For machines that keep sending 00 00 until an item is selected. Off: every VEND REQUEST reaches the app. Leave off on machines that really sell at price 0.</p>
+            <div class="ctl"><label class="tog" for="skipZero"><input type="checkbox" id="skipZero"><span id="skipZeroLabel">Off</span></label></div>
+          </div>
+          <div class="field" data-levels="1 2 3">
             <div class="ftop"><div class="fname"><b>Nearpay UI dismiss</b><span class="key">nearpay_ui_dismiss</span></div><span class="pill">app setting · all levels</span></div>
             <p class="fhint">On: the app closes the Nearpay payment screen by itself when the vend ends without a sale (machine cancel, failure, session ended). Off: the screen stays until the customer closes it. Lives in the app, not on the reader.</p>
             <div class="ctl"><label class="tog" for="nearpayDismiss"><input type="checkbox" id="nearpayDismiss"><span id="nearpayDismissLabel">Off</span></label></div>
@@ -470,6 +480,10 @@
       o.vmc_cancel_mode = document.querySelector('input[name="cancel"]:checked').value;
       o.direct_vend = $('directVend').checked;
       o.force_session_end_after_vend = $('forceEnd').checked;
+      o.mdb_session_cancel_retry_ms = clamp('retryMs', 0, 10000, 0);
+      if (o.mdb_session_cancel_retry_ms > 0 && o.mdb_session_cancel_retry_ms < 300) o.mdb_session_cancel_retry_ms = 300;
+      o.mdb_session_cancel_retry_count = clamp('retryCount', 1, 10, 3);
+      o.mdb_skip_zero_vend = $('skipZero').checked;
       o.nearpay_ui_dismiss = $('nearpayDismiss').checked;
       if (lv === 3) o.always_idle = $('alwaysIdle').checked;
       for (const it of ITEMS) if (it.levels.includes(lv)) o[it.key] = values[it.name];
@@ -504,6 +518,7 @@
     $('alwaysIdleLabel').textContent = $('alwaysIdle').checked ? 'On · last byte 20' : 'Off · last byte 00';
     $('directVendLabel').textContent = $('directVend').checked ? 'On · accept a vend request in any state' : 'Off · only inside a session';
     $('forceEndLabel').textContent = $('forceEnd').checked ? 'On · cancel the session after every vend' : 'Off · wait for the machine to close it';
+    $('skipZeroLabel').textContent = $('skipZero').checked ? 'On · 00 00 requests are ignored' : 'Off · every request reaches the app';
     $('nearpayDismissLabel').textContent = $('nearpayDismiss').checked ? 'On · close the payment screen when the vend fails' : 'Off · the customer closes it';
     $('crcLabel').textContent = $('crc').checked ? 'On · bad-CRC frames are discarded' : 'Off · every frame is accepted';
     $('readyFbLabel').textContent = $('readyFb').checked ? 'On · pulse only when the machine is ready' : 'Off · pulses are always sent';
@@ -514,8 +529,8 @@
 
   document.querySelectorAll('input[name="level"]').forEach(r => r.addEventListener('change', () => applyProtocol(true)));
   document.querySelectorAll('input[name="protocol"]').forEach(r => r.addEventListener('change', () => applyProtocol(false)));
-  for (const id of ['autoSession', 'directVend', 'forceEnd', 'nearpayDismiss', 'crc', 'readyFb', 'baud', 'dataBits', 'stopBits', 'parity']) $(id).addEventListener('change', render);
-  for (const id of ['cooldown', 'gap', 'pulseWidth', 'pulsePeriod']) $(id).addEventListener('input', render);
+  for (const id of ['autoSession', 'directVend', 'forceEnd', 'skipZero', 'nearpayDismiss', 'crc', 'readyFb', 'baud', 'dataBits', 'stopBits', 'parity']) $(id).addEventListener('change', render);
+  for (const id of ['cooldown', 'gap', 'pulseWidth', 'pulsePeriod', 'retryMs', 'retryCount']) $(id).addEventListener('input', render);
   document.querySelectorAll('input[name="rf0"], input[name="rf1"], input[name="rf2"]').forEach(r => r.addEventListener('change', render));
   document.querySelectorAll('input[name="cancel"], input[name="pulseMode"]').forEach(r => r.addEventListener('change', render));
   $('alwaysIdle').addEventListener('change', () => { alwaysIdleToByte(); applyAlwaysIdleLock(); if (!$('configOverlay').hidden) buildConfigPanel(); render(); });
