@@ -1,16 +1,16 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.4
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.5
 
-Companion files: IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
+Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
 ## What to do (2 steps, no code changes)
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.4.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.5.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.4.aar')
+   implementation files('libs/hardware-lib-8.2.5.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -27,6 +27,21 @@ Companion files: IMPLEMENTATION-README.md (the end-to-end guide for the Android 
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.5 - every cancel reaches onVendFailure with a reason; operator cancels get their own reason (25 October 2026)
+
+The 8.2.2 rule (the app's own `cancelVend()` is silent) is withdrawn. Since 8.2.5 every cancel is delivered through
+`onVendFailure`, exactly once, and `lastVendFailureReason` says who cancelled: **CANCELLED_BY_VMC** (the machine),
+**CANCELLED_BY_APP** (your own `cancelVend()`), **CANCELLED_BY_OPERATOR** (new: the dashboard's Vend Cancel, the
+remote `cancelVend` commands, or a remote session-mode switch while a session is live). The wire replies are
+unchanged. In the handler: CANCELLED_BY_APP needs no gateway action (you already declined) but still resets the UI;
+CANCELLED_BY_OPERATOR must void the hold, or reverse if you had approved, because the app did not decide it. A Java
+`switch` over `VendFailureReason` without `default` must add the new case. `vendStats` adds `operatorCancels`.
+Full tables and sequences: `CANCEL-FLOW-README.md`.
+
+Also 8.2.5: `[remote]` reply lines (the answer to `help`, `getSettings` acknowledgements, the `vendStats`
+summary) are no longer muted by the MQTT Logs switch, so an operator command always answers. They travel on the
+`ops` channel since mqtt-lib 2.8.0.
 
 ### 8.2.4 - skip 00 00 vend requests (24 October 2026, no code change)
 
@@ -71,7 +86,7 @@ first still logs UNMATCHED). First match wins - list tail rules after the exact 
 unique. `*` at both ends is rejected. Rule table only; every existing table behaves as before. mqtt-lib stays 2.8.0.
 Details and a verify table: `RELEASE-NOTES-8.2.3.md`. Not yet run on a real CM30.
 
-### 8.2.2 - the app's own cancelVend() is no longer echoed as onVendFailure (22 October 2026, RELEASED as v8.2.2)
+### 8.2.2 - the app's own cancelVend() is no longer echoed as onVendFailure (22 October 2026; WITHDRAWN in 8.2.5, see above)
 
 Until 8.2.1 `HardwareLib.cancelVend()` (and the dashboard's `cancelVend` command) closed the open vend AND fired
 `onVendFailure` with reason CANCELLED_BY_APP - the app heard its own cancel back. The fleet app does not want that:
@@ -290,7 +305,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.19.0 build 106** bundles hardware-lib 8.2.4 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.20.0 build 107** bundles hardware-lib 8.2.5 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

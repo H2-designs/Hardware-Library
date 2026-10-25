@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.4 / 2.8.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.5 / 2.8.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,16 +133,27 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.4 / mqtt-lib&nbsp;2.8.0.
+    hardware-lib&nbsp;8.2.5 / mqtt-lib&nbsp;2.8.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.4 / mqtt-lib 2.8.0 &mdash; 24 October 2026</span>What changed in 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.5 / mqtt-lib 2.8.0 &mdash; 25 October 2026</span>What changed in 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>8.2.5 &mdash; every cancel reaches <code>onVendFailure</code> with a reason</h3>
+    <p>The 8.2.2 rule (the app's own cancel is silent) is withdrawn. Every cancel is delivered exactly once and
+    <code class="cmd">lastVendFailureReason</code> says who cancelled: <strong>CANCELLED_BY_VMC</strong> (VEND CANCEL /
+    READER CANCEL / RS232 cancel rule), <strong>CANCELLED_BY_APP</strong> (your own <code class="cmd">cancelVend()</code>),
+    <strong>CANCELLED_BY_OPERATOR</strong> (new: the dashboard's Vend Cancel, the remote <code class="cmd">cancelVend</code>
+    commands, a remote session-mode switch mid-session). Wire replies unchanged. Handler rule: CANCELLED_BY_APP needs no
+    gateway action but resets the UI; CANCELLED_BY_OPERATOR voids the hold (reverses if approved). A Java switch without
+    default must add the case. <code class="cmd">vendStats</code> adds <code>operatorCancels</code>. Also 8.2.5:
+    <code>[remote]</code> reply lines (the answer to <code class="cmd">help</code>, acknowledgements, the vendStats
+    summary) are no longer muted by the MQTT Logs switch. Guide: <code>CANCEL-FLOW-README.md</code>.</p>
 
     <h3>8.2.4 &mdash; skip 00 00 vend requests</h3>
     <p>Some machines keep sending VEND REQUEST with price <code>00 00</code> while the customer is still choosing and
@@ -316,6 +327,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.5</strong><br>mqtt-lib 2.8.0<br>demo APK build 107</td><td>25 Oct 2026</td><td>Every cancel reaches <code>onVendFailure</code> with a reason: CANCELLED_BY_VMC, CANCELLED_BY_APP (delivered again), new CANCELLED_BY_OPERATOR for dashboard / remote cancels; <code>vendStats</code> <code>operatorCancels</code>; <code>[remote]</code> replies no longer muted by the Logs switch. CANCEL-FLOW-README.md.</td><td>Branch on the reason: CANCELLED_BY_APP = UI reset only, CANCELLED_BY_OPERATOR = void / reverse. Java switch: add the case.</td></tr>
         <tr><td><strong>hardware-lib 8.2.4</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.3</td><td>24 Oct 2026</td><td>Skip 00 00 vend requests: persisted switch <code>setSkipZeroVend:on|off</code>, dashboard <strong>Skip 00 00 Vend</strong> - a VEND REQUEST priced 00 00 is ACKed and dropped, the request with the real price works as usual; counted in <code>vendStats</code>. Demo APK not rebuilt.</td><td>None. Operators turn it on per machine.</td></tr>
         <tr><td><strong>hardware-lib 8.2.3</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.2</td><td>24 Oct 2026</td><td>Session-cancel retry (D-1637): persisted switch <code>setSessionCancelRetry:on|off|MS</code>, dashboard <strong>Cancel Retry</strong> - an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms, up to 3 times; a new VEND REQUEST stops it; counted in <code>vendStats</code>. RS232 <code>rx</code> patterns may start with <code>*</code> to match the END of a frame (<code>"* 53 E7"</code>), for machines that send one frame in two pieces. Existing settings and rule tables unchanged. Demo APK not rebuilt.</td><td>None. Operators turn the retry on per machine; add tail rules only where needed.</td></tr>
         <tr><td><strong>hardware-lib 8.2.2</strong><br>mqtt-lib 2.8.0<br>demo APK build 105</td><td>22 Oct 2026</td><td>mqtt-lib 2.8.0: only coded RABBAH_LOG items on the backend's <code>logs</code> topic; plain lines, control lines, PONG and <code>version</code> move to <code>devices/&lt;id&gt;/ops</code> (D-0554 unknown_source flood), dashboard subscribes to both. The app's own <code>cancelVend()</code> (and the dashboard's <code>cancelVend</code>) no longer fires <code>onVendFailure</code>: the open vend is closed silently, the deny reply still goes out, <code>lastVendFailureReason</code> records CANCELLED_BY_APP. Machine-side ends (CANCELLED_BY_VMC / FAILED / SESSION_ENDED / RESET) unchanged, exactly once. Vend counters: <code>vendStats</code> / <code>VEND_STATS</code> (requests, successes, failures by reason, app cancels, ignored approves, stuck callbacks), dashboard <strong>Vend</strong> button.</td><td>Remove any "ignore CANCELLED_BY_APP" branch; nothing else.</td></tr>
@@ -1259,6 +1271,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.4 · mqtt-lib 2.8.0 · demo app v2.19.0 (build 106). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.5 · mqtt-lib 2.8.0 · demo app v2.20.0 (build 107). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

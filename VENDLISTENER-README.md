@@ -1,6 +1,6 @@
 # VendListener - how to implement it, and how to fix the usual mistakes
 
-hardware-lib 8.2.4, 24 October 2026. The payment hook is three callbacks. This document is the complete,
+hardware-lib 8.2.5, 25 October 2026. The payment hook is three callbacks. This document is the complete,
 copy-ready implementation plus the fix for every mistake we have seen in the field. Companion files:
 `IMPLEMENTATION-README.md` (the whole app), `API-REFERENCE.md`, `DUPLICATE-LOGS-README.md`.
 
@@ -14,10 +14,12 @@ copy-ready implementation plus the fix for every mistake we have seen in the fie
 | `onVendFailure()` | VEND FAILURE after your approval: product not dispensed | FAILED | reverse |
 | `onVendFailure()` | the machine closed the session with the vend still open, no success / failure / cancel | SESSION_ENDED | reverse if approved, else void |
 | `onVendFailure()` | bus RESET or `stop()` with the vend open | RESET | reverse if approved, else void |
-| nothing | your own `cancelVend()` (8.2.2) | CANCELLED_BY_APP is recorded, no callback | you already handled it |
+| `onVendFailure()` | your own `cancelVend()` (8.2.5: delivered again) | CANCELLED_BY_APP | nothing at the gateway, you already declined; reset the UI |
+| `onVendFailure()` | an operator cancelled from the dashboard or a remote command (8.2.5) | CANCELLED_BY_OPERATOR | void the hold; reverse if you had approved; reset the UI |
 
-Every VEND REQUEST the machine ends gives exactly one `onVendSuccess` or one `onVendFailure`. Your own cancel is
-the only silent end, because you caused it.
+Every VEND REQUEST gives exactly one `onVendSuccess` or one `onVendFailure`, whoever ended it. Since 8.2.5 that
+includes your own `cancelVend()` and a dashboard cancel; the reason tells you which. `CANCEL-FLOW-README.md` has the
+three cancel sources side by side.
 
 ## 2. The implementation, Kotlin
 
@@ -55,7 +57,7 @@ object PaymentFlow : HardwareLib.VendListener {
                 if (hold == null) {
                     s.closed = true
                     sale = null
-                    HardwareLib.cancelVend()              // silent: no onVendFailure comes back (8.2.2)
+                    HardwareLib.cancelVend()              // onVendFailure comes back with CANCELLED_BY_APP (8.2.5) - nothing left to do there
                     ui.resetToIdle()
                     return@launch
                 }
@@ -83,15 +85,16 @@ object PaymentFlow : HardwareLib.VendListener {
         scope.launch {
             val hold = s?.hold
             when (reason) {
-                HardwareLib.VendFailureReason.CANCELLED_BY_VMC ->       // the MACHINE cancelled (VEND CANCEL / READER CANCEL / RS232 CANCEL)
+                HardwareLib.VendFailureReason.CANCELLED_BY_VMC,         // the MACHINE cancelled (VEND CANCEL / READER CANCEL / RS232 CANCEL)
+                HardwareLib.VendFailureReason.CANCELLED_BY_OPERATOR ->  // the DASHBOARD cancelled (8.2.5): we did not decide this
                     if (hold != null) { if (s.approved) gateway.reverse(hold) else gateway.voidHold(hold) }
+                HardwareLib.VendFailureReason.CANCELLED_BY_APP -> {}    // our own cancelVend(): the decline was handled where we called it
                 HardwareLib.VendFailureReason.FAILED ->                 // VEND FAILURE after approval: product not dispensed
                     hold?.let { gateway.reverse(it) }
                 HardwareLib.VendFailureReason.SESSION_ENDED,            // session closed with the vend open: result unknown
                 HardwareLib.VendFailureReason.RESET ->                  // RESET / stop() with the vend open: result unknown
                     if (hold != null) { if (s.approved) gateway.reverse(hold) else gateway.voidHold(hold) }
-                HardwareLib.VendFailureReason.CANCELLED_BY_APP, null -> // never delivered since 8.2.2; keep the branch for completeness
-                    hold?.let { gateway.voidHold(it) }
+                null -> hold?.let { gateway.voidHold(it) }
             }
             ui.resetToIdle()
             log("vend failed: $reason approved=${s?.approved} hold=${hold != null}")
@@ -149,14 +152,17 @@ public final class PaymentFlow implements HardwareLib.VendListener {
         io.execute(() -> {
             GatewayHold hold = s == null ? null : s.hold;
             if (hold != null) {
-                if (reason == HardwareLib.VendFailureReason.CANCELLED_BY_VMC) {          // the machine cancelled
+                if (reason == HardwareLib.VendFailureReason.CANCELLED_BY_VMC
+                        || reason == HardwareLib.VendFailureReason.CANCELLED_BY_OPERATOR) { // the machine or the dashboard cancelled
                     if (s.approved) gateway.reverse(hold); else gateway.voidHold(hold);
+                } else if (reason == HardwareLib.VendFailureReason.CANCELLED_BY_APP) {   // our own cancelVend(): already handled
+                    // nothing at the gateway
                 } else if (reason == HardwareLib.VendFailureReason.FAILED) {            // product not dispensed
                     gateway.reverse(hold);
                 } else if (reason == HardwareLib.VendFailureReason.SESSION_ENDED
                         || reason == HardwareLib.VendFailureReason.RESET) {              // result unknown
                     if (s.approved) gateway.reverse(hold); else gateway.voidHold(hold);
-                } else {                                                                 // CANCELLED_BY_APP: never delivered since 8.2.2
+                } else {                                                                 // unknown reason
                     gateway.voidHold(hold);
                 }
             }
@@ -176,7 +182,7 @@ Mdb.onVendRequest(async ({ amount, minorUnits, itemNumber }) => {
   const hold = await gateway.authorize(minorUnits).catch(() => null);
   if (sale !== s || s.closed) { if (hold) await gateway.voidHold(hold); return; }
   s.hold = hold;
-  if (!hold) { s.closed = true; sale = null; await Mdb.cancelVend(); ui.reset(); return; }   // silent (8.2.2)
+  if (!hold) { s.closed = true; sale = null; await Mdb.cancelVend(); ui.reset(); return; }   // onVendFailure CANCELLED_BY_APP follows (8.2.5)
   s.approved = await Mdb.approveVend();
   if (!s.approved) await gateway.voidHold(hold);
 });
@@ -184,10 +190,11 @@ Mdb.onVendSuccess(async () => { const s = sale; if (!s) return; s.closed = true;
 Mdb.onVendFailure(async ({ reason }) => {
   const s = sale; if (s) { s.closed = true; sale = null; }
   if (s?.hold) {
-    if (reason === 'CANCELLED_BY_VMC') { if (s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); } // the machine cancelled
+    if (reason === 'CANCELLED_BY_VMC' || reason === 'CANCELLED_BY_OPERATOR') { if (s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); } // machine or dashboard cancelled
+    else if (reason === 'CANCELLED_BY_APP') { /* our own cancelVend(): already handled */ }
     else if (reason === 'FAILED') await gateway.reverse(s.hold);                                                              // product not dispensed
     else if (reason === 'SESSION_ENDED' || reason === 'RESET') { if (s.approved) await gateway.reverse(s.hold); else await gateway.voidHold(s.hold); }
-    else await gateway.voidHold(s.hold);                                                                                       // CANCELLED_BY_APP: never delivered since 8.2.2
+    else await gateway.voidHold(s.hold);                                                                                       // unknown reason
   }
   ui.reset();
 });
@@ -199,7 +206,8 @@ Mdb.onVendFailure(async ({ reason }) => {
 |---|---|---|
 | customer charged, no product, no refund, on machines that just close the session | reversed only on FAILED | reverse on FAILED, SESSION_ENDED and RESET when approved (section 2) |
 | hold left on the card after a customer cancel | nothing in onVendFailure for CANCELLED_BY_VMC | void on every other reason |
-| app's own decline shows a "vend failed" screen | handled CANCELLED_BY_APP in onVendFailure | since 8.2.2 there is no callback; handle the decline where `cancelVend()` is called |
+| app's own decline shows a "vend failed" screen | treated CANCELLED_BY_APP like a machine cancel | branch on the reason: CANCELLED_BY_APP needs no gateway action and no error screen, only the UI reset (8.2.5) |
+| operator cancels from the dashboard, payment screen stays open | the app ignored CANCELLED_BY_APP, and before 8.2.5 the dashboard cancel was silent | 8.2.5 delivers CANCELLED_BY_OPERATOR; void the hold and reset the UI on it |
 | `approveVend IGNORED - no VEND REQUEST pending`, money captured anyway | ignored the Boolean | if `approveVend()` returns false the machine will not dispense: void, never capture |
 | vend approved after the machine had cancelled, hold never voided | gateway result applied to a stale request | the `sale !== s` check after `authorize` |
 | logs and callbacks freeze during card read | gateway called inside the callback | every callback returns at once; work on your own thread (the library warns after 3 s) |
@@ -275,7 +283,8 @@ Then, one line at a time from the dashboard passthrough bar, watching the app lo
 | request again, then `rs232Simulate:A0 08 00 02 43 41 A8` | onVendFailure | CANCELLED_BY_VMC | void |
 | request again, then another request | onVendFailure for the first | SESSION_ENDED | reverse if approved, else void |
 | request again, then `close` (HardwareLib.stop) | onVendFailure | RESET | reverse if approved, else void |
-| request again, then app `cancelVend()` | nothing | CANCELLED_BY_APP recorded | handled at the call |
+| request again, then app `cancelVend()` | onVendFailure | CANCELLED_BY_APP | nothing at the gateway, UI reset |
+| request again, then dashboard Vend Cancel | onVendFailure | CANCELLED_BY_OPERATOR | void (reverse if approved) |
 
 `vendStats` afterwards must show requests=6, successes=1, failures=4 with one of each reason, app cancels=1,
 STUCK callbacks=0. On MDB the engine fires the identical callbacks from the bus, so a handler that passes this table

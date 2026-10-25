@@ -1,0 +1,112 @@
+<title>Vend Cancel Flow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+<style>
+  h1 { margin-bottom: 6px; }
+  h2 { margin-top: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  h3 { margin-top: 6px; }
+  main > * + * { margin-top: 0; }
+  main { gap: 14px; }
+  pre { white-space: pre; }
+  ol, ul { display: flex; flex-direction: column; gap: 6px; }
+</style>
+<main>
+<h1>Vend cancel - who can cancel, what the app hears, what goes on the bus</h1>
+<p>hardware-lib 8.2.5, 25 October 2026. The complete reference for every way a vend or a session can be cancelled, from the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: <code>VENDLISTENER-README.md</code> (the handler), <code>SESSION-ENDED-README.md</code>, <code>API-REFERENCE.md</code>.</p>
+<h2>1. The rule since 8.2.5</h2>
+<p><strong>Every cancel reaches the app through <code>onVendFailure</code>, exactly once, and <code>lastVendFailureReason</code> says who cancelled.</strong></p>
+<div class="twrap"><table><thead><tr><th>who cancelled</th><th>how</th><th>reason the app reads</th><th>wire reply the reader sends</th></tr></thead><tbody><tr><td>the machine</td><td>VEND CANCEL <code>13 01</code>, READER CANCEL <code>14 02</code>, or an RS232 rule with <code>event: vendCancel</code></td><td><strong>CANCELLED_BY_VMC</strong></td><td>per the cancel mode: VEND DENIED, or SESSION CANCEL REQUEST on the next POLL</td></tr><tr><td>the Android app</td><td><code>HardwareLib.cancelVend()</code> / <code>cancelVend(response)</code>, or <code>setAutoSession</code> from app code while a session is live</td><td><strong>CANCELLED_BY_APP</strong></td><td>the response you chose, or the standing cancel mode, on the next POLL</td></tr><tr><td>an operator</td><td>dashboard <strong>Vend Cancel</strong> button, the remote commands <code>cancelVend</code>, <code>cancelVend:sessionCancel</code>, <code>cancelVend:vendDenied</code>, or <code>setSessionMode</code> while a session is live</td><td><strong>CANCELLED_BY_OPERATOR</strong> (new in 8.2.5)</td><td>same as the app's</td></tr></tbody></table></div>
+<p>The other failure reasons are unchanged: FAILED (VEND FAILURE after approval), SESSION_ENDED (session closed with the vend open), RESET (bus RESET or <code>stop()</code>).</p>
+<p>Why the app is told about its own cancel again: between 8.2.2 and 8.2.4 the app's <code>cancelVend()</code> closed the vend silently, so a cancel pressed on the dashboard by an operator was invisible to the app too, and its payment screen stayed open. One rule for all three sources is simpler and safer: the app has one place that closes a vend, and the reason tells it whether it needs to do anything about the money.</p>
+<h2>2. The sequence, each source</h2>
+<h3>Machine cancel (CANCELLED_BY_VMC)</h3>
+<div class="twrap"><table><thead><tr><th>step</th><th>VMC sends</th><th>reader answers</th><th>library</th><th>app</th></tr></thead><tbody><tr><td>1</td><td>VEND REQUEST</td><td>ACK</td><td>vend open</td><td>onVendRequest</td></tr><tr><td>2</td><td>VEND CANCEL <code>13 01</code></td><td>ACK</td><td>vend closed, cancel reply armed</td><td><strong>onVendFailure</strong>, CANCELLED_BY_VMC</td></tr><tr><td>3</td><td>POLL</td><td>VEND DENIED or SESSION CANCEL REQUEST (cancel mode)</td><td></td><td></td></tr><tr><td>4</td><td>SESSION COMPLETE</td><td>ACK, END SESSION on the next POLL</td><td>ENABLED</td><td></td></tr></tbody></table></div>
+<p>READER CANCEL <code>14 02</code> is the same with CAN as the immediate answer. With Cancel Retry on, an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms.</p>
+<h3>App cancel (CANCELLED_BY_APP)</h3>
+<div class="twrap"><table><thead><tr><th>step</th><th>VMC sends</th><th>reader answers</th><th>library</th><th>app</th></tr></thead><tbody><tr><td>1</td><td>VEND REQUEST</td><td>ACK</td><td>vend open</td><td>onVendRequest, gateway declines</td></tr><tr><td>2</td><td></td><td></td><td>app calls <code>cancelVend()</code>: vend closed, reply armed</td><td><strong>onVendFailure</strong>, CANCELLED_BY_APP, fires at once</td></tr><tr><td>3</td><td>POLL</td><td>VEND DENIED or SESSION CANCEL REQUEST</td><td></td><td></td></tr><tr><td>4</td><td>SESSION COMPLETE</td><td>ACK, END SESSION on the next POLL</td><td>ENABLED</td><td></td></tr></tbody></table></div>
+<p>The callback fires when the cancel is armed, not when the reply goes out, so the app can reset its screen immediately. <code>cancelVend()</code> returns <code>false</code> and fires nothing when no session is live.</p>
+<h3>Operator cancel (CANCELLED_BY_OPERATOR)</h3>
+<p>Identical to the app cancel on the bus. The only difference is the reason, so the app knows it did not decide this: a hold placed for the customer must be voided, and a payment screen must be closed, by the app, now.</p>
+<p>Log lines, in order: <code>[operator] cancelVend armed - VEND DENIED goes out on the next POLL</code>, then <code>[mdb] vend failed: CANCELLED_BY_OPERATOR - onVendFailure fires</code>, then <code>[remote] vend cancel requested - will send ...</code>.</p>
+<h3>Cancel before any VEND REQUEST</h3>
+<p>If the session is open but the customer has not selected yet, <code>cancelVend()</code> from the app or the dashboard cancels the session on the wire and <strong>no callback fires</strong>, because there is no vend to fail. Nothing was authorized, nothing to clean up.</p>
+<h2>3. What the handler does with each reason</h2>
+<pre><code>override fun onVendFailure() {
+    val reason = HardwareLib.lastVendFailureReason          // first line - one global slot
+    scope.launch {
+        when (reason) {
+            HardwareLib.VendFailureReason.CANCELLED_BY_VMC,      // the machine cancelled
+            HardwareLib.VendFailureReason.CANCELLED_BY_OPERATOR  // the dashboard cancelled
+                -&gt; if (approved) gateway.reverse() else gateway.voidHold()
+            HardwareLib.VendFailureReason.CANCELLED_BY_APP       // our own cancelVend(): the decline is already handled
+                -&gt; { /* nothing to do at the gateway */ }
+            HardwareLib.VendFailureReason.FAILED                 // product not dispensed
+                -&gt; gateway.reverse()
+            HardwareLib.VendFailureReason.SESSION_ENDED,         // result unknown
+            HardwareLib.VendFailureReason.RESET
+                -&gt; if (approved) gateway.reverse() else gateway.voidHold()
+            null -&gt; gateway.voidHold()
+        }
+        ui.resetToIdle()                                        // every reason ends here
+    }
+}</code></pre>
+<p>Two points that follow from the table:</p>
+<ul><li><strong>CANCELLED_BY_APP needs no gateway action</strong> if the app voided the hold before calling <code>cancelVend()</code>, which is the normal order (decline, void, cancel). It still needs the UI reset, and that is why the callback exists.</li><li><strong>CANCELLED_BY_OPERATOR must void.</strong> The operator pressed cancel while the customer may have had a hold placed. The app did not decide, so it has not voided anything yet.</li></ul>
+<p>Java and React Native: same branches, the React Native event carries the reason as the string <code>'CANCELLED_BY_OPERATOR'</code>.</p>
+<h2>4. Counters</h2>
+<p><code>vendStats</code> (dashboard <strong>Vend</strong> button) shows the three sources apart:</p>
+<div class="twrap"><table><thead><tr><th>key</th><th>counts</th></tr></thead><tbody><tr><td><code>vendFailuresByReason.CANCELLED_BY_VMC</code></td><td>machine cancels delivered to the app</td></tr><tr><td><code>appCancels</code>, <code>vendFailuresByReason.CANCELLED_BY_APP</code></td><td>the app's own <code>cancelVend()</code> that closed an open vend</td></tr><tr><td><code>operatorCancels</code>, <code>vendFailuresByReason.CANCELLED_BY_OPERATOR</code></td><td>dashboard / remote cancels that closed an open vend</td></tr><tr><td><code>sessionCancelRetries</code>, <code>sessionCancelGaveUp</code></td><td>SESSION CANCEL REQUESTs the machine ignored and the retry re-sent</td></tr></tbody></table></div>
+<h2>5. What changed in the library (8.2.5)</h2>
+<ul><li><code>cancelVend(response)</code> now takes an internal reason: CANCELLED_BY_APP from the public call, CANCELLED_BY_OPERATOR from <code>handleCommand</code> (dashboard and backend commands) and from a session-mode switch issued remotely.</li><li>Both paths call the same <code>abortOpenVend(reason)</code> the machine paths use, so the callback, the counters and the log line are identical in shape.</li><li>New enum value <code>VendFailureReason.CANCELLED_BY_OPERATOR</code>. A Java <code>switch</code> without a <code>default</code> must add the case; the sample handlers have it.</li><li><code>[remote]</code> reply lines, such as the answer to <code>help</code>, <code>getSettings</code> acknowledgements and the <code>vendStats</code> summary, are no longer muted by the MQTT Logs switch. An operator command always answers. These lines travel on the <code>ops</code> channel since mqtt-lib 2.8.0, so the backend sees no change.</li><li>Nothing else in the vend flow moved. The three-callback listener stays as it is.</li></ul>
+<h2>6. Verify on the device</h2>
+<div class="twrap"><table><thead><tr><th>action</th><th>expect in the app</th><th>expect in the log</th></tr></thead><tbody><tr><td>machine VEND CANCEL after a request</td><td>onVendFailure, CANCELLED_BY_VMC</td><td><code>[mdb] vend failed: CANCELLED_BY_VMC - onVendFailure fires</code></td></tr><tr><td>app <code>cancelVend()</code> after a request</td><td>onVendFailure, CANCELLED_BY_APP</td><td><code>[app] cancelVend armed ...</code> then <code>[mdb] vend failed: CANCELLED_BY_APP ...</code></td></tr><tr><td>dashboard Vend Cancel after a request</td><td>onVendFailure, CANCELLED_BY_OPERATOR</td><td><code>[operator] cancelVend armed ...</code> then <code>[mdb] vend failed: CANCELLED_BY_OPERATOR ...</code></td></tr><tr><td>dashboard Vend Cancel, no request yet</td><td>nothing</td><td><code>[operator] cancelVend armed ...</code> only</td></tr><tr><td><code>vendStats</code></td><td></td><td><code>appCancels=.. operatorCancels=..</code> and the reasons in <code>vendFailuresByReason</code></td></tr></tbody></table></div>
+<p>Not yet run on a real CM30. Compiled and API-checked.</p>
+<h2>7. Why <code>help</code> sometimes answered nothing (fixed in 8.2.5)</h2>
+<p>Until 8.2.4 every plain line from hardware-lib, including the answers to operator commands such as <code>help</code>, was gated by the MQTT Logs switch. With Logs off the device executed the command and published nothing. With Logs on but an old dashboard (before v8.2.2) the answer went to the <code>ops</code> channel the old dashboard does not read. 8.2.5 removes the first cause: <code>[remote]</code> lines always go out. For the second, run dashboard v8.2.2 or newer; it has the <strong>Vend</strong> button in the header.</p>
+</main>

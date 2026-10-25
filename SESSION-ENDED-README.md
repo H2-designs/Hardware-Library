@@ -1,6 +1,6 @@
 # SESSION_ENDED - the vend the machine never finished
 
-hardware-lib 8.2.4, 24 October 2026. One failure reason explained on its own, because it is the one that costs money
+hardware-lib 8.2.5, 25 October 2026. One failure reason explained on its own, because it is the one that costs money
 when the app gets it wrong. Companion files: `VENDLISTENER-README.md` (the full handler), `IMPLEMENTATION-README.md`.
 
 ## 1. The scenario
@@ -56,11 +56,13 @@ just left. The same applies to RESET, the other reason where the dispense result
 override fun onVendFailure() {
     val reason = HardwareLib.lastVendFailureReason      // first line, one global slot
     when (reason) {
-        HardwareLib.VendFailureReason.CANCELLED_BY_VMC -> if (approved) gateway.reverse() else gateway.voidHold()  // the machine cancelled
+        HardwareLib.VendFailureReason.CANCELLED_BY_VMC,
+        HardwareLib.VendFailureReason.CANCELLED_BY_OPERATOR -> if (approved) gateway.reverse() else gateway.voidHold() // machine or dashboard cancelled
+        HardwareLib.VendFailureReason.CANCELLED_BY_APP -> {}                                                           // our own cancelVend(): already handled
         HardwareLib.VendFailureReason.FAILED -> gateway.reverse()                                                 // product not dispensed
         HardwareLib.VendFailureReason.SESSION_ENDED,
         HardwareLib.VendFailureReason.RESET -> if (approved) gateway.reverse() else gateway.voidHold()            // result unknown
-        HardwareLib.VendFailureReason.CANCELLED_BY_APP, null -> gateway.voidHold()                               // not delivered since 8.2.2
+        null -> gateway.voidHold()
     }
     ui.resetToIdle()
 }
