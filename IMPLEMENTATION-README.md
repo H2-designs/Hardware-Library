@@ -1,6 +1,6 @@
 # Implementation guide - putting hardware-lib into the Android app
 
-hardware-lib 8.2.2 + mqtt-lib 2.8.0, 22 October 2026. This is the one document to follow when wiring the libraries
+hardware-lib 8.2.4 + mqtt-lib 2.8.0, 24 October 2026. This is the one document to follow when wiring the libraries
 into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper:
 `API-REFERENCE.md` (every function), `AAR-HANDOFF-README.md` (what changed per release), `PULSE-README.md`,
 `DUPLICATE-LOGS-README.md`, `VENDLISTENER-README.md` (the listener in full, with the fixes and the counters), `SESSION-ENDED-README.md`, `samples/`.
@@ -28,7 +28,7 @@ Copy the three AARs from `AAR-Update-latest.zip` into the app's `libs/`:
 
 ```gradle
 implementation files('libs/mqtt-lib-2.8.0.aar')
-implementation files('libs/hardware-lib-8.2.2.aar')
+implementation files('libs/hardware-lib-8.2.4.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
 ```
 
@@ -184,6 +184,8 @@ all echoed in `SETTINGS_JSON` after `getSettings`.
 | `vmc_cancel_mode` | `setCancelMode(VEND_DENIED / SESSION_CANCEL_REQUEST)` | `setCancelMode:vendDenied|sessionCancel` | `vmcCancelMode` |
 | `mdb_direct_vend` | `setDirectVend(Boolean)` | `setDirectVend:on|off` | `directVend` |
 | `mdb_force_session_end` | `setForceSessionEnd(Boolean)` | `setForceSessionEnd:on|off` | `forceSessionEndAfterVend` |
+| none yet (8.2.3) | `setSessionCancelRetry(ms)` / `setSessionCancelRetry(Boolean)` | `setSessionCancelRetry:on|off|MS` | `sessionCancelRetryMs` |
+| none yet (8.2.4) | `setSkipZeroVend(Boolean)` | `setSkipZeroVend:on|off` | `skipZeroVend` |
 | `mdb_mqtt_logging` | `setMqttLogging(Boolean)` | `setMqttLogging:on|off` | `mqttLogsEnabled` |
 | `nearpay_ui_dismiss` | app-side only | - | - |
 | `reader_config_info_l3` etc. | `setConfigHex(name, hex)` | `{"setConfig":{"NAME":"hex"}}` | `CONFIG_JSON` |
@@ -194,6 +196,13 @@ What the switches mean in the field:
   with it off). The request is accepted in any state.
 - **Force session end ON** for machines that never send SESSION COMPLETE after a sale: the reader sends SESSION
   CANCEL REQUEST after every VEND SUCCESS.
+- **Session-cancel retry ON** (8.2.3) for machines that sometimes ignore a SESSION CANCEL REQUEST (log shows
+  `tx=SESSION CANCEL REQUEST` and then nothing for 20-30 s until the machine sends VEND CANCEL again): the reader
+  re-sends it after 1000 ms without SESSION COMPLETE, up to 3 times. Works with Force End and with the VEND CANCEL
+  reply alike. Machines that answer never see a retry.
+- **Skip 00 00 vend ON** (8.2.4) for machines that keep sending VEND REQUEST with price `00 00` until the customer
+  selects an item (log shows `VEND REQUEST ... price=0` over and over, the app sees a 0.00 sale each time): those
+  requests are ACKed and dropped, and only the request with the real price reaches `onVendRequest`.
 - **Auto session** for machines that expect the reader to open the session; **cooldown** for machines (Sielaff)
   that send READER ENABLE after their first POLL.
 - **Always idle** is not a setting: it is bit 5 of the last byte of `READER_CONFIG_INFO_L3` (`20`), Level 3 only,
@@ -241,7 +250,7 @@ override fun onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) {
 ```
 
 Then PRODUCTION_OK arrives as `onVendSuccess`, PRODUCTION_FAIL as `onVendFailure` (FAILED, reverse), CANCEL as
-`onVendFailure` (CANCELLED_BY_VMC, void). Rule fields, patterns (`??`, trailing `*`), price extraction
+`onVendFailure` (CANCELLED_BY_VMC, void). Rule fields, patterns (`??`, trailing `*`, leading `*` for a frame's tail), price extraction
 (`amountStart/End` for ASCII, `priceHi/Lo` for binary) and the port commands are in `API-REFERENCE.md` section 2.
 For a new machine, send the vendor protocol document; the rule table is the whole integration.
 
@@ -285,7 +294,7 @@ From the dashboard passthrough bar after deploy:
 
 | send | expect |
 |---|---|
-| `version` | `[remote] mqtt-lib 2.8.0, hardware-lib 8.2.2 - client id ...` |
+| `version` | `[remote] mqtt-lib 2.8.0, hardware-lib 8.2.3 - client id ...` |
 | `getSettings` | `SETTINGS_JSON` with every key in section 7 |
 | `status` | `VMC_STATUS` with `state` and `busState` |
 | one real sale | each exchange once on the backend, one `onVendSuccess` in the app |
@@ -302,6 +311,8 @@ From the dashboard passthrough bar after deploy:
 | `cancelVend IGNORED - no session live` | nothing to cancel | nothing |
 | onVendFailure never fires after your own cancel | correct since 8.2.2 (no echo) | handle the decline where you call cancelVend |
 | session never closes after a sale | machine sends no SESSION COMPLETE | `setForceSessionEnd:on` |
+| `tx=SESSION CANCEL REQUEST`, then silence for 20-30 s until VEND CANCEL again | machine sometimes ignores the request | `setSessionCancelRetry:on` |
+| `VEND REQUEST ... price=0` repeating, `onVendRequest(0.0, 0, ..)` in the app | machine sends 00 00 until an item is selected | `setSkipZeroVend:on` |
 | every line 2x or 4x on the backend | second publisher in the app | one attach, delete the app bridge |
 | every line 10x on the device screen | listener registered per Activity | register once, remove with the same reference |
 | `[rs232] ... UNMATCHED` | frame not in the rule table, or CRC check on with a non-XOR protocol | add the rule; `rs232Crc:off` |
@@ -315,7 +326,7 @@ Every rule above holds unchanged; the bridge registers its listeners once. Manua
 
 ## 14. Before the field
 
-- [ ] AARs 8.2.2 / 2.7.1 / 1.0.9 in `libs/`, `version` answers with them
+- [ ] AARs 8.2.4 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
 - [ ] `HardwareLib.init(applicationContext)` at boot, in every mode
 - [ ] one `attachRabbahMqtt()`, no custom bridge, listeners registered once
 - [ ] `onVendFailure` reverses on FAILED, SESSION_ENDED and RESET when approved, voids otherwise

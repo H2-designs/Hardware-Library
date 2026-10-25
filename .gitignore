@@ -1,6 +1,16 @@
-# OS noise
+# build output
+.gradle/
+build/
+**/build/
+captures/
+*.iml
+.idea/
 .DS_Store
-Thumbs.db
-
-# Nothing else is ignored here on purpose: this folder is the deliverable, so the
-# AARs, the dashboard, the docs and the APK are all meant to be in the repo.
+# secrets - the broker password lives ONLY in local.properties (copy local.properties.example)
+local.properties
+dashboard-app/config.json
+# dashboard packaging
+dashboard-app/node_modules/
+dashboard-app/dist/
+dashboard-app/package-lock.json
+source/react-native/**/node_modules/

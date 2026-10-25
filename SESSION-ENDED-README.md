@@ -1,6 +1,6 @@
 # SESSION_ENDED - the vend the machine never finished
 
-hardware-lib 8.2.2, 22 October 2026. One failure reason explained on its own, because it is the one that costs money
+hardware-lib 8.2.4, 24 October 2026. One failure reason explained on its own, because it is the one that costs money
 when the app gets it wrong. Companion files: `VENDLISTENER-README.md` (the full handler), `IMPLEMENTATION-README.md`.
 
 ## 1. The scenario

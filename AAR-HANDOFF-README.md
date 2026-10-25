@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.2
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.4
 
 Companion files: IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: IMPLEMENTATION-README.md (the end-to-end guide for the Android 
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.2.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.4.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.2.aar')
+   implementation files('libs/hardware-lib-8.2.4.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -27,6 +27,49 @@ Companion files: IMPLEMENTATION-README.md (the end-to-end guide for the Android 
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.4 - skip 00 00 vend requests (24 October 2026, no code change)
+
+Field case: a machine keeps sending VEND REQUEST with price `00 00` while the customer is still choosing, and sends
+the real price only once an item is selected. Each 00 00 request reached the app as `onVendRequest(0.0, 0, ..)`.
+
+New persisted setting **skip 00 00 vend** (default OFF): when ON, a VEND REQUEST whose price bytes are `00 00` is ACKed
+on the bus and dropped - no `onVendRequest`, no vend opened, no state change, and an open vend, a pending approval or a
+session-cancel retry is left as it is. The next request with a real price is handled exactly as before. Works in a
+session and with direct vend alike.
+
+- Dashboard: **Skip 00 00 Vend** toggle next to Cancel Retry. Remote: `setSkipZeroVend:on|off`.
+- Kotlin: `HardwareLib.setSkipZeroVend(Boolean)` / `HardwareLib.isSkipZeroVend`. SETTINGS_JSON: `skipZeroVend`.
+- Log: `[mdb] VEND REQUEST with price 00 00 skipped (skip 00 00 vend ON) - ACK only, no onVendRequest (N so far)`, at most
+  one line per 10 s. The dropped exchanges themselves are hidden like idle POLLs (shown with `setPollVisibility:on`), so
+  they do not flood the log or the backend. `vendStats` counts them as `zeroVendSkipped`.
+- MDB only. Leave it OFF on machines that sell items at price 0 (free vend).
+
+### 8.2.3 - session-cancel retry (24 October 2026, no code change)
+
+Field case D-1637 (22 October): 3 of 47 SESSION CANCEL REQUESTs (our answer to the machine's VEND CANCEL) were
+ignored. Each time the machine sent no SESSION COMPLETE and sat 21-29 s, blocking the next customer, until it sent
+VEND CANCEL again; the second request was then answered at once. Answered requests took at most 0.36 s.
+
+New persisted setting **session-cancel retry** (default OFF): when ON and SESSION COMPLETE has not arrived 1000 ms after
+any SESSION CANCEL REQUEST the reader sent (VEND CANCEL / READER CANCEL reply, `cancelVend()`, Force End), the request
+goes out again on the next POLL, up to 3 times; then `[mdb] WARNING: no SESSION COMPLETE after 3 re-sent ...` and the
+session is left to the machine. A new VEND REQUEST stops the retry (the machine kept the session - that vend is served).
+
+- Dashboard: **Cancel Retry** toggle next to Force End. Remote: `setSessionCancelRetry:on|off` or `setSessionCancelRetry:MS` (300-10000).
+- Kotlin: `HardwareLib.setSessionCancelRetry(Boolean)` / `setSessionCancelRetry(ms)` / `isSessionCancelRetry`. SETTINGS_JSON: `sessionCancelRetryMs`.
+- Log: `[mdb] no SESSION COMPLETE 1012 ms after SESSION CANCEL REQUEST - sent again (retry 1/3)`; the re-send itself is a
+  normal `POLL tx=SESSION CANCEL REQUEST` exchange. `vendStats` counts `sessionCancelRetries` and `sessionCancelGaveUp`.
+- Not the same as Force End: Force End decides WHEN the reader asks to close (after VEND SUCCESS); the retry makes sure
+  any such request is not lost. Turn on what the machine needs; they work together.
+
+### 8.2.3 - RS232 rx patterns may start with `*` (24 October 2026, no code change)
+
+A leading `*` matches the END of a frame: `"* 53 E7"` matches every frame whose last bytes are `53 E7`. For machines
+that pause mid-frame longer than `frameGapMs`, so one frame arrives as two: a tail rule catches the second piece (the
+first still logs UNMATCHED). First match wins - list tail rules after the exact ones, and use enough tail bytes to be
+unique. `*` at both ends is rejected. Rule table only; every existing table behaves as before. mqtt-lib stays 2.8.0.
+Details and a verify table: `RELEASE-NOTES-8.2.3.md`. Not yet run on a real CM30.
 
 ### 8.2.2 - the app's own cancelVend() is no longer echoed as onVendFailure (22 October 2026, RELEASED as v8.2.2)
 
@@ -247,7 +290,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.18.0 build 105** bundles hardware-lib 8.2.2 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.19.0 build 106** bundles hardware-lib 8.2.4 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

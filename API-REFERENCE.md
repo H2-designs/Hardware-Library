@@ -1,4 +1,4 @@
-# hardware-lib 8.2.2 - every public function, by protocol
+# hardware-lib 8.2.4 - every public function, by protocol
 
 Package `com.rabbah.mdb`. Three singletons: `HardwareLib` (MDB engine, settings, payloads, listeners),
 `Rs232Lib` (serial rule engine), `PulseLib` (coin-pulse output). Every call returns `Boolean` (true = done or
@@ -23,7 +23,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 | `init(context): Boolean` | Loads persisted settings and payloads, re-drives pulse polarity and the ready gate, registers the remote-command listener if mqtt-lib is initialised. Idempotent. |
 | `start(): Boolean` | Opens the CM30 MDB port and starts the bus loop. State resets to INACTIVE and is announced at once. Remote: `open`. |
 | `stop(): Boolean` | Closes the port, resets to INACTIVE, closes any open vend with reason RESET. Remote: `close`. |
-| `VERSION` | `"8.2.2"`. Remote `version` reports it together with mqtt-lib. |
+| `VERSION` | `"8.2.4"`. Remote `version` reports it together with mqtt-lib. |
 
 ### The payment hook - `vendListener`
 
@@ -62,6 +62,8 @@ Since app start, never persisted, like the mqtt-lib link counters. Remote `vendS
 | `approveIgnored` | `approveVend()` with no request pending (machine cancelled / timed out first) |
 | `callbackStuck` | **the stuck-listener counter**: a callback still running after 3 s; `lastStuckCallback` names it, `lastStuckAgoSec` when |
 | `callbackThrew` / `noListener` | a callback threw / an event had nobody registered |
+| `sessionCancelRetries` / `sessionCancelGaveUp` (8.2.3) | SESSION CANCEL REQUEST re-sent because the machine did not answer it / still no SESSION COMPLETE after the third retry |
+| `zeroVendSkipped` (8.2.4) | VEND REQUESTs priced `00 00` dropped because skip 00 00 vend is ON |
 | `lastRequestAgoSec`, `lastFailureReason`, `vendOpen`, `listenerRegistered`, `sinceSec` | the current picture |
 
 Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `vendFailureCount`,
@@ -96,6 +98,8 @@ Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `ve
 | `setCancelMode(CancelResponse)` | what plain `cancelVend()` sends and how the machine's own VEND CANCEL is answered: `SESSION_CANCEL_REQUEST` or `VEND_DENIED`. | `setCancelMode:sessionCancel|vendDenied` | `vmcCancelMode` |
 | `setDirectVend(Boolean)` / `isDirectVend` | ON: a VEND REQUEST is accepted in INACTIVE / DISABLED / ENABLED (machines that skip the handshake); the state listener reports ENABLED_STATE while the bus is INACTIVE/DISABLED. | `setDirectVend:on|off` | `directVend` |
 | `setForceSessionEnd(Boolean)` / `isForceSessionEnd` | ON: after every VEND SUCCESS the reader sends SESSION CANCEL REQUEST on the next POLL, for machines that never send SESSION COMPLETE. Failed vends keep the spec flow. | `setForceSessionEnd:on|off` | `forceSessionEndAfterVend` |
+| `setSessionCancelRetry(ms: Int)` / `setSessionCancelRetry(Boolean)` / `isSessionCancelRetry` / `sessionCancelRetryWaitMs` (8.2.3) | ON: when the machine does not answer any SESSION CANCEL REQUEST the reader sent (VEND CANCEL / READER CANCEL reply, `cancelVend()`, Force End) with SESSION COMPLETE within `ms`, it is sent again on the next POLL, up to 3 times, then a WARNING line. A new VEND REQUEST stops it. `true` = 1000 ms; 300-10000 ms; 0 / `false` = OFF (default). | `setSessionCancelRetry:on|off|MS` | `sessionCancelRetryMs` |
+| `setSkipZeroVend(Boolean)` / `isSkipZeroVend` (8.2.4) | ON: a VEND REQUEST whose price bytes are `00 00` is ACKed and dropped - no `onVendRequest`, no vend opened, no state change; an open vend or pending approval is untouched. The next request with a real price works as usual. For machines that keep sending `13 00 00 00 ...` until an item is selected. Default OFF. | `setSkipZeroVend:on|off` | `skipZeroVend` |
 | `setMdbLevel(1|2|3)` | handshake variant, level byte in READER CONFIG DATA, which Begin Session / Peripheral ID payload is sent. | `setMdbLevel:N` | `mdbLevel` |
 | `setMqttLogging(Boolean)` / `isMqttLoggingEnabled` | stream the log lines over MQTT or not (persisted, default OFF; control lines always flow). Since mqtt-lib 2.8.0 coded items go to the `logs` topic and plain lines to `ops`. | `setMqttLogging:on|off` | `mqttLogsEnabled` |
 | `setPollVisibility` / `setUnhandledVisibility` / `setPeripheralVisibility` / `setEmptySessionVisibility` | log-debug switches: idle POLL/ACK, commands we could not answer, traffic for other peripherals, empty auto-mode session cycles. | `set...Visibility:on|off` | `showPollTraffic`, `showUnhandledCmd`, `showOtherPeripheral`, `showEmptySessions` |
@@ -175,7 +179,7 @@ replies. Frames are cut by silence (`frameGapMs`). First matching rule wins.
 
 | field | meaning |
 |---|---|
-| `rx` | hex pattern; `??` = any one byte, trailing `*` = any number of remaining bytes; without `*` the length must match |
+| `rx` | hex pattern; `??` = any one byte, trailing `*` = any number of remaining bytes, leading `*` (8.2.3) = any bytes before, so the pattern matches the frame's last bytes (`"* 53 E7"`); not both ends; without `*` the length must match. First match wins: put leading-`*` rules after the exact ones |
 | `tx` | hex reply sent immediately on match; `""` = match and report, send nothing |
 | `priceHi` / `priceLo` | byte positions of a binary price (hi*256+lo); negative counts from the end |
 | `amountStart` / `amountEnd` | ASCII digit price inside the frame; end is exclusive, -1 = up to the CRC |
@@ -231,7 +235,7 @@ Settings keys: `pulseMode`, `readyFeedbackEnabled`, `readyFeedbackValue`, `ready
 ```
 open | close | beginSession | vendApprove | cancelVend[:sessionCancel|:vendDenied]
 setCancelMode:sessionCancel|vendDenied | setSessionMode:auto|manual | setAutoBeginCooldown:0-50
-setDirectVend:on|off | setForceSessionEnd:on|off | setMdbLevel:1|2|3 | setMqttLogging:on|off
+setDirectVend:on|off | setForceSessionEnd:on|off | setSessionCancelRetry:on|off|MS | setSkipZeroVend:on|off | setMdbLevel:1|2|3 | setMqttLogging:on|off
 setPollVisibility:on|off | setUnhandledVisibility:on|off | setPeripheralVisibility:on|off | setEmptySessionVisibility:on|off
 getSettings | vendStats | getConfig | setConfig:NAME:hex | resetConfig:NAME | {"setConfig":{...}} | {"resetConfig":[...]} | simulateExchange:HEX
 initPulse:true|false | sendPulse:w,p,c | setReadyFeedback:[yes,]value[,channel]|ch=val,ch=val|on|off | checkMachineReady

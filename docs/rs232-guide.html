@@ -126,7 +126,7 @@
   <h1>RS232 Card Reader Guide</h1>
   <p class="lede">How the coffee-machine ⇄ card-reader serial protocol maps onto
   <code>Rs232Lib</code> rules — every frame from the vendor document, the rule table that
-  answers it, and the functions that build replies. hardware-lib 8.2.2.</p>
+  answers it, and the functions that build replies. hardware-lib 8.2.4.</p>
   <p><span class="verified">✓ every frame below verified against the library via simulateFrame</span></p>
   <div class="callout"><p><b>New in hardware-lib 8.1.0 (7 October 2026):</b> a rule can carry <code>"event"</code> and fire the same <code>HardwareLib.vendListener</code> as MDB - PRODUCTION_FAIL becomes <code>onVendFailure</code>, no more rule-name matching. <a href="#v810">Jump to the section</a>.</p></div>
 
@@ -192,6 +192,10 @@
   <ul>
     <li><code>"A0 01 *"</code> — the trailing <code>*</code> matches <b>any number of remaining
       bytes</b>, so one rule catches every amount length.</li>
+    <li><code>"* 53 E7"</code> — a <i>leading</i> <code>*</code> (8.2.3) matches the frame's
+      <b>end</b> instead: every frame whose last bytes are <code>53 E7</code>. Use it for the tail
+      of a frame the machine sent in two pieces. First match wins, so list these after the exact
+      rules. A pattern cannot start and end with <code>*</code>.</li>
     <li><code>"amountStart":4</code> — the ASCII amount begins at byte 4 (after Start, CMD and
       the 2-byte Length). For CMD 06 it starts at 5, because a payment-type byte comes first.</li>
     <li><code>"amountEnd":-1</code> — end is exclusive and negative counts from the frame end,

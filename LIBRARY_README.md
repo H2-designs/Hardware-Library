@@ -298,7 +298,10 @@ Rs232Lib.vendRequestListener = { price, frame ->
 
 - **Matching**: rx is hex where `??` matches ANY byte (that is how a vend request whose price
   bytes change per sale still matches one rule); a single trailing `*` matches ANY NUMBER of
-  remaining bytes for VARIABLE-LENGTH frames (`"F2 *"` matches every frame starting `F2`);
+  remaining bytes for VARIABLE-LENGTH frames (`"F2 *"` matches every frame starting `F2`); a
+  single LEADING `*` (8.2.3) matches the frame's END instead (`"* 53 E7"` matches every frame
+  whose last two bytes are `53 E7` - the tail of a frame the machine sent in two pieces; put
+  such rules after the exact ones);
   without `*` the frame length must equal the pattern length; first matching rule wins.
   Frames are cut from the byte stream by silence (`frameGapMs`, default 1000 ms — RS232 has
   no frame markers; the reply goes out this long after the machine's last byte. Tune live via

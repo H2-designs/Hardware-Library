@@ -511,6 +511,14 @@
       <input type="checkbox" id="forceEndToggle"><span class="slider"></span><span class="tlabel">Force End</span>
     </label>
     <span class="divider"></span>
+    <label class="tswitch" title="Session-cancel retry (hardware-lib 8.2.3+, persisted). ON = setSessionCancelRetry:on - when the machine does not answer a SESSION CANCEL REQUEST with SESSION COMPLETE within 1000 ms, the reader sends it again (up to 3 times). Covers every SESSION CANCEL REQUEST: the answer to the machine's VEND CANCEL, the app's cancelVend and Force End. A new VEND REQUEST stops it. Other waits: setSessionCancelRetry:MS (300-10000) on the passthrough bar. OFF (default) = sent once, spec behavior. Synced from SETTINGS_JSON.">
+      <input type="checkbox" id="cancelRetryToggle"><span class="slider"></span><span class="tlabel">Cancel Retry</span>
+    </label>
+    <span class="divider"></span>
+    <label class="tswitch" title="Skip 00 00 vend requests (hardware-lib 8.2.4+, persisted). ON = setSkipZeroVend:on - a VEND REQUEST whose price bytes are 00 00 is ACKed and ignored: no onVendRequest, no vend opened, nothing else changes. The next VEND REQUEST with a real price works as usual. For machines that keep sending VEND REQUEST 00 00 until an item is selected. OFF (default) = every VEND REQUEST reaches the app. Synced from SETTINGS_JSON.">
+      <input type="checkbox" id="skipZeroToggle"><span class="slider"></span><span class="tlabel">Skip 00 00 Vend</span>
+    </label>
+    <span class="divider"></span>
     <button id="configBtn">Config</button>
     </span>
 
@@ -1435,6 +1443,8 @@
     if (data.vmcCancelMode) document.getElementById('cancelModeSelect').value = data.vmcCancelMode;
     if (typeof data.directVend === 'boolean') document.getElementById('directVendToggle').checked = data.directVend;
     if (typeof data.forceSessionEndAfterVend === 'boolean') document.getElementById('forceEndToggle').checked = data.forceSessionEndAfterVend;
+    if (typeof data.sessionCancelRetryMs === 'number') document.getElementById('cancelRetryToggle').checked = data.sessionCancelRetryMs > 0;
+    if (typeof data.skipZeroVend === 'boolean') document.getElementById('skipZeroToggle').checked = data.skipZeroVend;
     if (typeof data.showPollTraffic === 'boolean') document.getElementById('pollVisibilityCheck').checked = data.showPollTraffic;
     if (typeof data.showUnhandledCmd === 'boolean') document.getElementById('unhandledVisibilityCheck').checked = data.showUnhandledCmd;
     // Checked = HIDE other peripherals, so it mirrors the inverse of the device flag.
@@ -1497,6 +1507,8 @@
     return '[vend stats] requests=' + d.vendRequests + ' successes=' + d.vendSuccesses + ' failures=' + d.vendFailures +
       (reasons ? ' (' + reasons + ')' : '') + ' · app cancels=' + d.appCancels + ' · approve ignored=' + d.approveIgnored +
       ' · STUCK callbacks=' + d.callbackStuck + (d.lastStuckCallback ? ' (last ' + d.lastStuckCallback + ', ' + d.lastStuckAgoSec + ' s ago)' : '') +
+      (typeof d.sessionCancelRetries === 'number' ? ' · session-cancel retries=' + d.sessionCancelRetries + ' (gave up ' + d.sessionCancelGaveUp + ')' : '') +
+      (typeof d.zeroVendSkipped === 'number' ? ' · 00 00 vend requests skipped=' + d.zeroVendSkipped : '') +
       ' · threw=' + d.callbackThrew + ' · no listener=' + d.noListener + ' · listener ' + (d.listenerRegistered ? 'registered' : 'NOT REGISTERED') +
       ' · vend open=' + d.vendOpen + ' · since ' + d.sinceSec + ' s';
   }
@@ -1996,6 +2008,12 @@
   document.getElementById('forceEndToggle').onchange = (e) => sendCommand(
     e.target.checked ? 'setForceSessionEnd:on' : 'setForceSessionEnd:off',
     e.target.checked ? 'Force session end ON (SESSION CANCEL REQUEST after every vend)' : 'Force session end OFF (wait for SESSION COMPLETE)');
+  document.getElementById('cancelRetryToggle').onchange = (e) => sendCommand(
+    e.target.checked ? 'setSessionCancelRetry:on' : 'setSessionCancelRetry:off',
+    e.target.checked ? 'Session-cancel retry ON (re-send SESSION CANCEL REQUEST after 1000 ms without SESSION COMPLETE)' : 'Session-cancel retry OFF (sent once)');
+  document.getElementById('skipZeroToggle').onchange = (e) => sendCommand(
+    e.target.checked ? 'setSkipZeroVend:on' : 'setSkipZeroVend:off',
+    e.target.checked ? 'Skip 00 00 vend ON (VEND REQUEST 00 00 is ACKed and ignored)' : 'Skip 00 00 vend OFF (every VEND REQUEST reaches the app)');
   document.getElementById('cancelModeSelect').onchange = (e) => {
     const mode = e.target.value; // 'sessionCancel' | 'vendDenied'
     sendCommand('setCancelMode:' + mode, 'Set VMC-cancel mode: ' + mode);

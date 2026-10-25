@@ -281,7 +281,7 @@
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
     <header>
       <h1 id="rulesTitle">RS232 RULE TABLE</h1>
-      <p class="desc">One row per frame the machine can send. rx is the hex pattern to match, tx the hex reply. Price hi/lo are byte positions in the machine's frame that carry the price; amount start/end mark an ASCII amount instead (end −1 = up to the trailing CRC). First matching rule wins, top to bottom. "Event to the app" fires the same vend listener MDB uses: vend request carries the price, then exactly one success or failure per request.</p>
+      <p class="desc">One row per frame the machine can send. rx is the hex pattern to match (?? = any one byte, a trailing * = any remaining bytes, a leading * = match only the frame's last bytes), tx the hex reply. Price hi/lo are byte positions in the machine's frame that carry the price; amount start/end mark an ASCII amount instead (end −1 = up to the trailing CRC). First matching rule wins, top to bottom. "Event to the app" fires the same vend listener MDB uses: vend request carries the price, then exactly one success or failure per request.</p>
       <div class="hbtns"><button type="button" id="ruleAddBtn">+ Add rule</button><button type="button" id="rulesLoadBtn">Load from device</button><button type="button" id="rulesResetBtn">Reset to sample</button><button type="button" id="rulesClearBtn">Clear all</button><button type="button" id="rulesCloseBtn">Done</button></div>
     </header>
     <div class="pbody" id="rulesBody"></div>

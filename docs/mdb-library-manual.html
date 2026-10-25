@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.2 / 2.8.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.4 / 2.8.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,16 +133,39 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.2 / mqtt-lib&nbsp;2.8.0.
+    hardware-lib&nbsp;8.2.4 / mqtt-lib&nbsp;2.8.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.2 / mqtt-lib 2.8.0 &mdash; 22 October 2026</span>What changed in 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.4 / mqtt-lib 2.8.0 &mdash; 24 October 2026</span>What changed in 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>8.2.4 &mdash; skip 00 00 vend requests</h3>
+    <p>Some machines keep sending VEND REQUEST with price <code>00 00</code> while the customer is still choosing and
+    send the real price only once an item is selected; every 00 00 request reached the app as a 0.00 sale. New
+    persisted setting, default OFF: <code class="cmd">setSkipZeroVend:on</code> (dashboard <strong>Ignore 0
+    Price</strong>) ACKs a 00 00 request and drops it - no onVendRequest, nothing else changes - and the request with
+    the real price is handled as usual. Details: <a href="#apiSkipZeroVend">the API entry</a>.</p>
+
+    <h3>8.2.3 &mdash; session-cancel retry</h3>
+    <p>Field case D-1637: 3 of 47 SESSION CANCEL REQUESTs (the answer to the machine's VEND CANCEL) were ignored and
+    the machine sat 21-29 s without SESSION COMPLETE, blocking the next customer, until it sent VEND CANCEL again.
+    New persisted setting, default OFF: <code class="cmd">setSessionCancelRetry:on</code> (dashboard <strong>Cancel
+    Retry</strong>) re-sends any unanswered SESSION CANCEL REQUEST after 1000 ms, up to 3 times; a new VEND REQUEST
+    stops it. Works with Force End and the VEND CANCEL reply alike. Details: <a href="#apiSessionCancelRetry">the API entry</a>
+    and <a href="release-notes-8.2.3.html">release notes 8.2.3</a>.</p>
+
+    <h3>8.2.3 &mdash; RS232 rx patterns may start with <code>*</code></h3>
+    <p>A leading <code>*</code> matches the END of a frame: <code>"* 53 E7"</code> matches every frame whose last bytes
+    are <code>53 E7</code>. For machines that pause mid-frame longer than <code>frameGapMs</code>, so one frame arrives
+    as two: a tail rule catches the second piece (the first still logs UNMATCHED). First match wins - list tail rules
+    after the exact ones, and use enough tail bytes to be unique. <code>*</code> at both ends is rejected. Rule table
+    only; every existing table behaves as before; mqtt-lib stays 2.8.0. Details:
+    <a href="release-notes-8.2.3.html">release notes 8.2.3</a>.</p>
 
     <h3>8.2.2 &mdash; the app's own cancelVend() is no longer echoed as onVendFailure</h3>
     <p>Until 8.2.1 <code class="cmd">HardwareLib.cancelVend()</code> (and the dashboard's <code class="cmd">cancelVend</code>
@@ -293,6 +316,8 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.4</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.3</td><td>24 Oct 2026</td><td>Skip 00 00 vend requests: persisted switch <code>setSkipZeroVend:on|off</code>, dashboard <strong>Skip 00 00 Vend</strong> - a VEND REQUEST priced 00 00 is ACKed and dropped, the request with the real price works as usual; counted in <code>vendStats</code>. Demo APK not rebuilt.</td><td>None. Operators turn it on per machine.</td></tr>
+        <tr><td><strong>hardware-lib 8.2.3</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.2</td><td>24 Oct 2026</td><td>Session-cancel retry (D-1637): persisted switch <code>setSessionCancelRetry:on|off|MS</code>, dashboard <strong>Cancel Retry</strong> - an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms, up to 3 times; a new VEND REQUEST stops it; counted in <code>vendStats</code>. RS232 <code>rx</code> patterns may start with <code>*</code> to match the END of a frame (<code>"* 53 E7"</code>), for machines that send one frame in two pieces. Existing settings and rule tables unchanged. Demo APK not rebuilt.</td><td>None. Operators turn the retry on per machine; add tail rules only where needed.</td></tr>
         <tr><td><strong>hardware-lib 8.2.2</strong><br>mqtt-lib 2.8.0<br>demo APK build 105</td><td>22 Oct 2026</td><td>mqtt-lib 2.8.0: only coded RABBAH_LOG items on the backend's <code>logs</code> topic; plain lines, control lines, PONG and <code>version</code> move to <code>devices/&lt;id&gt;/ops</code> (D-0554 unknown_source flood), dashboard subscribes to both. The app's own <code>cancelVend()</code> (and the dashboard's <code>cancelVend</code>) no longer fires <code>onVendFailure</code>: the open vend is closed silently, the deny reply still goes out, <code>lastVendFailureReason</code> records CANCELLED_BY_APP. Machine-side ends (CANCELLED_BY_VMC / FAILED / SESSION_ENDED / RESET) unchanged, exactly once. Vend counters: <code>vendStats</code> / <code>VEND_STATS</code> (requests, successes, failures by reason, app cancels, ignored approves, stuck callbacks), dashboard <strong>Vend</strong> button.</td><td>Remove any "ignore CANCELLED_BY_APP" branch; nothing else.</td></tr>
         <tr><td><strong>hardware-lib 8.2.1</strong><br>mqtt-lib 2.7.1<br>demo APK build 104</td><td>15 Oct 2026</td><td>Every exchange reaches the backend exactly once (D-0961): add*Listener / <code>MqttLib.addCommandListener</code> ignore a repeat registration of the same instance, <code>attachRabbahMqtt()</code> is the complete bridge and publishes the coded exchange items itself (samples <code>MdbMqttBridge</code> = two-line wrapper), <code>RabbahLog.log</code> drops an identical item within 30 ms (<code>dedupedItems</code>). Health check that can never get stuck: reported state held and replayed to any state/status/control listener on registration, re-announced on every real bus transition, 5 s heartbeat to the state listeners while direct vend is ON and the bus is INACTIVE/DISABLED; <code>currentState</code> = reported state, new <code>busState</code> = real. SESSION COMPLETE / VEND CANCEL / SUCCESS / FAILURE ACKed in every state, stray SESSION COMPLETE &rarr; END SESSION on the next POLL, RESET wipes every per-session flag. READER ENABLE / CANCEL answered in INACTIVE when direct vend is ON. New docs: API-REFERENCE.md, PULSE-README.md, samples/PulsePaymentSample.kt. Dashboard: device tabs, log recording to disk, History (offline) and Export.</td><td>None. Swap the AARs. Register listeners once; drop any custom bridge next to <code>attachRabbahMqtt</code>.</td></tr>
         <tr><td><strong>hardware-lib 8.2.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 103</td><td>8 Oct 2026</td><td>Force session end after vend: persisted setting (<code>setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong> toggle, SETTINGS_JSON <code>forceSessionEndAfterVend</code>, Kotlin <code>HardwareLib.setForceSessionEnd</code>). When ON the reader arms SESSION CANCEL REQUEST for the POLL after every VEND SUCCESS, so a VMC that never sends SESSION COMPLETE still closes the session; skipped when SESSION COMPLETE already arrived. END SESSION now clears every per-session flag (forced cancel, stale approve, pending request).</td><td>None required. Turn it on per machine from the dashboard.</td></tr>
@@ -768,6 +793,28 @@ HardwareLib.logListener = { line, showOnScreen -&gt;
     are unchanged. Persisted. <em>Dashboard: the <strong>Force End</strong> toggle, or
     <code class="cmd">setForceSessionEnd:on|off</code>; reported as <code class="cmd">forceSessionEndAfterVend</code> in SETTINGS_JSON.</em></p>
 
+    <h3 id="apiSessionCancelRetry"><code>HardwareLib.setSessionCancelRetry(ms: Int)</code> · <code>setSessionCancelRetry(enabled: Boolean)</code> · <code>isSessionCancelRetry</code> <em>(8.2.3)</em></h3>
+    <p>Default OFF: a SESSION CANCEL REQUEST goes out once and the reader waits for the VMC's SESSION COMPLETE, per
+    spec. ON: when SESSION COMPLETE has not arrived <code>ms</code> after ANY SESSION CANCEL REQUEST the reader sent
+    (the answer to VEND CANCEL / READER CANCEL, <code class="cmd">cancelVend()</code>, Force End), the request goes out
+    again on the next POLL, up to 3 times; then a WARNING line and the session is left to the VMC. A new VEND REQUEST
+    stops the retry - the machine kept the session, so that vend is served. <code>true</code> = 1000 ms; 300-10000 ms;
+    0 / <code>false</code> = OFF. For machines that sometimes ignore the request (D-1637: 3 of 47 ignored, 21-29 s
+    stalls). Counted in <code class="cmd">vendStats</code> as <code>sessionCancelRetries</code> /
+    <code>sessionCancelGaveUp</code>. Persisted. <em>Dashboard: the <strong>Cancel Retry</strong> toggle, or
+    <code class="cmd">setSessionCancelRetry:on|off|MS</code>; reported as <code class="cmd">sessionCancelRetryMs</code> in SETTINGS_JSON.</em></p>
+
+    <h3 id="apiSkipZeroVend"><code>HardwareLib.setSkipZeroVend(enabled: Boolean)</code> · <code>HardwareLib.isSkipZeroVend</code> <em>(8.2.4)</em></h3>
+    <p>Default <code class="cmd">false</code>: every VEND REQUEST fires onVendRequest, whatever its price.
+    <code class="cmd">true</code>: a VEND REQUEST whose price bytes are <code>00 00</code> is ACKed and dropped - no
+    onVendRequest, no vend opened, no state change; an open vend, a pending approval or a session-cancel retry is left
+    as it is. The next request with a real price works as usual, in a session or with direct vend. For machines that
+    send <code>13 00 00 00 ...</code> until an item is selected. The dropped exchanges are hidden like idle POLLs (shown
+    with POLL visibility on); one log line per 10 s at most; counted in <code class="cmd">vendStats</code> as
+    <code>zeroVendSkipped</code>. Leave it off on machines that sell at price 0. Persisted. <em>Dashboard: the
+    <strong>Skip 00 00 Vend</strong> toggle, or <code class="cmd">setSkipZeroVend:on|off</code>; reported as
+    <code class="cmd">skipZeroVend</code> in SETTINGS_JSON.</em></p>
+
     <h3><code>HardwareLib.setAutoBeginCooldown(polls: Int)</code> · <code>HardwareLib.autoBeginCooldown</code> <em>(7.25.0)</em></h3>
     <p>Auto mode only. How many idle POLLs the engine waits after END SESSION before it re-arms
     SESSION BEGIN. Default <code class="cmd">3</code> (about 300&ndash;600 ms); range 0&ndash;50;
@@ -890,7 +937,9 @@ Rs232Lib.vendRequestListener = { price, frame -&gt; <span class="c">/* charge, t
     <p><code>??</code> in an rx pattern matches ANY ONE byte - a vend request whose price bytes
     change still matches one rule - and a single trailing <code>*</code> matches ANY NUMBER of
     remaining bytes, for frames whose LENGTH varies (<code>"A0 01 *"</code> matches every frame
-    starting <code>A0 01</code>). Two price formats, positions 0-based from the frame start or
+    starting <code>A0 01</code>); a single LEADING <code>*</code> (8.2.3) matches the frame's END
+    instead (<code>"* 53 E7"</code> matches every frame ending <code>53 E7</code> - the tail of a
+    frame the machine sent in two pieces; list it after the exact rules). Two price formats, positions 0-based from the frame start or
     NEGATIVE from the frame end (<code>-1</code> = last byte): <strong>binary</strong>
     <code>priceHi</code>/<code>priceLo</code> (price = hi&times;256+lo), or
     <strong>ASCII</strong> <code>amountStart</code>/<code>amountEnd</code> for card-reader
@@ -1168,6 +1217,8 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
         <tr><td><code>mqttStats</code> / <code>linkStats</code> <em>(mqtt-lib 2.7.0)</em></td><td>answered by mqtt-lib itself - MqttLib.statsJson()</td><td><code>MQTT_STATS:{clientId, connected, sessionsEstablished, connectionLosses, failedConnectAttempts, consecutiveShortSessions, takeoverSuspected, lastLossReason, ...}</code>. Dashboard: link badge</td></tr>
         <tr><td><code>vendStats</code> <em>(8.2.2)</em></td><td>vend counters since app start: requests / successes / failures by reason / app cancels / ignored approves / stuck callbacks</td><td><code>VEND_STATS:{...}</code> + <code>[remote] vend stats: ...</code></td></tr>
         <tr><td><code>setForceSessionEnd:on</code> / <code>:off</code> <em>(8.2.0)</em></td><td>setForceSessionEnd(true/false) - SESSION CANCEL REQUEST on the POLL after every VEND SUCCESS, for VMCs that never send SESSION COMPLETE; default off</td><td>[remote] force session end ON/OFF + SETTINGS_JSON (forceSessionEndAfterVend). Dashboard: Force End toggle</td></tr>
+        <tr><td><code>setSkipZeroVend:on</code> / <code>:off</code> <em>(8.2.4)</em></td><td>setSkipZeroVend(true/false) - a VEND REQUEST priced 00 00 is ACKed and dropped (no onVendRequest); default off</td><td>[remote] skip 00 00 vend ON/OFF + SETTINGS_JSON (skipZeroVend). Dashboard: Skip 00 00 Vend toggle</td></tr>
+        <tr><td><code>setSessionCancelRetry:on</code> / <code>:off</code> / <code>:MS</code> <em>(8.2.3)</em></td><td>setSessionCancelRetry(...) - re-send an unanswered SESSION CANCEL REQUEST after 1000 ms (or MS, 300-10000), up to 3 times; a new VEND REQUEST stops it; default off</td><td>[remote] session-cancel retry ON/OFF + SETTINGS_JSON (sessionCancelRetryMs). Dashboard: Cancel Retry toggle</td></tr>
         <tr><td><code>setDirectVend:on</code> / <code>:off</code> <em>(7.28.0)</em></td><td>setDirectVend(true/false) - accept a VEND REQUEST in ANY state (INACTIVE/DISABLED/ENABLED) for VMCs that skip the handshake; default off</td><td>[remote] direct vend ON/OFF + SETTINGS_JSON (directVend). Dashboard: Direct Vend toggle</td></tr>
         <tr><td><code>setAutoBeginCooldown:N</code> <em>(7.25.0)</em></td><td>setAutoBeginCooldown(N) - idle POLLs after END SESSION before auto SESSION BEGIN, 0-50, default 3</td><td>ack + SETTINGS_JSON</td></tr>
         <tr><td><code>setMdbLevel:1|2|3</code></td><td>setMdbLevel(n)</td><td>ack + SETTINGS_JSON</td></tr>
@@ -1208,6 +1259,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.2 · mqtt-lib 2.8.0 · demo app v2.18.0 (build 105). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.4 · mqtt-lib 2.8.0 · demo app v2.19.0 (build 106). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 
