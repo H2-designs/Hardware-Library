@@ -1,7 +1,6 @@
 {"setRs232Rules":[
  {"name":"CONNECT",             "rx":"A0 04 00 03 43 4F 4E E5",             "tx":"A1 05 00 02 4F 4B A2"},
  {"name":"HEARTBEAT",           "rx":"A0 06 00 02 48 42 ??",                "tx":"A1 06 00 02 4F 4B A1"},
- {"name":"HEARTBEAT_HEAD",      "rx":"A0 06 00 02 *",                       "tx":""},
  {"name":"PAYMENT_REQUEST",     "rx":"A0 01 *", "tx":"", "amountStart":4, "amountEnd":-1, "event":"vendRequest"},
  {"name":"PAYMENT_TYPED",       "rx":"A0 06 *", "tx":"", "amountStart":5, "amountEnd":-1, "event":"vendRequest"},
  {"name":"PRODUCTION_OK",       "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7", "tx":"A1 03 00 02 4F 4B A4", "event":"vendSuccess"},
@@ -11,11 +10,5 @@
  {"name":"PRODUCTION_OK_TAIL2", "rx":"* 53 E7",                             "tx":"A1 03 00 02 4F 4B A4", "event":"vendSuccess"},
  {"name":"PRODUCTION_FAIL_TAIL","rx":"* 46 41 49 4C 45 44 A6",              "tx":"A1 03 00 02 4F 4B A4", "event":"vendFailure"},
  {"name":"PRODUCTION_FAIL_TAIL2","rx":"* 44 A6",                            "tx":"A1 03 00 02 4F 4B A4", "event":"vendFailure"},
- {"name":"CANCEL_TAIL",         "rx":"* 43 41 4E 43 45 4C A8",              "tx":"", "event":"vendCancel"},
- {"name":"CANCEL_TAIL2",        "rx":"* 4C A8",                             "tx":"", "event":"vendCancel"},
- {"name":"HEARTBEAT_TAIL",      "rx":"* 42 ??",                             "tx":"A1 06 00 02 4F 4B A1"},
- {"name":"CONNECT_TAIL",        "rx":"* 4E E5",                             "tx":"A1 05 00 02 4F 4B A2"},
- {"name":"RESULT_HEAD",         "rx":"A0 03 *",                             "tx":""},
- {"name":"CANCEL_HEAD",         "rx":"A0 08 *",                             "tx":""},
- {"name":"CONNECT_HEAD",        "rx":"A0 04 *",                             "tx":""}
+ {"name":"RESULT_HEAD",         "rx":"A0 03 *",                             "tx":""}
 ]}
