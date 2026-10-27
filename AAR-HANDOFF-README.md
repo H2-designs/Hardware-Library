@@ -123,6 +123,17 @@ session is left to the machine. A new VEND REQUEST stops the retry (the machine 
 - Not the same as Force End: Force End decides WHEN the reader asks to close (after VEND SUCCESS); the retry makes sure
   any such request is not lost. Turn on what the machine needs; they work together.
 
+**Two frames in one read (27 October 2026, rule table only - works on every library since 7.10.0, including the fleet's 8.2.2).** Field log:
+`RS232 UNMATCHED rx=A0 03 00 07 53 55 43 43 45 53 53 E7 A0 06 00 02 48 42 AE` - the Making Result SUCCESS and the next
+HEARTBEAT arrived back to back, inside the frame gap (`frameGapMs`, default 1000 ms), so the library read them as ONE
+frame. An exact rule needs the exact length, so nothing matched and no `onVendSuccess` fired. Fix: make the two result
+rules open-ended with a trailing `*` - `"A0 03 00 07 53 55 43 43 45 53 53 E7 *"` and `"A0 03 00 06 46 41 49 4C 45 44 A6 *"`
+(the `*` is its OWN token: `E7 *` with a space; `E7*` is not valid hex and the whole table is rejected). An open-ended
+rule matches the frame alone AND the frame with anything glued behind it, so the ACK goes out and the event fires in both
+cases. Keep them ABOVE `RESULT_HEAD` (`A0 03 *`, no event) - rules are tried in order, first match wins. The heartbeat
+glued into that read is not answered on its own; the machine's next heartbeat is. Keep the CRC check OFF for this machine:
+the XOR over a merged frame never matches its last byte, so with CRC ON the frame is discarded before any rule sees it.
+
 ### 8.2.3 - RS232 rx patterns may start with `*` (24 October 2026, no code change)
 
 A leading `*` matches the END of a frame: `"* 53 E7"` matches every frame whose last bytes are `53 E7`. For machines
@@ -274,8 +285,8 @@ Rules without `event` behave exactly as before.
 ```json
 {"setRs232Rules":[
   {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
-  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"A1 03 00 02 4F 4B A4","event":"vendSuccess"},
-  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"A1 03 00 02 4F 4B A4","event":"vendFailure"},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7 *","tx":"A1 03 00 02 4F 4B A4","event":"vendSuccess"},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6 *","tx":"A1 03 00 02 4F 4B A4","event":"vendFailure"},
   {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"","event":"vendCancel"}
 ]}
 ```
@@ -402,8 +413,8 @@ failed production after a paid sale was just a log line.
 ```json
 {"setRs232Rules":[
   {"name":"PAYMENT_REQUEST","rx":"A0 01 *","tx":"","amountStart":4,"amountEnd":-1,"event":"vendRequest"},
-  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7","tx":"A1 03 00 02 4F 4B A4","event":"vendSuccess"},
-  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6","tx":"A1 03 00 02 4F 4B A4","event":"vendFailure"},
+  {"name":"PRODUCTION_OK",  "rx":"A0 03 00 07 53 55 43 43 45 53 53 E7 *","tx":"A1 03 00 02 4F 4B A4","event":"vendSuccess"},
+  {"name":"PRODUCTION_FAIL","rx":"A0 03 00 06 46 41 49 4C 45 44 A6 *","tx":"A1 03 00 02 4F 4B A4","event":"vendFailure"},
   {"name":"CANCEL",         "rx":"A0 08 00 06 43 41 4E 43 45 4C A8","tx":"","event":"vendCancel"}
 ]}
 ```
