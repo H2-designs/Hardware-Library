@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.5 / 2.8.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.6 / 2.8.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,16 +133,28 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.5 / mqtt-lib&nbsp;2.8.0.
+    hardware-lib&nbsp;8.2.6 / mqtt-lib&nbsp;2.8.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.5 / mqtt-lib 2.8.0 &mdash; 25 October 2026</span>What changed in 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.6 / mqtt-lib 2.8.0 &mdash; 27 October 2026</span>What changed in 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>8.2.6 &mdash; ordered vend callbacks, <code>onVendFailure(reason)</code></h3>
+    <p>Field case: the app called its gateway inside <code>onVendRequest</code> (~300 ms) and the machine sent VEND CANCEL
+    57 ms later; each callback had its own thread, so <code>onVendFailure</code> finished BEFORE <code>onVendRequest</code>
+    returned and the app painted a payment screen for a dead vend. The three callbacks now run on <strong>one ordered
+    thread</strong>: for a vend, <code>onVendRequest</code> completes before its outcome is delivered (MDB and RS232). A
+    blocking handler now delays the outcome by as long as it blocks, so returning immediately is mandatory; the 3 s
+    watchdog and <code>vendStats</code> <code>callbackStuck</code> still name offenders. New overload
+    <code class="cmd">onVendFailure(reason: VendFailureReason)</code>: the reason is captured when the vend is closed and
+    travels with the callback (the global <code>lastVendFailureReason</code> can be overwritten by the next failure).
+    The default calls the old <code>onVendFailure()</code>; the interface methods are Java default methods now, so
+    implementers override only what they use. React Native passes the captured reason.</p>
 
     <h3>8.2.5 &mdash; every cancel reaches <code>onVendFailure</code> with a reason</h3>
     <p>The 8.2.2 rule (the app's own cancel is silent) is withdrawn. Every cancel is delivered exactly once and
@@ -334,6 +346,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.6</strong><br>mqtt-lib 2.8.0<br>demo APK build 108</td><td>27 Oct 2026</td><td>Ordered vend callbacks (one thread: <code>onVendRequest</code> completes before its outcome; field case of a payment screen left open after a fast cancel). <code>onVendFailure(reason)</code> overload with the reason captured at close time; interface methods are Java default methods. react-native-mdb 1.3.5.</td><td>Override <code>onVendFailure(reason)</code>; keep gateway work off the callback thread (a blocking handler now delays the outcome).</td></tr>
         <tr><td><strong>hardware-lib 8.2.5</strong><br>mqtt-lib 2.8.0<br>demo APK build 107</td><td>25 Oct 2026</td><td>Every cancel reaches <code>onVendFailure</code> with a reason: CANCELLED_BY_VMC, CANCELLED_BY_APP (delivered again), new CANCELLED_BY_OPERATOR for dashboard / remote cancels; <code>vendStats</code> <code>operatorCancels</code>; <code>[remote]</code> replies no longer muted by the Logs switch. CANCEL-FLOW-README.md.</td><td>Branch on the reason: CANCELLED_BY_APP = UI reset only, CANCELLED_BY_OPERATOR = void / reverse. Java switch: add the case.</td></tr>
         <tr><td><strong>hardware-lib 8.2.4</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.3</td><td>24 Oct 2026</td><td>Skip 00 00 vend requests: persisted switch <code>setSkipZeroVend:on|off</code>, dashboard <strong>Skip 00 00 Vend</strong> - a VEND REQUEST priced 00 00 is ACKed and dropped, the request with the real price works as usual; counted in <code>vendStats</code>. Demo APK not rebuilt.</td><td>None. Operators turn it on per machine.</td></tr>
         <tr><td><strong>hardware-lib 8.2.3</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.2</td><td>24 Oct 2026</td><td>Session-cancel retry (D-1637): persisted switch <code>setSessionCancelRetry:on|off|MS[,COUNT]</code>, dashboard <strong>Cancel Retry</strong> - an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms, up to 3 times; a new VEND REQUEST stops it; counted in <code>vendStats</code>. RS232 <code>rx</code> patterns may start with <code>*</code> to match the END of a frame (<code>"* 53 E7"</code>), for machines that send one frame in two pieces. Existing settings and rule tables unchanged. Demo APK not rebuilt.</td><td>None. Operators turn the retry on per machine; add tail rules only where needed.</td></tr>
@@ -1278,6 +1291,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.5 · mqtt-lib 2.8.0 · demo app v2.20.0 (build 107). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.6 · mqtt-lib 2.8.0 · demo app v2.21.0 (build 108). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

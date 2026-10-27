@@ -58,7 +58,7 @@
 </style>
 <main>
 <h1>SESSION_ENDED - the vend the machine never finished</h1>
-<p>hardware-lib 8.2.5, 25 October 2026. One failure reason explained on its own, because it is the one that costs money when the app gets it wrong. Companion files: <code>VENDLISTENER-README.md</code> (the full handler), <code>IMPLEMENTATION-README.md</code>.</p>
+<p>hardware-lib 8.2.6, 27 October 2026. One failure reason explained on its own, because it is the one that costs money when the app gets it wrong. Companion files: <code>VENDLISTENER-README.md</code> (the full handler), <code>IMPLEMENTATION-README.md</code>.</p>
 <h2>1. The scenario</h2>
 <p>The customer picks an item. The machine sends VEND REQUEST. The app authorizes the card and approves, or is still at the gateway. Then the machine closes the session without ever saying how the vend ended: no VEND SUCCESS, no VEND FAILURE, no VEND CANCEL. It just sends SESSION COMPLETE.</p>
 <p>Machines do this when the customer walks away, when their own selection timer runs out, or when the dispense fails in a way their firmware does not report. From the bus it looks like a normal session close. From the app it looks like a vend that never got an answer.</p>
@@ -77,8 +77,7 @@ POLL tx=END SESSION</code></pre>
 <h2>4. What the app must do in that callback</h2>
 <ul><li>If you had already called <code>approveVend()</code>, money is held or captured for a product you cannot prove came out. <strong>Reverse it.</strong></li><li>If you had not approved yet, the gateway may still hold the amount. <strong>Void it.</strong></li><li>Either way close the payment screen. Nothing else will arrive for this vend.</li></ul>
 <p>This is why the handler must reverse on SESSION_ENDED and not only on FAILED. The machine never said "failed". It just left. The same applies to RESET, the other reason where the dispense result is unknown.</p>
-<pre><code>override fun onVendFailure() {
-    val reason = HardwareLib.lastVendFailureReason      // first line, one global slot
+<pre><code>override fun onVendFailure(reason: HardwareLib.VendFailureReason) {   // 8.2.6: reason as the parameter
     when (reason) {
         HardwareLib.VendFailureReason.CANCELLED_BY_VMC,
         HardwareLib.VendFailureReason.CANCELLED_BY_OPERATOR -&gt; if (approved) gateway.reverse() else gateway.voidHold() // machine or dashboard cancelled

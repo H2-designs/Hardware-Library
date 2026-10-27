@@ -1,6 +1,6 @@
 # Implementation guide - putting hardware-lib into the Android app
 
-hardware-lib 8.2.5 + mqtt-lib 2.8.0, 25 October 2026. This is the one document to follow when wiring the libraries
+hardware-lib 8.2.6 + mqtt-lib 2.8.0, 27 October 2026. This is the one document to follow when wiring the libraries
 into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper:
 `API-REFERENCE.md` (every function), `AAR-HANDOFF-README.md` (what changed per release), `PULSE-README.md`,
 `DUPLICATE-LOGS-README.md`, `VENDLISTENER-README.md` (the listener in full, with the fixes and the counters), `SESSION-ENDED-README.md`, `CANCEL-FLOW-README.md` (machine / app / operator cancel side by side), `samples/`.
@@ -28,7 +28,7 @@ Copy the three AARs from `AAR-Update-latest.zip` into the app's `libs/`:
 
 ```gradle
 implementation files('libs/mqtt-lib-2.8.0.aar')
-implementation files('libs/hardware-lib-8.2.5.aar')
+implementation files('libs/hardware-lib-8.2.6.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
 ```
 
@@ -76,8 +76,9 @@ Without MQTT: drop steps 1 and 2. Nothing throws, the MDB engine runs fully offl
 
 ## 4. The payment flow - `VendListener`
 
-Three callbacks, and that is the whole listener. Each runs on its own callback thread: return at once and do
-gateway work on your own coroutine or thread (a callback running longer than 3 s logs a warning).
+Three callbacks, and that is the whole listener. Since 8.2.6 they run on one ordered thread: for a vend, onVendRequest
+completes before its outcome arrives. Return at once and do gateway work on your own coroutine or thread; a blocking
+handler delays the outcome, and a callback running longer than 3 s logs a warning.
 
 ```kotlin
 object PaymentFlow : HardwareLib.VendListener {
@@ -103,8 +104,7 @@ object PaymentFlow : HardwareLib.VendListener {
         scope.launch { gateway.capture(); ui.showThanks() }
     }
 
-    override fun onVendFailure() {                              // every end the MACHINE caused, exactly once
-        val reason = HardwareLib.lastVendFailureReason        // read it HERE, one global slot
+    override fun onVendFailure(reason: HardwareLib.VendFailureReason) {   // 8.2.6: reason comes with the callback
         scope.launch {
             when (reason) {
                 HardwareLib.VendFailureReason.CANCELLED_BY_VMC,        // the MACHINE cancelled: VEND CANCEL 13 01 / READER CANCEL 14 02
@@ -139,8 +139,8 @@ The contract the code above relies on:
 - **Reversal rule:** reverse the charge whenever you had approved and the vend did not reach `onVendSuccess`. That
   is three reasons, not one: FAILED, SESSION_ENDED and RESET. A handler that reverses only on FAILED leaks money
   on machines that close the session without any VEND FAILURE, and on resets mid-vend.
-- `lastVendFailureReason` is one global slot written just before the callback and never cleared. Read it inside
-  `onVendFailure`, not later.
+- Take the reason as the `onVendFailure(reason)` parameter (8.2.6). `lastVendFailureReason` still exists but is a global
+  slot the next failure overwrites.
 
 ## 5. State, and a health check that cannot get stuck
 
@@ -329,7 +329,7 @@ Every rule above holds unchanged; the bridge registers its listeners once. Manua
 
 ## 14. Before the field
 
-- [ ] AARs 8.2.5 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
+- [ ] AARs 8.2.6 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
 - [ ] `HardwareLib.init(applicationContext)` at boot, in every mode
 - [ ] one `attachRabbahMqtt()`, no custom bridge, listeners registered once
 - [ ] `onVendFailure` reverses on FAILED, SESSION_ENDED and RESET when approved, voids on CANCELLED_BY_VMC / CANCELLED_BY_OPERATOR, only resets the UI on CANCELLED_BY_APP

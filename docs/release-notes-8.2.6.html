@@ -1,0 +1,96 @@
+<title>Release Notes 8.2.6</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+<style>
+  h1 { margin-bottom: 6px; }
+  h2 { margin-top: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  h3 { margin-top: 6px; }
+  main > * + * { margin-top: 0; }
+  main { gap: 14px; }
+  pre { white-space: pre; }
+  ol, ul { display: flex; flex-direction: column; gap: 6px; }
+</style>
+<main>
+<h1>Release notes - hardware-lib 8.2.6 + mqtt-lib 2.8.0</h1>
+<p>Release: https://github.com/RabbahSystems/hardware-library/releases/tag/v8.2.6 (and https://github.com/H2-designs/Hardware-Library/releases/tag/v8.2.6) Date: 27 October 2026. Replaces v8.2.5 (25 October). Cumulative against the fleet's hardware-lib 8.0.0 / mqtt-lib 2.6.0.</p>
+<h2>TL;DR for the Android app</h2>
+<ul><li>Swap <code>hardware-lib-8.2.6.aar</code>; mqtt-lib stays 2.8.0 (copy all three AARs from <code>AAR-Update-latest.zip</code>). Rebuild. No existing signature changes.</li><li><strong>Ordered callbacks.</strong> For one vend, <code>onVendRequest</code> always finishes before its <code>onVendSuccess</code> / <code>onVendFailure</code> is delivered. Until 8.2.5 each callback ran on its own thread, so an app that blocked inside <code>onVendRequest</code> could get the failure delivered and finished first, then paint a payment screen for a vend that was already dead (field case, 27 October).</li><li><strong><code>onVendFailure(reason)</code>.</strong> New overload with the reason as a parameter, captured when the vend was closed. Override it instead of reading <code>lastVendFailureReason</code>. The default calls the old <code>onVendFailure()</code>, so nothing breaks; Java implementers now only override what they use.</li><li><strong>Still mandatory:</strong> return from every callback immediately and do gateway work on your own thread. With ordered delivery a request handler that blocks for 10 s now delays the cancel by 10 s; the 3 s watchdog names the offender and <code>vendStats</code> counts it.</li><li>Everything from 8.2.5 applies: every cancel delivered with CANCELLED_BY_VMC / CANCELLED_BY_APP / CANCELLED_BY_OPERATOR, <code>[remote]</code> replies never muted, session-cancel retry <code>MS,COUNT</code>, skip 00 00 vend, RS232 leading-<code>*</code> patterns.</li></ul>
+<h2>Files</h2>
+<div class="twrap"><table><thead><tr><th>file</th><th>version</th></tr></thead><tbody><tr><td><code>libs/hardware-lib-8.2.6.aar</code></td><td>8.2.6 (fleet has 8.0.0)</td></tr><tr><td><code>libs/mqtt-lib-2.8.0.aar</code></td><td>2.8.0, unchanged since v8.2.2 (fleet has 2.6.0)</td></tr><tr><td><code>libs/CM30-HardwareLibrary-1.0.9.aar</code></td><td>unchanged</td></tr><tr><td><code>AAR-Update-latest.zip</code></td><td>the three AARs + AAR-HANDOFF-README, IMPLEMENTATION-README, VENDLISTENER-README, CANCEL-FLOW-README, SESSION-ENDED-README, DUPLICATE-LOGS-README, API-REFERENCE, PULSE-README</td></tr><tr><td><code>react-native-mdb</code> 1.3.5</td><td>bundles hardware-lib 8.2.6; the native bridge passes the captured reason</td></tr><tr><td><code>Hardware-Dashboard-win32-x64-v8.2.5.zip</code></td><td>Windows dashboard, unchanged since 8.2.5</td></tr><tr><td><code>MDB-Slave-2-v2.21.0-build108-debug.apk</code></td><td>demo/test app on 8.2.6 / 2.8.0 (private release only)</td></tr></tbody></table></div>
+<pre><code>implementation files('libs/mqtt-lib-2.8.0.aar')
+implementation files('libs/hardware-lib-8.2.6.aar')
+implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
+<h2>New in 8.2.6 (27 October)</h2>
+<h3>Ordered vend callbacks</h3>
+<p>Field case: the app called its gateway inside <code>onVendRequest</code> (about 300 ms); the machine sent VEND CANCEL 57 ms after the request. The library delivered <code>onVendFailure</code> on a second thread, it ran to completion, then <code>onVendRequest</code> returned and the app showed "tap your card" for a vend that no longer existed. Reproduced on a plain JVM with the same executor: with the 8.2.5 cached pool the failure finishes first; with one thread the request finishes first.</p>
+<p>The three vend callbacks now run on ONE ordered thread. For a vend, <code>onVendRequest</code> completes before its <code>onVendSuccess</code> or <code>onVendFailure</code> is delivered, on MDB and on RS232 alike. The 7.24.0 property that a cancel reached a stuck request handler at once is gone: a blocking handler now delays the outcome by as long as it blocks. The 3 s watchdog still logs <code>WARNING: VendListener.onVendRequest has been running for 3000 ms (stuck #N)</code> and <code>vendStats</code> still counts <code>callbackStuck</code>. Logs, exchange events and bus replies are unaffected either way; they never ran on the callback thread.</p>
+<h3><code>onVendFailure(reason: VendFailureReason)</code></h3>
+<pre><code>override fun onVendFailure(reason: HardwareLib.VendFailureReason) {
+    when (reason) {
+        HardwareLib.VendFailureReason.CANCELLED_BY_VMC,
+        HardwareLib.VendFailureReason.CANCELLED_BY_OPERATOR -&gt; if (approved) gateway.reverse() else gateway.voidHold()
+        HardwareLib.VendFailureReason.CANCELLED_BY_APP -&gt; {}
+        HardwareLib.VendFailureReason.FAILED -&gt; gateway.reverse()
+        HardwareLib.VendFailureReason.SESSION_ENDED,
+        HardwareLib.VendFailureReason.RESET -&gt; if (approved) gateway.reverse() else gateway.voidHold()
+    }
+    ui.resetToIdle()
+}</code></pre>
+<p>The reason is captured in the library at the moment the vend is closed and travels with the callback, so a second failure or a <code>stop()</code> before the callback runs cannot overwrite it. <code>lastVendFailureReason</code> stays for code that still reads it; it is written at the same moment. Java: the interface methods are real default methods now (<code>-Xjvm-default=all</code>), override <code>onVendFailure(VendFailureReason)</code> only. React Native: unchanged event, the bridge passes the captured reason.</p>
+<h2>Since 8.0.0 - 8.2.5 (25 October)</h2>
+<ul><li>Every cancel reaches <code>onVendFailure</code> with a reason: CANCELLED_BY_VMC, CANCELLED_BY_APP, CANCELLED_BY_OPERATOR.</li><li><code>[remote]</code> replies never muted by the Logs switch; session-cancel retry wait and count (<code>setSessionCancelRetry:MS,COUNT</code>).</li></ul>
+<h2>Since 8.0.0 - 8.2.4 and 8.2.3 (24 October)</h2>
+<ul><li>Skip 00 00 vend (<code>setSkipZeroVend:on</code>); session-cancel retry (D-1637); RS232 leading-<code>*</code> rx patterns.</li></ul>
+<h2>Since 8.0.0 - 8.2.2 / mqtt-lib 2.8.0 and earlier (October)</h2>
+<ul><li>mqtt-lib 2.8.0: only coded items on the backend's <code>logs</code> topic; plain and control lines on <code>devices/&lt;id&gt;/ops</code>.</li><li><code>vendStats</code> counters; exactly-once publishing (D-0961); health check that cannot get stuck; force session end; RS232 rules fire the VendListener; multi-input ready gate; direct vend reports ENABLED_STATE.</li></ul>
+<h2>Verify after deploy (dashboard passthrough)</h2>
+<div class="twrap"><table><thead><tr><th>send</th><th>expect</th></tr></thead><tbody><tr><td><code>version</code></td><td><code>[remote] mqtt-lib 2.8.0, hardware-lib 8.2.6 - client id ...</code></td></tr><tr><td>a sale the machine cancels right after the request</td><td>app: <code>onVendRequest</code> returns, THEN one <code>onVendFailure(CANCELLED_BY_VMC)</code>; the payment screen closes</td></tr><tr><td>a sale with a slow gateway inside <code>onVendRequest</code> (do not ship this)</td><td><code>[mdb] WARNING: VendListener.onVendRequest has been running for 3000 ms</code>, <code>vendStats</code> <code>callbackStuck</code> rises, the cancel arrives after the handler returns</td></tr><tr><td><code>vendStats</code></td><td><code>STUCK callbacks=0</code> on a correctly written app</td></tr></tbody></table></div>
+<h2>Known limits</h2>
+<ul><li>Not yet run on a real CM30. Compiled, API-checked (javap: the executor is a single thread, the overload is a default method) and reproduced on the JVM only.</li><li>Everything listed for 8.2.5 still holds.</li></ul>
+</main>

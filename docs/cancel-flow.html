@@ -58,7 +58,7 @@
 </style>
 <main>
 <h1>Vend cancel - who can cancel, what the app hears, what goes on the bus</h1>
-<p>hardware-lib 8.2.5, 25 October 2026. The complete reference for every way a vend or a session can be cancelled, from the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: <code>VENDLISTENER-README.md</code> (the handler), <code>SESSION-ENDED-README.md</code>, <code>API-REFERENCE.md</code>.</p>
+<p>hardware-lib 8.2.6, 27 October 2026. The complete reference for every way a vend or a session can be cancelled, from the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: <code>VENDLISTENER-README.md</code> (the handler), <code>SESSION-ENDED-README.md</code>, <code>API-REFERENCE.md</code>.</p>
 <h2>1. The rule since 8.2.5</h2>
 <p><strong>Every cancel reaches the app through <code>onVendFailure</code>, exactly once, and <code>lastVendFailureReason</code> says who cancelled.</strong></p>
 <div class="twrap"><table><thead><tr><th>who cancelled</th><th>how</th><th>reason the app reads</th><th>wire reply the reader sends</th></tr></thead><tbody><tr><td>the machine</td><td>VEND CANCEL <code>13 01</code>, READER CANCEL <code>14 02</code>, or an RS232 rule with <code>event: vendCancel</code></td><td><strong>CANCELLED_BY_VMC</strong></td><td>per the cancel mode: VEND DENIED, or SESSION CANCEL REQUEST on the next POLL</td></tr><tr><td>the Android app</td><td><code>HardwareLib.cancelVend()</code> / <code>cancelVend(response)</code>, or <code>setAutoSession</code> from app code while a session is live</td><td><strong>CANCELLED_BY_APP</strong></td><td>the response you chose, or the standing cancel mode, on the next POLL</td></tr><tr><td>an operator</td><td>dashboard <strong>Vend Cancel</strong> button, the remote commands <code>cancelVend</code>, <code>cancelVend:sessionCancel</code>, <code>cancelVend:vendDenied</code>, or <code>setSessionMode</code> while a session is live</td><td><strong>CANCELLED_BY_OPERATOR</strong> (new in 8.2.5)</td><td>same as the app's</td></tr></tbody></table></div>
@@ -77,8 +77,7 @@
 <h3>Cancel before any VEND REQUEST</h3>
 <p>If the session is open but the customer has not selected yet, <code>cancelVend()</code> from the app or the dashboard cancels the session on the wire and <strong>no callback fires</strong>, because there is no vend to fail. Nothing was authorized, nothing to clean up.</p>
 <h2>3. What the handler does with each reason</h2>
-<pre><code>override fun onVendFailure() {
-    val reason = HardwareLib.lastVendFailureReason          // first line - one global slot
+<pre><code>override fun onVendFailure(reason: HardwareLib.VendFailureReason) {   // 8.2.6: the reason comes with the callback
     scope.launch {
         when (reason) {
             HardwareLib.VendFailureReason.CANCELLED_BY_VMC,      // the machine cancelled

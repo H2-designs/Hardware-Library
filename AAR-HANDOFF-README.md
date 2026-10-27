@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.5
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.6
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.5.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.6.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.5.aar')
+   implementation files('libs/hardware-lib-8.2.6.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -27,6 +27,24 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.6 - ordered vend callbacks and onVendFailure(reason) (27 October 2026)
+
+Field case: the app called its gateway inside `onVendRequest` (~300 ms) and the machine sent VEND CANCEL 57 ms after
+the request. Each callback ran on its own thread, so `onVendFailure` was delivered and finished BEFORE
+`onVendRequest` returned; the app then painted its payment screen for a vend that was already dead and stayed there.
+Reproduced on the JVM with the same executor.
+
+- **The three vend callbacks now run on ONE ordered thread.** For a vend, `onVendRequest` completes before its
+  `onVendSuccess` / `onVendFailure` is delivered, on MDB and RS232. The price: a request handler that blocks now
+  delays the outcome by as long as it blocks (until 8.2.5 a cancel reached a stuck handler at once). So the rule is
+  not optional any more: **return from every callback immediately; gateway work goes on your own thread.** The 3 s
+  watchdog still names a stuck callback and `vendStats` counts it.
+- **`onVendFailure(reason: VendFailureReason)`**: new overload, the reason captured when the vend was closed and
+  passed with the callback, so a later failure or `stop()` cannot overwrite it before you read it. Override this one.
+  The default calls the old `onVendFailure()`; nothing existing changes. Java implementers only override what they
+  use (the interface methods are real default methods now).
+- React Native: the bridge passes the captured reason; the event is unchanged.
 
 ### 8.2.5 - every cancel reaches onVendFailure with a reason; operator cancels get their own reason (25 October 2026)
 
@@ -320,7 +338,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.20.0 build 107** bundles hardware-lib 8.2.5 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.21.0 build 108** bundles hardware-lib 8.2.6 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

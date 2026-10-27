@@ -58,7 +58,7 @@
 </style>
 <main>
 <h1>Implementation guide - putting hardware-lib into the Android app</h1>
-<p>hardware-lib 8.2.5 + mqtt-lib 2.8.0, 25 October 2026. This is the one document to follow when wiring the libraries into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper: <code>API-REFERENCE.md</code> (every function), <code>AAR-HANDOFF-README.md</code> (what changed per release), <code>PULSE-README.md</code>, <code>DUPLICATE-LOGS-README.md</code>, <code>VENDLISTENER-README.md</code> (the listener in full, with the fixes and the counters), <code>SESSION-ENDED-README.md</code>, <code>CANCEL-FLOW-README.md</code> (machine / app / operator cancel side by side), <code>samples/</code>.</p>
+<p>hardware-lib 8.2.6 + mqtt-lib 2.8.0, 27 October 2026. This is the one document to follow when wiring the libraries into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper: <code>API-REFERENCE.md</code> (every function), <code>AAR-HANDOFF-README.md</code> (what changed per release), <code>PULSE-README.md</code>, <code>DUPLICATE-LOGS-README.md</code>, <code>VENDLISTENER-README.md</code> (the listener in full, with the fixes and the counters), <code>SESSION-ENDED-README.md</code>, <code>CANCEL-FLOW-README.md</code> (machine / app / operator cancel side by side), <code>samples/</code>.</p>
 <h2>1. What the library does, and what stays in the app</h2>
 <p>The library is the reader on the vending machine's bus. It does the whole protocol by itself: handshake, session, vend request, approve or deny, dispense result, session close, resets, and every machine deviation we have met in the field (persisted settings, never app code). It talks to the backend and the dashboard over mqtt-lib.</p>
 <p>The app does three things and nothing else:</p>
@@ -67,7 +67,7 @@
 <h2>2. Files and Gradle</h2>
 <p>Copy the three AARs from <code>AAR-Update-latest.zip</code> into the app's <code>libs/</code>:</p>
 <pre><code>implementation files('libs/mqtt-lib-2.8.0.aar')
-implementation files('libs/hardware-lib-8.2.5.aar')
+implementation files('libs/hardware-lib-8.2.6.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
 <ul><li><code>minSdk</code> 30 (the CM30 runs Android 11), ABI armeabi-v7a.</li><li>No ProGuard rules in the app: both AARs ship their own consumer keep rules.</li><li>The broker password goes into <code>local.properties</code> and reaches the app through <code>BuildConfig</code> (see <code>source/MdbSlaveApp/app/build.gradle</code> for the four <code>buildConfigField</code> lines). Never in source, never in git.</li></ul>
 <h2>3. Startup, once per process</h2>
@@ -99,7 +99,7 @@ implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
 <p>Order matters in one place: <code>init</code> publishes the first settings snapshot through the bridge, so attach before init. <code>HardwareLib.init</code> is also what loads the persisted settings and payloads; an app that skips it runs with defaults and forgets every operator setting at the next restart.</p>
 <p>Without MQTT: drop steps 1 and 2. Nothing throws, the MDB engine runs fully offline.</p>
 <h2>4. The payment flow - <code>VendListener</code></h2>
-<p>Three callbacks, and that is the whole listener. Each runs on its own callback thread: return at once and do gateway work on your own coroutine or thread (a callback running longer than 3 s logs a warning).</p>
+<p>Three callbacks, and that is the whole listener. Since 8.2.6 they run on one ordered thread: for a vend, onVendRequest completes before its outcome arrives. Return at once and do gateway work on your own coroutine or thread; a blocking handler delays the outcome, and a callback running longer than 3 s logs a warning.</p>
 <pre><code>object PaymentFlow : HardwareLib.VendListener {
     private val scope = CoroutineScope(Dispatchers.IO)
     @Volatile private var approved = false      // did WE approve the vend that is open now
@@ -123,8 +123,7 @@ implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
         scope.launch { gateway.capture(); ui.showThanks() }
     }
 
-    override fun onVendFailure() {                              // every end the MACHINE caused, exactly once
-        val reason = HardwareLib.lastVendFailureReason        // read it HERE, one global slot
+    override fun onVendFailure(reason: HardwareLib.VendFailureReason) {   // 8.2.6: reason comes with the callback
         scope.launch {
             when (reason) {
                 HardwareLib.VendFailureReason.CANCELLED_BY_VMC,        // the MACHINE cancelled: VEND CANCEL 13 01 / READER CANCEL 14 02
@@ -146,7 +145,7 @@ implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
     fun onState(state: String) { ui.showReader(state) }          // section 5
 }</code></pre>
 <p>The contract the code above relies on:</p>
-<ul><li><code>onVendRequest</code> carries <code>minorUnits</code> (exact integer, use it for money) and <code>amount</code> (decimal, display only). Scale factor and decimals from READER CONFIG DATA are already applied. <code>itemNumber</code> is -1 when the machine sent none (always on RS232).</li><li>Every VEND REQUEST the machine ends is reported exactly once, as <code>onVendSuccess</code> or <code>onVendFailure</code>.</li><li><strong>Every cancel is delivered (8.2.5):</strong> the machine's as CANCELLED_BY_VMC, your own <code>cancelVend()</code> as CANCELLED_BY_APP, a dashboard or remote cancel as CANCELLED_BY_OPERATOR. The reason tells you whether the money needs anything; the UI reset is the same for all. <code>CANCEL-FLOW-README.md</code> has the full table.</li><li><strong>Reversal rule:</strong> reverse the charge whenever you had approved and the vend did not reach <code>onVendSuccess</code>. That is three reasons, not one: FAILED, SESSION_ENDED and RESET. A handler that reverses only on FAILED leaks money on machines that close the session without any VEND FAILURE, and on resets mid-vend.</li><li><code>lastVendFailureReason</code> is one global slot written just before the callback and never cleared. Read it inside <code>onVendFailure</code>, not later.</li></ul>
+<ul><li><code>onVendRequest</code> carries <code>minorUnits</code> (exact integer, use it for money) and <code>amount</code> (decimal, display only). Scale factor and decimals from READER CONFIG DATA are already applied. <code>itemNumber</code> is -1 when the machine sent none (always on RS232).</li><li>Every VEND REQUEST the machine ends is reported exactly once, as <code>onVendSuccess</code> or <code>onVendFailure</code>.</li><li><strong>Every cancel is delivered (8.2.5):</strong> the machine's as CANCELLED_BY_VMC, your own <code>cancelVend()</code> as CANCELLED_BY_APP, a dashboard or remote cancel as CANCELLED_BY_OPERATOR. The reason tells you whether the money needs anything; the UI reset is the same for all. <code>CANCEL-FLOW-README.md</code> has the full table.</li><li><strong>Reversal rule:</strong> reverse the charge whenever you had approved and the vend did not reach <code>onVendSuccess</code>. That is three reasons, not one: FAILED, SESSION_ENDED and RESET. A handler that reverses only on FAILED leaks money on machines that close the session without any VEND FAILURE, and on resets mid-vend.</li><li>Take the reason as the <code>onVendFailure(reason)</code> parameter (8.2.6). <code>lastVendFailureReason</code> still exists but is a global slot the next failure overwrites.</li></ul>
 <h2>5. State, and a health check that cannot get stuck</h2>
 <p>The reader state is <code>INACTIVE_STATE</code>, <code>DISABLED_STATE</code>, <code>ENABLED_STATE</code>, <code>VEND_STATE</code>. The app shows it, nothing more. Three guarantees since 8.2.1 make a "wait for ENABLED" screen safe:</p>
 <ul><li>a state listener registered at any time receives the current state immediately;</li><li>with direct vend ON the listener reports ENABLED_STATE while the bus is still INACTIVE or DISABLED, re-announces it on every real transition and re-sends it every 5 s until the bus is really enabled;</li><li><code>HardwareLib.currentState</code> returns the same reported state; <code>busState</code> is the real one.</li></ul>
@@ -208,6 +207,6 @@ Rs232Lib.simulateFrame("A0 01 00 06 31 35 30 30 30 30 A3")   // a fake payment r
 <h2>13. React Native apps</h2>
 <p>The same libraries ship inside <code>react-native-mdb</code> (package 1.3.x): <code>Mdb.initMqtt</code>, <code>Mdb.initMdb</code>, <code>Mdb.startMdb</code>, events <code>onVendRequest</code> / <code>onVendSuccess</code> / <code>onVendFailure({ reason })</code>, <code>Mdb.approveVend()</code> / <code>Mdb.cancelVend()</code>. Every rule above holds unchanged; the bridge registers its listeners once. Manual: <code>docs/mdb-reactnative-manual.html</code>.</p>
 <h2>14. Before the field</h2>
-<ul><li>[ ] AARs 8.2.5 / 2.8.0 / 1.0.9 in <code>libs/</code>, <code>version</code> answers with them</li><li>[ ] <code>HardwareLib.init(applicationContext)</code> at boot, in every mode</li><li>[ ] one <code>attachRabbahMqtt()</code>, no custom bridge, listeners registered once</li><li>[ ] <code>onVendFailure</code> reverses on FAILED, SESSION_ENDED and RESET when approved, voids on CANCELLED_BY_VMC / CANCELLED_BY_OPERATOR, only resets the UI on CANCELLED_BY_APP</li><li>[ ] <code>approveVend()</code> / <code>cancelVend()</code> return values logged</li><li>[ ] gateway work off the callback thread</li><li>[ ] machine settings applied and echoed in <code>SETTINGS_JSON</code></li><li>[ ] one real sale: each exchange once on the backend</li></ul>
+<ul><li>[ ] AARs 8.2.6 / 2.8.0 / 1.0.9 in <code>libs/</code>, <code>version</code> answers with them</li><li>[ ] <code>HardwareLib.init(applicationContext)</code> at boot, in every mode</li><li>[ ] one <code>attachRabbahMqtt()</code>, no custom bridge, listeners registered once</li><li>[ ] <code>onVendFailure</code> reverses on FAILED, SESSION_ENDED and RESET when approved, voids on CANCELLED_BY_VMC / CANCELLED_BY_OPERATOR, only resets the UI on CANCELLED_BY_APP</li><li>[ ] <code>approveVend()</code> / <code>cancelVend()</code> return values logged</li><li>[ ] gateway work off the callback thread</li><li>[ ] machine settings applied and echoed in <code>SETTINGS_JSON</code></li><li>[ ] one real sale: each exchange once on the backend</li></ul>
 <p>Nothing since 8.1.0 has run on a real CM30. First field checks: duplicates gone, direct-vend health check, a reader restart mid-session, the force-end machine, the no-echo cancel.</p>
 </main>

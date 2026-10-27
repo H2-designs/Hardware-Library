@@ -1,6 +1,6 @@
 # Vend cancel - who can cancel, what the app hears, what goes on the bus
 
-hardware-lib 8.2.5, 25 October 2026. The complete reference for every way a vend or a session can be cancelled, from
+hardware-lib 8.2.6, 27 October 2026. The complete reference for every way a vend or a session can be cancelled, from
 the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This
 replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: `VENDLISTENER-README.md` (the handler),
 `SESSION-ENDED-README.md`, `API-REFERENCE.md`.
@@ -66,8 +66,7 @@ to clean up.
 ## 3. What the handler does with each reason
 
 ```kotlin
-override fun onVendFailure() {
-    val reason = HardwareLib.lastVendFailureReason          // first line - one global slot
+override fun onVendFailure(reason: HardwareLib.VendFailureReason) {   // 8.2.6: the reason comes with the callback
     scope.launch {
         when (reason) {
             HardwareLib.VendFailureReason.CANCELLED_BY_VMC,      // the machine cancelled

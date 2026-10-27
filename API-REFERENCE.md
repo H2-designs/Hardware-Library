@@ -23,7 +23,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 | `init(context): Boolean` | Loads persisted settings and payloads, re-drives pulse polarity and the ready gate, registers the remote-command listener if mqtt-lib is initialised. Idempotent. |
 | `start(): Boolean` | Opens the CM30 MDB port and starts the bus loop. State resets to INACTIVE and is announced at once. Remote: `open`. |
 | `stop(): Boolean` | Closes the port, resets to INACTIVE, closes any open vend with reason RESET. Remote: `close`. |
-| `VERSION` | `"8.2.5"`. Remote `version` reports it together with mqtt-lib. |
+| `VERSION` | `"8.2.6"`. Remote `version` reports it together with mqtt-lib. |
 
 ### The payment hook - `vendListener`
 
@@ -31,7 +31,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 HardwareLib.vendListener = object : HardwareLib.VendListener {
     override fun onVendRequest(amount: Double, minorUnits: Int, itemNumber: Int) { /* authorize, then approveVend() or cancelVend() */ }
     override fun onVendSuccess(itemNumber: Int) { /* product dispensed - capture */ }
-    override fun onVendFailure() { /* every other end of the vend, exactly once - void / refund, reset UI */ }
+    override fun onVendFailure(reason: HardwareLib.VendFailureReason) { /* every other end of the vend, exactly once - void / refund, reset UI */ }   // 8.2.6: reason as a parameter; onVendFailure() still works
 }
 ```
 
@@ -41,13 +41,15 @@ HardwareLib.vendListener = object : HardwareLib.VendListener {
 | `onVendSuccess(itemNumber)` | the machine confirmed the product came out. Capture here. |
 | `onVendFailure()` | exactly once for every request that did not reach success: machine cancel, your own `cancelVend()`, a dashboard / remote cancel (8.2.5), dispense failure, session ended with the vend open, reset. Reason in `lastVendFailureReason`. |
 
-Rules: return immediately and do gateway work on your own thread (each callback runs on its own thread; one
-running longer than 3 s logs a warning); every request ends in exactly one of success / failure; the interface is
-three methods and Java implementers must override all three.
+Rules: return immediately and do gateway work on your own thread (8.2.6: the callbacks run on ONE ordered thread, so
+for a vend `onVendRequest` completes before its outcome is delivered, and a blocking handler delays that outcome; one
+running longer than 3 s logs a warning); every request ends in exactly one of success / failure; the interface
+methods are default methods, so Kotlin and Java implementers override only what they use.
 
 | member | what it does |
 |---|---|
-| `lastVendFailureReason: VendFailureReason?` | `CANCELLED_BY_VMC`, `CANCELLED_BY_APP`, `CANCELLED_BY_OPERATOR` (8.2.5), `FAILED`, `SESSION_ENDED`, `RESET`. Read inside `onVendFailure`; one global slot, never cleared. |
+| `onVendFailure(reason)` | 8.2.6: the same callback with the reason as a parameter, captured when the vend was closed. Override this one; the default calls `onVendFailure()`. |
+| `lastVendFailureReason: VendFailureReason?` | `CANCELLED_BY_VMC`, `CANCELLED_BY_APP`, `CANCELLED_BY_OPERATOR` (8.2.5), `FAILED`, `SESSION_ENDED`, `RESET`. Written at the same moment the callback is queued; prefer the `onVendFailure(reason)` parameter (8.2.6). One global slot, never cleared. |
 
 ### Vend counters - `vendStats` (8.2.2)
 

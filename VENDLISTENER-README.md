@@ -1,6 +1,6 @@
 # VendListener - how to implement it, and how to fix the usual mistakes
 
-hardware-lib 8.2.5, 25 October 2026. The payment hook is three callbacks. This document is the complete,
+hardware-lib 8.2.6, 27 October 2026. The payment hook is three callbacks. This document is the complete,
 copy-ready implementation plus the fix for every mistake we have seen in the field. Companion files:
 `IMPLEMENTATION-README.md` (the whole app), `API-REFERENCE.md`, `DUPLICATE-LOGS-README.md`.
 
@@ -79,8 +79,7 @@ object PaymentFlow : HardwareLib.VendListener {
     }
 
     // ---------------------------------------------------------------- 3. every machine-side failure
-    override fun onVendFailure() {
-        val reason = HardwareLib.lastVendFailureReason   // read HERE, it is one global slot
+    override fun onVendFailure(reason: HardwareLib.VendFailureReason) {   // 8.2.6: the reason comes with the callback
         val s = synchronized(lock) { sale?.also { it.closed = true; sale = null } }
         scope.launch {
             val hold = s?.hold
@@ -112,13 +111,13 @@ What each piece protects against:
   did; the app does.
 - **`closed` flag.** Makes success and failure idempotent. If a gateway callback and a bus callback race, the money
   operation runs once.
-- **Reading the reason first thing.** The next failure overwrites the slot.
+- **Taking the reason as the parameter (8.2.6).** It is captured when the vend was closed; the global slot can be overwritten by the next failure, the parameter cannot.
 - **`else` branch.** A future reason value lands on void, never on nothing.
 
 ## 3. The implementation, Java
 
-The interface has default no-op methods in Kotlin, but Java implementers must override all three. Same logic,
-same flags:
+Since 8.2.6 the interface methods are real default methods, so a Java implementer overrides only what it uses. Same
+logic, same flags:
 
 ```java
 public final class PaymentFlow implements HardwareLib.VendListener {
@@ -146,8 +145,7 @@ public final class PaymentFlow implements HardwareLib.VendListener {
         io.execute(() -> { if (s.hold != null) gateway.capture(s.hold); ui.showThanks(); });
     }
 
-    @Override public void onVendFailure() {
-        HardwareLib.VendFailureReason reason = HardwareLib.INSTANCE.getLastVendFailureReason();
+    @Override public void onVendFailure(HardwareLib.VendFailureReason reason) {   // 8.2.6: only this override is needed
         Sale s; synchronized (this) { s = sale; if (s != null) { s.closed = true; sale = null; } }
         io.execute(() -> {
             GatewayHold hold = s == null ? null : s.hold;
@@ -212,7 +210,8 @@ Mdb.onVendFailure(async ({ reason }) => {
 | vend approved after the machine had cancelled, hold never voided | gateway result applied to a stale request | the `sale !== s` check after `authorize` |
 | logs and callbacks freeze during card read | gateway called inside the callback | every callback returns at once; work on your own thread (the library warns after 3 s) |
 | onVendRequest fires N times per selection on the device screen | listener assigned in an Activity, or the same lambda added per screen | one assignment at boot in Application; `remove...Listener` with the same reference if a screen must listen |
-| wrong reason read, or always RESET | read `lastVendFailureReason` later, after another failure | read it as the first line of onVendFailure |
+| wrong reason read, or always RESET | read `lastVendFailureReason` later, after another failure | override `onVendFailure(reason)` and use the parameter (8.2.6) |
+| payment screen stays open after a fast machine cancel | the gateway was called inside `onVendRequest`; before 8.2.6 the failure callback could finish first | 8.2.6 orders the callbacks; still move the gateway call off the callback thread |
 | payment screen stays open after a reset mid-vend | no RESET branch | RESET is a failure like any other: void or reverse, reset the UI |
 | `amount` sent to the gateway, off by rounding | used the Double | send `minorUnits`, the exact integer; `amount` is display only |
 | RS232 machine: PRODUCTION_FAIL after payment, no refund | matched the rule name in `exchangeListener` instead of the listener | give the rule `"event":"vendFailure"`; it arrives as onVendFailure with FAILED |
