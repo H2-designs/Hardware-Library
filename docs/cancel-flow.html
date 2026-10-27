@@ -1,4 +1,4 @@
-<title>Vend Cancel Flow</title>
+<title>Cancel flow</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
@@ -58,7 +58,7 @@
 </style>
 <main>
 <h1>Vend cancel - who can cancel, what the app hears, what goes on the bus</h1>
-<p>hardware-lib 8.2.6, 27 October 2026. The complete reference for every way a vend or a session can be cancelled, from the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: <code>VENDLISTENER-README.md</code> (the handler), <code>SESSION-ENDED-README.md</code>, <code>API-REFERENCE.md</code>.</p>
+<p>hardware-lib 8.2.7, 27 October 2026. The complete reference for every way a vend or a session can be cancelled, from the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: <code>VENDLISTENER-README.md</code> (the handler), <code>SESSION-ENDED-README.md</code>, <code>API-REFERENCE.md</code>.</p>
 <h2>1. The rule since 8.2.5</h2>
 <p><strong>Every cancel reaches the app through <code>onVendFailure</code>, exactly once, and <code>lastVendFailureReason</code> says who cancelled.</strong></p>
 <div class="twrap"><table><thead><tr><th>who cancelled</th><th>how</th><th>reason the app reads</th><th>wire reply the reader sends</th></tr></thead><tbody><tr><td>the machine</td><td>VEND CANCEL <code>13 01</code>, READER CANCEL <code>14 02</code>, or an RS232 rule with <code>event: vendCancel</code></td><td><strong>CANCELLED_BY_VMC</strong></td><td>per the cancel mode: VEND DENIED, or SESSION CANCEL REQUEST on the next POLL</td></tr><tr><td>the Android app</td><td><code>HardwareLib.cancelVend()</code> / <code>cancelVend(response)</code>, or <code>setAutoSession</code> from app code while a session is live</td><td><strong>CANCELLED_BY_APP</strong></td><td>the response you chose, or the standing cancel mode, on the next POLL</td></tr><tr><td>an operator</td><td>dashboard <strong>Vend Cancel</strong> button, the remote commands <code>cancelVend</code>, <code>cancelVend:sessionCancel</code>, <code>cancelVend:vendDenied</code>, or <code>setSessionMode</code> while a session is live</td><td><strong>CANCELLED_BY_OPERATOR</strong> (new in 8.2.5)</td><td>same as the app's</td></tr></tbody></table></div>
@@ -98,6 +98,8 @@
 <p>Two points that follow from the table:</p>
 <ul><li><strong>CANCELLED_BY_APP needs no gateway action</strong> if the app voided the hold before calling <code>cancelVend()</code>, which is the normal order (decline, void, cancel). It still needs the UI reset, and that is why the callback exists.</li><li><strong>CANCELLED_BY_OPERATOR must void.</strong> The operator pressed cancel while the customer may have had a hold placed. The app did not decide, so it has not voided anything yet.</li></ul>
 <p>Java and React Native: same branches, the React Native event carries the reason as the string <code>'CANCELLED_BY_OPERATOR'</code>.</p>
+<h2>3a. Cancel grace (8.2.7)</h2>
+<p>A failure that arrives within 200 ms of its <code>onVendRequest</code> is delivered 350 ms later, so a request handler that posts its screen to the UI thread has drawn it before the failure clears it. Order is kept (a new request flushes a held failure first), the bus replies are not delayed, all reasons are covered. <code>setCancelGrace:WINDOW,DELAY</code>, <code>setCancelGrace:off</code>; <code>vendStats</code> <code>failureDelayed</code>.</p>
 <h2>4. Counters</h2>
 <p><code>vendStats</code> (dashboard <strong>Vend</strong> button) shows the three sources apart:</p>
 <div class="twrap"><table><thead><tr><th>key</th><th>counts</th></tr></thead><tbody><tr><td><code>vendFailuresByReason.CANCELLED_BY_VMC</code></td><td>machine cancels delivered to the app</td></tr><tr><td><code>appCancels</code>, <code>vendFailuresByReason.CANCELLED_BY_APP</code></td><td>the app's own <code>cancelVend()</code> that closed an open vend</td></tr><tr><td><code>operatorCancels</code>, <code>vendFailuresByReason.CANCELLED_BY_OPERATOR</code></td><td>dashboard / remote cancels that closed an open vend</td></tr><tr><td><code>sessionCancelRetries</code>, <code>sessionCancelGaveUp</code></td><td>SESSION CANCEL REQUESTs the machine ignored and the retry re-sent</td></tr></tbody></table></div>
