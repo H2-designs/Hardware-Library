@@ -24,7 +24,8 @@ three cancel sources side by side.
 ## 2. The implementation, Kotlin
 
 One object for the whole process, registered once at boot (`HardwareLib.vendListener = PaymentFlow`). Every
-callback returns immediately; the gateway work runs on a coroutine. A small `Sale` record holds what we know about
+callback returns immediately; the gateway work runs on a coroutine (since 8.2.6 the callbacks are delivered in order on
+one thread, so a blocking handler would hold back its own outcome). A small `Sale` record holds what we know about
 the vend that is open right now, so the failure handler can decide between void and reverse without guessing.
 
 ```kotlin
@@ -219,8 +220,9 @@ Mdb.onVendFailure(async ({ reason }) => {
 
 ## 6. What the library guarantees, so you do not have to
 
-- Exactly one success or failure per machine-ended request, delivered on a callback thread, never on the bus
-  thread, even while your request handler is blocked.
+- Exactly one success or failure per request, delivered on ONE ordered callback thread (8.2.6), never on the bus
+  thread: for a vend the request handler has returned before its outcome arrives. A handler that blocks delays
+  that outcome, which is why every callback must return immediately.
 - `approveVend()` cannot charge the next customer: it only arms when a request is pending and is dropped when the
   session ends.
 - A late VEND SUCCESS / FAILURE / SESSION COMPLETE after a reader restart is answered in every state; a stray
