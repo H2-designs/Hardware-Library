@@ -1,6 +1,6 @@
 # VendListener - how to implement it, and how to fix the usual mistakes
 
-hardware-lib 8.2.7, 27 October 2026. The payment hook is three callbacks. This document is the complete,
+hardware-lib 8.2.8, 28 October 2026. The payment hook is three callbacks. This document is the complete,
 copy-ready implementation plus the fix for every mistake we have seen in the field. Companion files:
 `IMPLEMENTATION-README.md` (the whole app), `API-REFERENCE.md`, `DUPLICATE-LOGS-README.md`.
 
@@ -223,8 +223,9 @@ Mdb.onVendFailure(async ({ reason }) => {
 - Exactly one success or failure per request, delivered on ONE ordered callback thread (8.2.6), never on the bus
   thread: for a vend the request handler has returned before its outcome arrives. A handler that blocks delays
   that outcome, which is why every callback must return immediately.
-- `approveVend()` cannot charge the next customer: it only arms when a request is pending and is dropped when the
-  session ends.
+- `approveVend()` cannot charge the next customer: it only arms when a request is pending, is refused while a cancel
+  reply or a session end is armed (8.2.8), and is dropped by the cancel-reply POLL, VEND FAILURE, SESSION COMPLETE,
+  END SESSION and by the next VEND REQUEST (8.2.8 - before that a same-session request could inherit it).
 - A late VEND SUCCESS / FAILURE / SESSION COMPLETE after a reader restart is answered in every state; a stray
   SESSION COMPLETE never leaves the machine hanging.
 - Settings that change the flow (direct vend, force session end, cancel mode, session mode) never change the

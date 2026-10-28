@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.7 / 2.8.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.8 / 2.8.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,16 +133,28 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.7 / mqtt-lib&nbsp;2.8.0.
+    hardware-lib&nbsp;8.2.8 / mqtt-lib&nbsp;2.8.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.7 / mqtt-lib 2.8.0 &mdash; 27 October 2026</span>What changed in 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.8 / mqtt-lib 2.8.0 &mdash; 28 October 2026</span>What changed in 8.2.8, 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>8.2.8 &mdash; a cancelled, failed or ended vend can never leave an approval behind</h3>
+    <p>Field case B11 (D-0838, D-0178): the payment approved a moment after the machine's VEND CANCEL, <code>approveVend()</code>
+    passed its only check (a request had arrived) and armed VEND APPROVED for a dead vend; the POLL that sent VEND DENIED cleared
+    the request flag but not the approval; the next VEND REQUEST of the same session was approved with nobody paying. Rule now:
+    once the machine or the app ends a vend nothing of it stays armed, once the session is ended no flag remains.
+    <code class="cmd">approveVend()</code> returns <strong>false</strong> while a cancel reply or a session end is armed
+    (log <code>approveVend IGNORED - a cancel reply is already armed ...</code>); the cancel-reply POLL, VEND FAILURE, SESSION
+    COMPLETE and END SESSION wipe the approve flag; a new VEND REQUEST never inherits one. Treat <code>false</code> as "the machine
+    gave up": void / reverse. <code class="cmd">vendStats</code> <code>approveAfterCancel</code>. No API change. Verified with the
+    RN team's JVM bus-trace harness (<code>hardware-lib/bus-trace/</code>): 8 scenarios, 4 failed on 8.2.7, all pass on 8.2.8,
+    plus 3 more; normal and multi-vend sales unchanged.</p>
 
     <h3>8.2.7 &mdash; cancel grace</h3>
     <p>With 8.2.6 the callbacks were ordered, but the stuck screen survived: <code>onVendRequest</code> returned at once and
@@ -357,6 +369,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.8</strong><br>mqtt-lib 2.8.0<br>demo APK build 110</td><td>28 Oct 2026</td><td>A cancelled / failed / ended vend can never leave an approval behind (field case B11): <code>approveVend()</code> false while a cancel reply or session end is armed; cancel-reply POLL, VEND FAILURE, SESSION COMPLETE, END SESSION wipe the approve flag; a new request never inherits one; <code>vendStats</code> <code>approveAfterCancel</code>. JVM bus-trace harness in the source tree. react-native-mdb 1.3.7.</td><td>None. Void / reverse when approveVend() returns false (already the rule).</td></tr>
         <tr><td><strong>hardware-lib 8.2.7</strong><br>mqtt-lib 2.8.0<br>demo APK build 109</td><td>27 Oct 2026</td><td>Cancel grace (default ON): a vend failure within 200 ms of its request is delivered 350 ms later so the app's UI has drawn the request first; <code>setCancelGrace:WINDOW,DELAY|on|off</code>, SETTINGS_JSON <code>cancelGraceWindowMs</code>/<code>cancelGraceDelayMs</code>, <code>vendStats</code> <code>failureDelayed</code>. react-native-mdb 1.3.6.</td><td>None. Still clear the screen from onVendFailure.</td></tr>
         <tr><td><strong>hardware-lib 8.2.6</strong><br>mqtt-lib 2.8.0<br>demo APK build 108</td><td>27 Oct 2026</td><td>Ordered vend callbacks (one thread: <code>onVendRequest</code> completes before its outcome; field case of a payment screen left open after a fast cancel). <code>onVendFailure(reason)</code> overload with the reason captured at close time; interface methods are Java default methods. react-native-mdb 1.3.5.</td><td>Override <code>onVendFailure(reason)</code>; keep gateway work off the callback thread (a blocking handler now delays the outcome).</td></tr>
         <tr><td><strong>hardware-lib 8.2.5</strong><br>mqtt-lib 2.8.0<br>demo APK build 107</td><td>25 Oct 2026</td><td>Every cancel reaches <code>onVendFailure</code> with a reason: CANCELLED_BY_VMC, CANCELLED_BY_APP (delivered again), new CANCELLED_BY_OPERATOR for dashboard / remote cancels; <code>vendStats</code> <code>operatorCancels</code>; <code>[remote]</code> replies no longer muted by the Logs switch. CANCEL-FLOW-README.md.</td><td>Branch on the reason: CANCELLED_BY_APP = UI reset only, CANCELLED_BY_OPERATOR = void / reverse. Java switch: add the case.</td></tr>
@@ -574,7 +587,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.8.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-8.2.7.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-8.2.8.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -756,8 +769,10 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
 
     <h3><code>HardwareLib.approveVend(): Boolean</code></h3>
     <p>Arms VEND APPROVED. Returns <code class="cmd">false</code> (and does nothing) if no VEND
-    REQUEST is actually pending — an early or stale approval can never charge the next
-    customer's selection. One call per vend; the response goes out on the next POLL.
+    REQUEST is actually pending, or (8.2.8) while a cancel reply or a session end is already armed — the vend is
+    over, void / reverse. An early or stale approval can never charge the next customer's selection: the
+    cancel-reply POLL, VEND FAILURE, SESSION COMPLETE and END SESSION wipe the approve flag and a new request never
+    inherits one. One call per vend; the response goes out on the next POLL.
     <em>Dashboard: <code class="cmd">vendApprove</code>.</em></p>
 
     <h3><code>HardwareLib.cancelVend(): Boolean</code></h3>
@@ -1303,6 +1318,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.7 · mqtt-lib 2.8.0 · demo app v2.22.0 (build 109). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.8 · mqtt-lib 2.8.0 · demo app v2.23.0 (build 110). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

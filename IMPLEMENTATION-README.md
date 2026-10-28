@@ -1,6 +1,6 @@
 # Implementation guide - putting hardware-lib into the Android app
 
-hardware-lib 8.2.7 + mqtt-lib 2.8.0, 27 October 2026. This is the one document to follow when wiring the libraries
+hardware-lib 8.2.8 + mqtt-lib 2.8.0, 28 October 2026. This is the one document to follow when wiring the libraries
 into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper:
 `API-REFERENCE.md` (every function), `AAR-HANDOFF-README.md` (what changed per release), `PULSE-README.md`,
 `DUPLICATE-LOGS-README.md`, `VENDLISTENER-README.md` (the listener in full, with the fixes and the counters), `SESSION-ENDED-README.md`, `CANCEL-FLOW-README.md` (machine / app / operator cancel side by side), `samples/`.
@@ -28,7 +28,7 @@ Copy the three AARs from `AAR-Update-latest.zip` into the app's `libs/`:
 
 ```gradle
 implementation files('libs/mqtt-lib-2.8.0.aar')
-implementation files('libs/hardware-lib-8.2.7.aar')
+implementation files('libs/hardware-lib-8.2.8.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
 ```
 
@@ -164,13 +164,15 @@ fun waitForReader(onReady: () -> Unit) {
 
 | call | when | returns false when | what the listener sees |
 |---|---|---|---|
-| `approveVend()` | after the gateway authorized | no VEND REQUEST is pending (machine cancelled or timed out first) | later `onVendSuccess`, or `onVendFailure` (FAILED / SESSION_ENDED / RESET) |
+| `approveVend()` | after the gateway authorized | no VEND REQUEST is pending (machine cancelled or timed out first), or (8.2.8) a cancel reply / session end is already armed - the vend is over | later `onVendSuccess`, or `onVendFailure` (FAILED / SESSION_ENDED / RESET) |
 | `cancelVend()` | gateway declined, or you want to abort the session | no session live | `onVendFailure` with CANCELLED_BY_APP if a vend was open (8.2.5); the deny goes out on the next POLL |
 | `cancelVend(VEND_DENIED)` / `cancelVend(SESSION_CANCEL_REQUEST)` | same, choosing the wire reply this once | same | nothing |
 | `beginSession()` | manual session mode only, the "card tap" | not in ENABLED | - |
 
 Always log the Boolean. `approveVend()` returning false means the money must be voided, because the machine will
-never dispense.
+never dispense. Since 8.2.8 that includes the payment that finished a moment after the machine's VEND CANCEL: the
+library refuses it (`approveVend IGNORED - a cancel reply is already armed`) instead of letting it approve the next
+request of the same session (field case B11).
 
 ## 7. Settings per machine
 
@@ -312,6 +314,7 @@ From the dashboard passthrough bar after deploy:
 |---|---|---|
 | `rx=13 00 ... tx=UNHANDLED` | machine sends VEND REQUEST without a session, direct vend off | `setDirectVend:on` |
 | health check waits forever for ENABLED | app registered its listener after the event, old library | 8.2.1+ replays and heartbeats; see section 5 |
+| `approveVend IGNORED - a cancel reply is already armed` / `SESSION COMPLETE already received` (8.2.8) | the payment finished after the machine or the app cancelled the vend | void the hold / reverse; nothing to fix in the library |
 | `approveVend IGNORED - no VEND REQUEST pending` | the machine cancelled or timed out before the gateway answered | void the hold; speed up the gateway or raise the machine's timeout |
 | `cancelVend IGNORED - no session live` | nothing to cancel | nothing |
 | onVendFailure after your own cancel shows an error screen | the handler treats CANCELLED_BY_APP like a machine cancel | branch on the reason: CANCELLED_BY_APP = UI reset only (8.2.5) |
@@ -331,7 +334,7 @@ Every rule above holds unchanged; the bridge registers its listeners once. Manua
 
 ## 14. Before the field
 
-- [ ] AARs 8.2.7 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
+- [ ] AARs 8.2.8 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
 - [ ] `HardwareLib.init(applicationContext)` at boot, in every mode
 - [ ] one `attachRabbahMqtt()`, no custom bridge, listeners registered once
 - [ ] `onVendFailure` reverses on FAILED, SESSION_ENDED and RESET when approved, voids on CANCELLED_BY_VMC / CANCELLED_BY_OPERATOR, only resets the UI on CANCELLED_BY_APP

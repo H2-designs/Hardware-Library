@@ -1,6 +1,6 @@
 # Vend cancel - who can cancel, what the app hears, what goes on the bus
 
-hardware-lib 8.2.7, 27 October 2026. The complete reference for every way a vend or a session can be cancelled, from
+hardware-lib 8.2.8, 28 October 2026. The complete reference for every way a vend or a session can be cancelled, from
 the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This
 replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: `VENDLISTENER-README.md` (the handler),
 `SESSION-ENDED-README.md`, `API-REFERENCE.md`.
@@ -102,6 +102,16 @@ A failure that arrives within 200 ms of its `onVendRequest` is delivered 350 ms 
 posts its screen to the UI thread has drawn it before the failure clears it. Order is kept (a new request flushes a
 held failure first), the bus replies are not delayed, all reasons are covered. `setCancelGrace:WINDOW,DELAY`,
 `setCancelGrace:off`; `vendStats` `failureDelayed`.
+
+## 3b. The late approval (8.2.8)
+
+The payment that finishes a moment after the cancel is the dangerous one. Before 8.2.8 `approveVend()` only checked
+that a request had arrived, so it armed VEND APPROVED for the cancelled vend; the cancel-reply POLL cleared the request
+but not the approval, and the next VEND REQUEST of the same session (Jofemar / Vision, a VMC that ignores SESSION
+CANCEL REQUEST) was approved with nobody paying. Now `approveVend()` returns **false** while a cancel reply or a session
+end is armed, every machine-side end of a vend (VEND CANCEL, READER CANCEL, VEND FAILURE, SESSION COMPLETE, END SESSION)
+and the cancel-reply POLL wipe the approve flag, and a new request never inherits one. The handler rule stays: when
+`approveVend()` returns false, void the hold or reverse the capture. `vendStats` `approveAfterCancel` counts it.
 
 ## 4. Counters
 

@@ -23,7 +23,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 | `init(context): Boolean` | Loads persisted settings and payloads, re-drives pulse polarity and the ready gate, registers the remote-command listener if mqtt-lib is initialised. Idempotent. |
 | `start(): Boolean` | Opens the CM30 MDB port and starts the bus loop. State resets to INACTIVE and is announced at once. Remote: `open`. |
 | `stop(): Boolean` | Closes the port, resets to INACTIVE, closes any open vend with reason RESET. Remote: `close`. |
-| `VERSION` | `"8.2.7"`. Remote `version` reports it together with mqtt-lib. |
+| `VERSION` | `"8.2.8"`. Remote `version` reports it together with mqtt-lib. |
 
 ### The payment hook - `vendListener`
 
@@ -62,6 +62,7 @@ Since app start, never persisted, like the mqtt-lib link counters. Remote `vendS
 | `vendFailuresByReason` | `{"CANCELLED_BY_VMC":n,"CANCELLED_BY_APP":n,"CANCELLED_BY_OPERATOR":n,"FAILED":n,"SESSION_ENDED":n,"RESET":n}` |
 | `appCancels` / `operatorCancels` | the app's `cancelVend()` / a dashboard or remote `cancelVend` that closed an open vend (each delivered as onVendFailure since 8.2.5) |
 | `approveIgnored` | `approveVend()` with no request pending (machine cancelled / timed out first) |
+| `approveAfterCancel` | 8.2.8: `approveVend()` refused because a cancel reply or a session end was already armed - the payment finished after the vend died |
 | `callbackStuck` | **the stuck-listener counter**: a callback still running after 3 s; `lastStuckCallback` names it, `lastStuckAgoSec` when |
 | `callbackThrew` / `noListener` | a callback threw / an event had nobody registered |
 | `sessionCancelRetries` / `sessionCancelGaveUp` (8.2.3) | SESSION CANCEL REQUEST re-sent because the machine did not answer it / still no SESSION COMPLETE after the third retry |
@@ -77,7 +78,7 @@ Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `ve
 | function | what it does | remote |
 |---|---|---|
 | `beginSession(): Boolean` | Arms BEGIN SESSION for the next POLL - the "card tap" in manual session mode. In auto mode never needed. | `beginSession` |
-| `approveVend(): Boolean` | Arms VEND APPROVED at the requested price. `false` when no VEND REQUEST is pending (a late approval can never charge the next customer). | `vendApprove` |
+| `approveVend(): Boolean` | Arms VEND APPROVED at the requested price. `false` when no VEND REQUEST is pending, and (8.2.8) while a cancel reply or a session end is already armed - the vend is over, void / reverse. A late approval can never charge the next customer: the cancel-reply POLL, VEND FAILURE, SESSION COMPLETE and END SESSION wipe the approve flag and a new request never inherits one. | `vendApprove` |
 | `cancelVend(): Boolean` | Cancels the live session on the next POLL with the standing cancel mode. Works before or after a request. `false` when no session is live. An open vend is closed and `onVendFailure` fires with CANCELLED_BY_APP (8.2.5); from the dashboard / a remote command the reason is CANCELLED_BY_OPERATOR. | `cancelVend` |
 | `cancelVend(response): Boolean` | Same, sending exactly `SESSION_CANCEL_REQUEST` or `VEND_DENIED` this once. | `cancelVend:sessionCancel` / `:vendDenied` |
 
