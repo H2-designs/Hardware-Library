@@ -35,7 +35,7 @@ release history. Current release: **v8.2.11** (hardware-lib 8.2.11, mqtt-lib 2.8
 | mqtt-lib | 2.8.0 |
 | CM30-HardwareLibrary (vendor) | 1.0.9 |
 | demo APK MDB-Slave-2 | v2.26.0 build 113 (on hardware-lib 8.2.11) |
-| Hardware Dashboard | v8.2.4 (Cancel Retry, Skip 00 00 Vend toggles): `Hardware-Dashboard-win32-x64-v8.2.4.zip` on the release |
+| Hardware Dashboard | v8.2.11 (Event gap field; Cancel Retry, Skip 00 00 Vend toggles): `Hardware-Dashboard-win32-x64-v8.2.11.zip` on the release |
 | react-native-mdb | 1.4.0 |
 
 A device on the right build answers `version` on the dashboard passthrough bar with
