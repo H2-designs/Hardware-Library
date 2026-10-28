@@ -58,7 +58,7 @@
 </style>
 <main>
 <h1>SESSION_ENDED - the vend the machine never finished</h1>
-<p>hardware-lib 8.2.11, 28 October 2026. One failure reason explained on its own, because it is the one that costs money when the app gets it wrong. Companion files: <code>VENDLISTENER-README.md</code> (the full handler), <code>IMPLEMENTATION-README.md</code>.</p>
+<p>hardware-lib 8.2.12, 28 October 2026. One failure reason explained on its own, because it is the one that costs money when the app gets it wrong. Companion files: <code>VENDLISTENER-README.md</code> (the full handler), <code>IMPLEMENTATION-README.md</code>.</p>
 <h2>1. The scenario</h2>
 <p>The customer picks an item. The machine sends VEND REQUEST. The app authorizes the card and approves, or is still at the gateway. Then the machine closes the session without ever saying how the vend ended: no VEND SUCCESS, no VEND FAILURE, no VEND CANCEL. It just sends SESSION COMPLETE.</p>
 <p>Machines do this when the customer walks away, when their own selection timer runs out, or when the dispense fails in a way their firmware does not report. From the bus it looks like a normal session close. From the app it looks like a vend that never got an answer.</p>

@@ -1,6 +1,6 @@
 # Implementation guide - putting hardware-lib into the Android app
 
-hardware-lib 8.2.11 + mqtt-lib 2.8.0, 28 October 2026. This is the one document to follow when wiring the libraries
+hardware-lib 8.2.12 + mqtt-lib 2.8.0, 28 October 2026. This is the one document to follow when wiring the libraries
 into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper:
 `API-REFERENCE.md` (every function), `AAR-HANDOFF-README.md` (what changed per release), `PULSE-README.md`,
 `DUPLICATE-LOGS-README.md`, `VENDLISTENER-README.md` (the listener in full, with the fixes and the counters), `SESSION-ENDED-README.md`, `CANCEL-FLOW-README.md` (machine / app / operator cancel side by side), `samples/`.
@@ -28,7 +28,7 @@ Copy the three AARs from `AAR-Update-latest.zip` into the app's `libs/`:
 
 ```gradle
 implementation files('libs/mqtt-lib-2.8.0.aar')
-implementation files('libs/hardware-lib-8.2.11.aar')
+implementation files('libs/hardware-lib-8.2.12.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
 ```
 
@@ -167,7 +167,7 @@ fun waitForReader(onReady: () -> Unit) {
 | `approveVend()` | after the gateway authorized | no VEND REQUEST is pending (machine cancelled or timed out first), or (8.2.8) a cancel reply / session end is already armed - the vend is over | later `onVendSuccess`, or `onVendFailure` (FAILED / SESSION_ENDED / RESET) |
 | `cancelVend()` | gateway declined, or you want to abort the session | no session live | `onVendFailure` with CANCELLED_BY_APP if a vend was open (8.2.5); the deny goes out on the next POLL |
 | `cancelVend(VEND_DENIED)` / `cancelVend(SESSION_CANCEL_REQUEST)` | same, choosing the wire reply this once | same | nothing |
-| `beginSession()` | manual session mode only, the "card tap" | not in ENABLED | - |
+| `beginSession()` | manual session mode only, the "card tap" | not in ENABLED (8.2.12: logged `beginSession IGNORED - the reader is not enabled`; retry once the state is ENABLED) | - |
 
 Always log the Boolean. `approveVend()` returning false means the money must be voided, because the machine will
 never dispense. Since 8.2.8 that includes the payment that finished a moment after the machine's VEND CANCEL: the
@@ -335,7 +335,7 @@ Every rule above holds unchanged; the bridge registers its listeners once. Manua
 
 ## 14. Before the field
 
-- [ ] AARs 8.2.11 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
+- [ ] AARs 8.2.12 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
 - [ ] `HardwareLib.init(applicationContext)` at boot, in every mode
 - [ ] one `attachRabbahMqtt()`, no custom bridge, listeners registered once
 - [ ] `onVendFailure` reverses on FAILED, SESSION_ENDED and RESET when approved, voids on CANCELLED_BY_VMC / CANCELLED_BY_OPERATOR, only resets the UI on CANCELLED_BY_APP

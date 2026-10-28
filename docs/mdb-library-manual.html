@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.11 / 2.8.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.12 / 2.8.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,18 +133,29 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.11 / mqtt-lib&nbsp;2.8.0.
+    hardware-lib&nbsp;8.2.12 / mqtt-lib&nbsp;2.8.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.11 / mqtt-lib 2.8.0 &mdash; 28 October 2026</span>What changed in 8.2.11, 8.2.10, 8.2.9, 8.2.8, 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.12 / mqtt-lib 2.8.0 &mdash; 28 October 2026</span>What changed in 8.2.12, 8.2.11, 8.2.10, 8.2.9, 8.2.8, 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
 
-    <h3>8.2.11 &mdash; vend event gap: a configurable minimum time between two callbacks</h3>
+    <h3>8.2.12 &mdash; the eight fixes of the code review</h3>
+    <p>No API change. (1) VEND SUCCESS fires <code class="cmd">onVendSuccess</code> only for a vend still open; after a VEND CANCEL /
+    VEND FAILURE it is ACKed and logged (<code>vendStats</code> <code>successIgnored</code>), and it clears the approve flag, the
+    request flag and the price, so a late <code class="cmd">approveVend()</code> can no longer send VEND APPROVED after the sale.
+    (2) A success flushes a held cancel-grace failure first. (3) The grace hand-over runs under one lock. (4) The vend is closed
+    with one compare-and-set: the app's <code class="cmd">cancelVend()</code> and the machine's VEND CANCEL in the same instant
+    fire <code class="cmd">onVendFailure</code> once. (5) <code class="cmd">stop()</code> then <code class="cmd">start()</code> back to
+    back leaves exactly one bus loop. (6) RS232 closes a superseded vend with CANCELLED_BY_VMC, like MDB. (7)
+    <code class="cmd">beginSession()</code> is refused until the reader is ENABLED. (8) READER DISABLE mid-session clears the
+    request flag and the price. 24 JVM bus-trace scenarios pass.</p>
+
+    <h3>8.2.11 &mdash; vend event gap: a configurable minimum time between two callbacks (never released, inside 8.2.12)</h3>
     <p>Two <code class="cmd">VendListener</code> callbacks never reach the app closer together than the gap: a callback that would
     follow the previous one sooner waits for the remainder on the single callback thread (order kept, bus replies never
     delayed), so the app's screen always has the gap to draw one event before the next. <strong>Default ON, 500 ms</strong>;
@@ -331,7 +342,7 @@
     CANCELLED_BY_VMC). On match the three callbacks of <code>HardwareLib.vendListener</code> fire with the same
     guarantee as MDB: exactly one <code>onVendSuccess</code> / <code>onVendFailure</code> per
     <code>onVendRequest</code>. The price arrives as minor units (<code>amount</code> = minorUnits / 100.0),
-    <code>itemNumber</code> is -1. A new request while one is open closes the first with SESSION_ENDED. Rules
+    <code>itemNumber</code> is -1. A new request while one is open closes the first with CANCELLED_BY_VMC (SESSION_ENDED before 8.2.12). Rules
     without <code>event</code> behave as before; <code>vendRequestListener</code> still fires too. The app
     still answers the machine with <code>Rs232Lib.sendHex</code> / <code>sendXorFrame</code>.</p>
     <pre class="code">{"setRs232Rules":[
@@ -397,7 +408,8 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
-        <tr><td><strong>hardware-lib 8.2.11</strong><br>mqtt-lib 2.8.0<br>dashboard 8.2.11<br>demo APK build 113</td><td>28 Oct 2026</td><td>Vend event gap (default ON 500 ms): a configurable minimum time between two VendListener callbacks; dashboard Event gap field / <code>setVendEventGap:MS|on|off</code>, Kotlin <code>setVendEventGap</code>, RN <code>Mdb.setVendEventGap</code>; SETTINGS_JSON <code>vendEventGapMs</code>; <code>vendStats</code> <code>eventsSpaced</code>. react-native-mdb 1.4.0 (+ setCancelGrace / getCancelGrace).</td><td>None.</td></tr>
+        <tr><td><strong>hardware-lib 8.2.12</strong><br>mqtt-lib 2.8.0<br>dashboard 8.2.11<br>demo APK build 114</td><td>28 Oct 2026</td><td>Eight review fixes: stray VEND SUCCESS ignored (<code>successIgnored</code>), VEND SUCCESS / READER DISABLE wipe the vend flags, <code>beginSession()</code> only when ENABLED, one <code>onVendFailure</code> on a simultaneous app + machine cancel, one bus loop after stop()/start(), atomic cancel-grace hand-over, RS232 superseded vend = CANCELLED_BY_VMC. react-native-mdb 1.4.1.</td><td>None. beginSession() may now return false before READER ENABLE.</td></tr>
+        <tr><td><strong>hardware-lib 8.2.11</strong> (never released)<br>mqtt-lib 2.8.0<br>dashboard 8.2.11<br>demo APK build 113</td><td>28 Oct 2026</td><td>Vend event gap (default ON 500 ms): a configurable minimum time between two VendListener callbacks; dashboard Event gap field / <code>setVendEventGap:MS|on|off</code>, Kotlin <code>setVendEventGap</code>, RN <code>Mdb.setVendEventGap</code>; SETTINGS_JSON <code>vendEventGapMs</code>; <code>vendStats</code> <code>eventsSpaced</code>. react-native-mdb 1.4.0 (+ setCancelGrace / getCancelGrace).</td><td>None.</td></tr>
         <tr><td><strong>hardware-lib 8.2.10</strong> (never released)<br>mqtt-lib 2.8.0<br>demo APK build 112</td><td>28 Oct 2026</td><td>Cancel grace delay 500 ms (was 350); a stored 350 migrated once. react-native-mdb 1.3.9.</td><td>None.</td></tr>
         <tr><td><strong>hardware-lib 8.2.9</strong> (never released)<br>mqtt-lib 2.8.0<br>demo APK build 111</td><td>28 Oct 2026</td><td>A new VEND REQUEST clears every flag of the previous vend (stale approval, armed cancel reply, armed END SESSION, open vend closed first with <code>onVendFailure(CANCELLED_BY_VMC)</code>); <code>vendStats</code> <code>requestSupersededFlags</code>; 15 JVM bus-trace scenarios. react-native-mdb 1.3.8.</td><td>None.</td></tr>
         <tr><td><strong>hardware-lib 8.2.8</strong> (never released)<br>mqtt-lib 2.8.0<br>demo APK build 110</td><td>28 Oct 2026</td><td>A cancelled / failed / ended vend can never leave an approval behind (field case B11): <code>approveVend()</code> false while a cancel reply or session end is armed; cancel-reply POLL, VEND FAILURE, SESSION COMPLETE, END SESSION wipe the approve flag; a new request never inherits one; <code>vendStats</code> <code>approveAfterCancel</code>. JVM bus-trace harness in the source tree. react-native-mdb 1.3.7.</td><td>None. Void / reverse when approveVend() returns false (already the rule).</td></tr>
@@ -618,7 +630,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.8.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-8.2.11.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-8.2.12.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -1349,6 +1361,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.11 · mqtt-lib 2.8.0 · demo app v2.26.0 (build 113). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.12 · mqtt-lib 2.8.0 · demo app v2.27.0 (build 114). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

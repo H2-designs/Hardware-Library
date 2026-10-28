@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.11
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.12
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.11.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.12.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.11.aar')
+   implementation files('libs/hardware-lib-8.2.12.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -28,7 +28,21 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
 
-### 8.2.11 - vend event gap: a configurable minimum time between two VendListener callbacks (28 October 2026)
+### 8.2.12 - the eight fixes of the 28 October code review (28 October 2026)
+
+No API change. (1) VEND SUCCESS fires `onVendSuccess` only for a vend still open - after a VEND CANCEL / VEND FAILURE it
+is ACKed and logged (`VEND SUCCESS with no vend open ... onVendSuccess NOT fired`, `vendStats` `successIgnored`), and
+it clears the approve flag, the request flag and the price, so a late `approveVend()` can no longer send VEND APPROVED
+after the sale. (2) A success flushes a held cancel-grace failure first. (3) The cancel-grace hand-over runs under one
+lock, so a VEND REQUEST at the exact expiry cannot overtake the old failure. (4) The vend is closed with one
+compare-and-set: the app's `cancelVend()` and the machine's VEND CANCEL in the same instant fire `onVendFailure` once.
+(5) `stop()` then `start()` back to back leaves exactly one bus loop (loop generation + a 1.5 s wait for the old
+loop). (6) RS232 closes a superseded vend with CANCELLED_BY_VMC, like MDB. (7) `beginSession()` is refused until the
+reader is ENABLED (`beginSession IGNORED - the reader is not enabled`) - a tap before READER ENABLE used to open a
+session minutes later. (8) READER DISABLE mid-session clears the request flag and the price. 24 JVM bus-trace
+scenarios pass.
+
+### 8.2.11 - vend event gap: a configurable minimum time between two VendListener callbacks (28 October 2026, never released - shipped inside 8.2.12)
 
 User request: "add the delay between events and I can configure it from the dashboard or from Android". Two
 `VendListener` callbacks never reach the app closer together than the gap: a callback that would follow the previous
@@ -405,7 +419,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.26.0 build 113** bundles hardware-lib 8.2.11 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.27.0 build 114** bundles hardware-lib 8.2.12 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.
