@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.9
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.10
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.9.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.10.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.9.aar')
+   implementation files('libs/hardware-lib-8.2.10.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -28,7 +28,14 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
 
-### 8.2.9 - a new VEND REQUEST clears every flag of the previous vend (28 October 2026)
+### 8.2.10 - cancel grace delay 500 ms (28 October 2026)
+
+The held `onVendFailure` of the 8.2.7 cancel grace is now delivered **500 ms** after a failure that came within 200 ms of
+its request (was 350 ms). `setCancelGrace:on` = 200,500. A device that stored the old 350 ms default moves to 500 ms
+once on first start (`cancelGraceDefaultsV` = 2); any other stored value is kept. Nothing else changes; the log line
+reads `... delivered 500 ms later (cancel grace)`. No API change.
+
+### 8.2.9 - a new VEND REQUEST clears every flag of the previous vend (28 October 2026, never released - shipped inside 8.2.10)
 
 Extends 8.2.8 (below, never released). Before, a new VEND REQUEST only dropped a stale approval; a cancel reply still
 armed (VEND DENIED / SESSION CANCEL REQUEST not yet sent) **answered the new vend with the deny**, an END SESSION armed by
@@ -51,12 +58,12 @@ approve flag; a new VEND REQUEST never inherits one. Treat `false` as "the machi
 change. Verified with the team's JVM bus-trace harness (`source/MdbSlaveApp/hardware-lib/bus-trace/`): 8 scenarios, 4
 failed on 8.2.7, all pass on 8.2.8, plus 3 more in `bus-trace/extra/`; normal and multi-vend sales unchanged.
 
-### 8.2.7 - cancel grace: a failure right after the request is delivered 350 ms later (27 October 2026)
+### 8.2.7 - cancel grace: a failure right after the request is delivered 350 ms later (27 October 2026; 500 ms since 8.2.10)
 
 Field case, continued from 8.2.6: with ordered callbacks the stuck screen still appeared. `onVendRequest` returns at
 once and posts the screen to the UI thread; VEND CANCEL came 57 ms later, `onVendFailure` reset a screen that was not
 drawn yet, then the UI drew "tap your card" and nothing cleared it. Now: if a vend fails within **200 ms** of its
-`onVendRequest`, the `onVendFailure` delivery is held back **350 ms** (a new VEND REQUEST flushes it first, so order
+`onVendRequest`, the `onVendFailure` delivery is held back **350 ms** (500 ms since 8.2.10; a new VEND REQUEST flushes it first, so order
 is kept; the bus replies are not delayed). Defaults ON. Setting: `setCancelGrace:WINDOW,DELAY` (ms, 0..5000),
 `setCancelGrace:off`, `setCancelGrace:on`; Kotlin `setCancelGrace(windowMs, delayMs)`; SETTINGS_JSON
 `cancelGraceWindowMs` / `cancelGraceDelayMs`; backend keys `mdb_cancel_grace_window_ms` /
@@ -384,7 +391,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.24.0 build 111** bundles hardware-lib 8.2.9 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.25.0 build 112** bundles hardware-lib 8.2.10 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

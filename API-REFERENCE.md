@@ -23,7 +23,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 | `init(context): Boolean` | Loads persisted settings and payloads, re-drives pulse polarity and the ready gate, registers the remote-command listener if mqtt-lib is initialised. Idempotent. |
 | `start(): Boolean` | Opens the CM30 MDB port and starts the bus loop. State resets to INACTIVE and is announced at once. Remote: `open`. |
 | `stop(): Boolean` | Closes the port, resets to INACTIVE, closes any open vend with reason RESET. Remote: `close`. |
-| `VERSION` | `"8.2.9"`. Remote `version` reports it together with mqtt-lib. |
+| `VERSION` | `"8.2.10"`. Remote `version` reports it together with mqtt-lib. |
 
 ### The payment hook - `vendListener`
 
@@ -102,7 +102,7 @@ Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `ve
 | `setCancelMode(CancelResponse)` | what plain `cancelVend()` sends and how the machine's own VEND CANCEL is answered: `SESSION_CANCEL_REQUEST` or `VEND_DENIED`. | `setCancelMode:sessionCancel|vendDenied` | `vmcCancelMode` |
 | `setDirectVend(Boolean)` / `isDirectVend` | ON: a VEND REQUEST is accepted in INACTIVE / DISABLED / ENABLED (machines that skip the handshake); the state listener reports ENABLED_STATE while the bus is INACTIVE/DISABLED. | `setDirectVend:on|off` | `directVend` |
 | `setSessionCancelRetry(ms)` / `setSessionCancelRetry(ms, maxRetries)` / `isSessionCancelRetry` / `sessionCancelRetryWaitMs` / `sessionCancelRetryCount` | 8.2.3/8.2.5: re-send an unanswered SESSION CANCEL REQUEST after `ms` (0 = off, 300..10000), up to `maxRetries` times (1..10, default 3); stops on SESSION COMPLETE, END SESSION, RESET, a new VEND REQUEST. | `setSessionCancelRetry:on|off|MS[,COUNT]` | `sessionCancelRetryMs`, `sessionCancelRetryCount` |
-| `setCancelGrace(windowMs, delayMs)` / `cancelGraceWindow` / `cancelGraceDelay` | 8.2.7: a vend failure within `windowMs` of its onVendRequest has its onVendFailure delivered `delayMs` later, so the app's UI has drawn the request first. Defaults ON 200 / 350; 0 = off; each 0..5000. | `setCancelGrace:on|off|WINDOW,DELAY` | `cancelGraceWindowMs`, `cancelGraceDelayMs` |
+| `setCancelGrace(windowMs, delayMs)` / `cancelGraceWindow` / `cancelGraceDelay` | 8.2.7: a vend failure within `windowMs` of its onVendRequest has its onVendFailure delivered `delayMs` later, so the app's UI has drawn the request first. Defaults ON 200 / 500 (8.2.10; 350 before); 0 = off; each 0..5000. | `setCancelGrace:on|off|WINDOW,DELAY` | `cancelGraceWindowMs`, `cancelGraceDelayMs` |
 | `setSkipZeroVend(Boolean)` / `isSkipZeroVend` | 8.2.4: a VEND REQUEST priced 00 00 is ACKed and dropped (no onVendRequest). | `setSkipZeroVend:on|off` | `skipZeroVend` |
 | `setForceSessionEnd(Boolean)` / `isForceSessionEnd` | ON: after every VEND SUCCESS the reader sends SESSION CANCEL REQUEST on the next POLL, for machines that never send SESSION COMPLETE. Failed vends keep the spec flow. | `setForceSessionEnd:on|off` | `forceSessionEndAfterVend` |
 | `setSessionCancelRetry(ms: Int)` / `setSessionCancelRetry(Boolean)` / `isSessionCancelRetry` / `sessionCancelRetryWaitMs` (8.2.3) | ON: when the machine does not answer any SESSION CANCEL REQUEST the reader sent (VEND CANCEL / READER CANCEL reply, `cancelVend()`, Force End) with SESSION COMPLETE within `ms`, it is sent again on the next POLL, up to 3 times, then a WARNING line. A new VEND REQUEST stops it. `true` = 1000 ms; 300-10000 ms; 0 / `false` = OFF (default). | `setSessionCancelRetry:on|off|MS` | `sessionCancelRetryMs` |

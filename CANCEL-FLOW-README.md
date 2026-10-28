@@ -1,6 +1,6 @@
 # Vend cancel - who can cancel, what the app hears, what goes on the bus
 
-hardware-lib 8.2.9, 28 October 2026. The complete reference for every way a vend or a session can be cancelled, from
+hardware-lib 8.2.10, 28 October 2026. The complete reference for every way a vend or a session can be cancelled, from
 the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This
 replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: `VENDLISTENER-README.md` (the handler),
 `SESSION-ENDED-README.md`, `API-REFERENCE.md`.
@@ -98,7 +98,7 @@ Java and React Native: same branches, the React Native event carries the reason 
 
 ## 3a. Cancel grace (8.2.7)
 
-A failure that arrives within 200 ms of its `onVendRequest` is delivered 350 ms later, so a request handler that
+A failure that arrives within 200 ms of its `onVendRequest` is delivered 500 ms later (350 ms before 8.2.10), so a request handler that
 posts its screen to the UI thread has drawn it before the failure clears it. Order is kept (a new request flushes a
 held failure first), the bus replies are not delayed, all reasons are covered. `setCancelGrace:WINDOW,DELAY`,
 `setCancelGrace:off`; `vendStats` `failureDelayed`.
