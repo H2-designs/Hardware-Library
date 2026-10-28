@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.8
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.9
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.8.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.9.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.8.aar')
+   implementation files('libs/hardware-lib-8.2.9.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -28,7 +28,17 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
 
-### 8.2.8 - a cancelled, failed or ended vend can never leave an approval behind (28 October 2026)
+### 8.2.9 - a new VEND REQUEST clears every flag of the previous vend (28 October 2026)
+
+Extends 8.2.8 (below, never released). Before, a new VEND REQUEST only dropped a stale approval; a cancel reply still
+armed (VEND DENIED / SESSION CANCEL REQUEST not yet sent) **answered the new vend with the deny**, an END SESSION armed by
+SESSION COMPLETE closed the session the machine had just used again, and a previous vend still open stayed open under
+the new one. Now every flag of the previous vend goes: approval, cancel reply, END SESSION, and an open vend is closed
+first with `onVendFailure(CANCELLED_BY_VMC)` before `onVendRequest` for the new one (order kept). Same on the
+direct-vend path. Each drop is a log line; `vendStats` `requestSupersededFlags`. No API change. 15 JVM bus-trace
+scenarios pass (team's 8 + 7 in `bus-trace/extra/`).
+
+### 8.2.8 - a cancelled, failed or ended vend can never leave an approval behind (28 October 2026, never released - shipped inside 8.2.9)
 
 Field case B11 (D-0838, D-0178, Rabbah RN team handoff): the payment approved a moment after the machine's VEND CANCEL,
 `approveVend()` passed its only check (a request had arrived) and armed VEND APPROVED for a vend that was already dead;
@@ -374,7 +384,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.23.0 build 110** bundles hardware-lib 8.2.8 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.24.0 build 111** bundles hardware-lib 8.2.9 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

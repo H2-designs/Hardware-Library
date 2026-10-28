@@ -1,6 +1,6 @@
 # Vend cancel - who can cancel, what the app hears, what goes on the bus
 
-hardware-lib 8.2.8, 28 October 2026. The complete reference for every way a vend or a session can be cancelled, from
+hardware-lib 8.2.9, 28 October 2026. The complete reference for every way a vend or a session can be cancelled, from
 the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This
 replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: `VENDLISTENER-README.md` (the handler),
 `SESSION-ENDED-README.md`, `API-REFERENCE.md`.
@@ -112,6 +112,13 @@ CANCEL REQUEST) was approved with nobody paying. Now `approveVend()` returns **f
 end is armed, every machine-side end of a vend (VEND CANCEL, READER CANCEL, VEND FAILURE, SESSION COMPLETE, END SESSION)
 and the cancel-reply POLL wipe the approve flag, and a new request never inherits one. The handler rule stays: when
 `approveVend()` returns false, void the hold or reverse the capture. `vendStats` `approveAfterCancel` counts it.
+
+## 3c. A new VEND REQUEST clears the old vend (8.2.9)
+
+Whatever the previous vend left armed dies when the machine asks again: a stale approval, a cancel reply that had
+not gone out yet (it would have denied the NEW vend), an END SESSION armed by SESSION COMPLETE (the machine kept the
+session), and the previous vend itself if it was still open (`onVendFailure(CANCELLED_BY_VMC)` first, then the new
+`onVendRequest`). `vendStats` `requestSupersededFlags` counts the drops.
 
 ## 4. Counters
 
