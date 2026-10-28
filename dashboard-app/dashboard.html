@@ -519,6 +519,10 @@
       <input type="checkbox" id="skipZeroToggle"><span class="slider"></span><span class="tlabel">Skip 00 00 Vend</span>
     </label>
     <span class="divider"></span>
+    <span class="label mode-mdb" title="Vend event gap (hardware-lib 8.2.11+, persisted): the minimum time between two VendListener callbacks reaching the app. A callback that would follow the previous one sooner waits for the remainder, in order, so the app's screen has time to draw one event before the next. Default 500 ms; 0 = off; max 5000. Press Enter or leave the field to send setVendEventGap:N. Synced from SETTINGS_JSON.">Event gap:</span>
+    <input id="eventGapInput" type="number" min="0" max="5000" step="50" value="500" style="width:4.5em" title="Minimum ms between two VendListener callbacks (0 = off, max 5000). Press Enter or leave the field to send setVendEventGap:N.">
+    <span class="label">ms</span>
+    <span class="divider"></span>
     <button id="configBtn">Config</button>
     </span>
 
@@ -1445,6 +1449,7 @@
     if (typeof data.forceSessionEndAfterVend === 'boolean') document.getElementById('forceEndToggle').checked = data.forceSessionEndAfterVend;
     if (typeof data.sessionCancelRetryMs === 'number') document.getElementById('cancelRetryToggle').checked = data.sessionCancelRetryMs > 0;
     if (typeof data.skipZeroVend === 'boolean') document.getElementById('skipZeroToggle').checked = data.skipZeroVend;
+    if (typeof data.vendEventGapMs === 'number') { document.getElementById('eventGapInput').value = String(data.vendEventGapMs); lastSentEventGap = data.vendEventGapMs; }
     if (typeof data.showPollTraffic === 'boolean') document.getElementById('pollVisibilityCheck').checked = data.showPollTraffic;
     if (typeof data.showUnhandledCmd === 'boolean') document.getElementById('unhandledVisibilityCheck').checked = data.showUnhandledCmd;
     // Checked = HIDE other peripherals, so it mirrors the inverse of the device flag.
@@ -1794,6 +1799,7 @@
   // Auto-begin cooldown (7.25.0). Sent on Enter or blur, never per keystroke.
   const cooldownInput = document.getElementById('cooldownInput');
   let lastSentCooldown = null;
+  let lastSentEventGap = null;
   const sendCooldown = () => {
     let n = parseInt(cooldownInput.value, 10);
     if (isNaN(n)) return;
@@ -1804,6 +1810,18 @@
     sendCommand('setAutoBeginCooldown:' + n, 'Set auto-begin cooldown: ' + n + ' polls');
   };
   cooldownInput.addEventListener('change', sendCooldown);
+  const eventGapInput = document.getElementById('eventGapInput');
+  const sendEventGap = () => {
+    let n = parseInt(eventGapInput.value, 10);
+    if (isNaN(n)) return;
+    n = Math.max(0, Math.min(5000, n));
+    eventGapInput.value = String(n);
+    if (n === lastSentEventGap) return;
+    lastSentEventGap = n;
+    sendCommand('setVendEventGap:' + n, n > 0 ? 'Set vend event gap: ' + n + ' ms between VendListener callbacks' : 'Vend event gap OFF (callbacks back to back)');
+  };
+  eventGapInput.addEventListener('change', sendEventGap);
+  eventGapInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendEventGap(); } });
   cooldownInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendCooldown(); } });
   document.getElementById('mdbLevelSelect').onchange = (e) => {
     const level = e.target.value; // '1' | '2' | '3'

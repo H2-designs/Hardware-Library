@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.10
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.11
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.10.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.11.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.10.aar')
+   implementation files('libs/hardware-lib-8.2.11.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -28,7 +28,21 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
 
-### 8.2.10 - cancel grace delay 500 ms (28 October 2026)
+### 8.2.11 - vend event gap: a configurable minimum time between two VendListener callbacks (28 October 2026)
+
+User request: "add the delay between events and I can configure it from the dashboard or from Android". Two
+`VendListener` callbacks never reach the app closer together than the gap: a callback that would follow the previous
+one sooner waits for the remainder on the single callback thread (order kept, bus replies never delayed), so the app's
+screen always has the gap to draw one event before the next. **Default ON, 500 ms**; 0 = off; max 5000; persisted.
+Dashboard: **Event gap** field next to Skip 00 00 Vend (Enter / leave the field), or `setVendEventGap:MS|on|off`.
+Kotlin: `HardwareLib.setVendEventGap(ms)` / `vendEventGap`. React Native: `Mdb.setVendEventGap(ms)` /
+`getVendEventGap()` (react-native-mdb 1.4.0, which also exposes `setCancelGrace` / `getCancelGrace`). SETTINGS_JSON
+`vendEventGapMs`; backend key `mdb_vend_event_gap_ms`. Log `[mdb] VendListener.onVendFailure waits 312 ms - vend event
+gap 500 ms since the previous callback`; `vendStats` `eventsSpaced`. Independent of the cancel grace (fixed delay on
+a failure right after its request); both default ON, the later of the two wins. A normal sale is unaffected. Dashboard
+packaged as v8.2.11. 18 JVM bus-trace scenarios pass (gap timing included).
+
+### 8.2.10 - cancel grace delay 500 ms (28 October 2026, never released - shipped inside 8.2.11)
 
 The held `onVendFailure` of the 8.2.7 cancel grace is now delivered **500 ms** after a failure that came within 200 ms of
 its request (was 350 ms). `setCancelGrace:on` = 200,500. A device that stored the old 350 ms default moves to 500 ms
@@ -391,7 +405,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.25.0 build 112** bundles hardware-lib 8.2.10 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.26.0 build 113** bundles hardware-lib 8.2.11 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.10 / 2.8.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.11 / 2.8.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,18 +133,31 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.10 / mqtt-lib&nbsp;2.8.0.
+    hardware-lib&nbsp;8.2.11 / mqtt-lib&nbsp;2.8.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.10 / mqtt-lib 2.8.0 &mdash; 28 October 2026</span>What changed in 8.2.10, 8.2.9, 8.2.8, 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.11 / mqtt-lib 2.8.0 &mdash; 28 October 2026</span>What changed in 8.2.11, 8.2.10, 8.2.9, 8.2.8, 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
 
-    <h3>8.2.10 &mdash; cancel grace delay 500 ms</h3>
+    <h3>8.2.11 &mdash; vend event gap: a configurable minimum time between two callbacks</h3>
+    <p>Two <code class="cmd">VendListener</code> callbacks never reach the app closer together than the gap: a callback that would
+    follow the previous one sooner waits for the remainder on the single callback thread (order kept, bus replies never
+    delayed), so the app's screen always has the gap to draw one event before the next. <strong>Default ON, 500 ms</strong>;
+    0 = off; max 5000; persisted. Dashboard: <strong>Event gap</strong> field next to Skip 00 00 Vend, or
+    <code class="cmd">setVendEventGap:MS|on|off</code>. Kotlin <code class="cmd">HardwareLib.setVendEventGap(ms)</code> /
+    <code class="cmd">vendEventGap</code>. React Native <code class="cmd">Mdb.setVendEventGap(ms)</code> /
+    <code class="cmd">getVendEventGap()</code> (react-native-mdb 1.4.0, also <code class="cmd">setCancelGrace</code> /
+    <code class="cmd">getCancelGrace</code>). SETTINGS_JSON <code>vendEventGapMs</code>; backend key
+    <code>mdb_vend_event_gap_ms</code>; log <code>[mdb] VendListener.onVendFailure waits 312 ms - vend event gap 500 ms since the
+    previous callback</code>; <code class="cmd">vendStats</code> <code>eventsSpaced</code>. Independent of the cancel grace; both
+    default ON, the later of the two wins. A normal sale is unaffected. Dashboard packaged as v8.2.11.</p>
+
+    <h3>8.2.10 &mdash; cancel grace delay 500 ms (never released, inside 8.2.11)</h3>
     <p>The held <code class="cmd">onVendFailure</code> of the 8.2.7 cancel grace is now delivered <strong>500 ms</strong> after a
     failure that came within 200 ms of its request (was 350 ms). <code class="cmd">setCancelGrace:on</code> = 200,500. A device
     that stored the old 350 ms default moves to 500 ms once on first start; any other stored value is kept. Log:
@@ -384,14 +397,15 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
-        <tr><td><strong>hardware-lib 8.2.10</strong><br>mqtt-lib 2.8.0<br>demo APK build 112</td><td>28 Oct 2026</td><td>Cancel grace delay 500 ms (was 350); a stored 350 migrated once. react-native-mdb 1.3.9.</td><td>None.</td></tr>
+        <tr><td><strong>hardware-lib 8.2.11</strong><br>mqtt-lib 2.8.0<br>dashboard 8.2.11<br>demo APK build 113</td><td>28 Oct 2026</td><td>Vend event gap (default ON 500 ms): a configurable minimum time between two VendListener callbacks; dashboard Event gap field / <code>setVendEventGap:MS|on|off</code>, Kotlin <code>setVendEventGap</code>, RN <code>Mdb.setVendEventGap</code>; SETTINGS_JSON <code>vendEventGapMs</code>; <code>vendStats</code> <code>eventsSpaced</code>. react-native-mdb 1.4.0 (+ setCancelGrace / getCancelGrace).</td><td>None.</td></tr>
+        <tr><td><strong>hardware-lib 8.2.10</strong> (never released)<br>mqtt-lib 2.8.0<br>demo APK build 112</td><td>28 Oct 2026</td><td>Cancel grace delay 500 ms (was 350); a stored 350 migrated once. react-native-mdb 1.3.9.</td><td>None.</td></tr>
         <tr><td><strong>hardware-lib 8.2.9</strong> (never released)<br>mqtt-lib 2.8.0<br>demo APK build 111</td><td>28 Oct 2026</td><td>A new VEND REQUEST clears every flag of the previous vend (stale approval, armed cancel reply, armed END SESSION, open vend closed first with <code>onVendFailure(CANCELLED_BY_VMC)</code>); <code>vendStats</code> <code>requestSupersededFlags</code>; 15 JVM bus-trace scenarios. react-native-mdb 1.3.8.</td><td>None.</td></tr>
         <tr><td><strong>hardware-lib 8.2.8</strong> (never released)<br>mqtt-lib 2.8.0<br>demo APK build 110</td><td>28 Oct 2026</td><td>A cancelled / failed / ended vend can never leave an approval behind (field case B11): <code>approveVend()</code> false while a cancel reply or session end is armed; cancel-reply POLL, VEND FAILURE, SESSION COMPLETE, END SESSION wipe the approve flag; a new request never inherits one; <code>vendStats</code> <code>approveAfterCancel</code>. JVM bus-trace harness in the source tree. react-native-mdb 1.3.7.</td><td>None. Void / reverse when approveVend() returns false (already the rule).</td></tr>
         <tr><td><strong>hardware-lib 8.2.7</strong><br>mqtt-lib 2.8.0<br>demo APK build 109</td><td>27 Oct 2026</td><td>Cancel grace (default ON): a vend failure within 200 ms of its request is delivered 350 ms later so the app's UI has drawn the request first; <code>setCancelGrace:WINDOW,DELAY|on|off</code>, SETTINGS_JSON <code>cancelGraceWindowMs</code>/<code>cancelGraceDelayMs</code>, <code>vendStats</code> <code>failureDelayed</code>. react-native-mdb 1.3.6.</td><td>None. Still clear the screen from onVendFailure.</td></tr>
         <tr><td><strong>hardware-lib 8.2.6</strong><br>mqtt-lib 2.8.0<br>demo APK build 108</td><td>27 Oct 2026</td><td>Ordered vend callbacks (one thread: <code>onVendRequest</code> completes before its outcome; field case of a payment screen left open after a fast cancel). <code>onVendFailure(reason)</code> overload with the reason captured at close time; interface methods are Java default methods. react-native-mdb 1.3.5.</td><td>Override <code>onVendFailure(reason)</code>; keep gateway work off the callback thread (a blocking handler now delays the outcome).</td></tr>
         <tr><td><strong>hardware-lib 8.2.5</strong><br>mqtt-lib 2.8.0<br>demo APK build 107</td><td>25 Oct 2026</td><td>Every cancel reaches <code>onVendFailure</code> with a reason: CANCELLED_BY_VMC, CANCELLED_BY_APP (delivered again), new CANCELLED_BY_OPERATOR for dashboard / remote cancels; <code>vendStats</code> <code>operatorCancels</code>; <code>[remote]</code> replies no longer muted by the Logs switch. CANCEL-FLOW-README.md.</td><td>Branch on the reason: CANCELLED_BY_APP = UI reset only, CANCELLED_BY_OPERATOR = void / reverse. Java switch: add the case.</td></tr>
         <tr><td><strong>hardware-lib 8.2.4</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.3</td><td>24 Oct 2026</td><td>Skip 00 00 vend requests: persisted switch <code>setSkipZeroVend:on|off</code>, dashboard <strong>Skip 00 00 Vend</strong> - a VEND REQUEST priced 00 00 is ACKed and dropped, the request with the real price works as usual; counted in <code>vendStats</code>. Demo APK not rebuilt.</td><td>None. Operators turn it on per machine.</td></tr>
-        <tr><td><strong>hardware-lib 8.2.3</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.2</td><td>24 Oct 2026</td><td>Session-cancel retry (D-1637): persisted switch <code>setSessionCancelRetry:on|off|MS[,COUNT] | setCancelGrace:on|off|WINDOW,DELAY</code>, dashboard <strong>Cancel Retry</strong> - an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms, up to 3 times; a new VEND REQUEST stops it; counted in <code>vendStats</code>. RS232 <code>rx</code> patterns may start with <code>*</code> to match the END of a frame (<code>"* 53 E7"</code>), for machines that send one frame in two pieces. Existing settings and rule tables unchanged. Demo APK not rebuilt.</td><td>None. Operators turn the retry on per machine; add tail rules only where needed.</td></tr>
+        <tr><td><strong>hardware-lib 8.2.3</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.2</td><td>24 Oct 2026</td><td>Session-cancel retry (D-1637): persisted switch <code>setSessionCancelRetry:on|off|MS[,COUNT] | setCancelGrace:on|off|WINDOW,DELAY | setVendEventGap:on|off|MS</code>, dashboard <strong>Cancel Retry</strong> - an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms, up to 3 times; a new VEND REQUEST stops it; counted in <code>vendStats</code>. RS232 <code>rx</code> patterns may start with <code>*</code> to match the END of a frame (<code>"* 53 E7"</code>), for machines that send one frame in two pieces. Existing settings and rule tables unchanged. Demo APK not rebuilt.</td><td>None. Operators turn the retry on per machine; add tail rules only where needed.</td></tr>
         <tr><td><strong>hardware-lib 8.2.2</strong><br>mqtt-lib 2.8.0<br>demo APK build 105</td><td>22 Oct 2026</td><td>mqtt-lib 2.8.0: only coded RABBAH_LOG items on the backend's <code>logs</code> topic; plain lines, control lines, PONG and <code>version</code> move to <code>devices/&lt;id&gt;/ops</code> (D-0554 unknown_source flood), dashboard subscribes to both. The app's own <code>cancelVend()</code> (and the dashboard's <code>cancelVend</code>) no longer fires <code>onVendFailure</code>: the open vend is closed silently, the deny reply still goes out, <code>lastVendFailureReason</code> records CANCELLED_BY_APP. Machine-side ends (CANCELLED_BY_VMC / FAILED / SESSION_ENDED / RESET) unchanged, exactly once. Vend counters: <code>vendStats</code> / <code>VEND_STATS</code> (requests, successes, failures by reason, app cancels, ignored approves, stuck callbacks), dashboard <strong>Vend</strong> button.</td><td>Remove any "ignore CANCELLED_BY_APP" branch; nothing else.</td></tr>
         <tr><td><strong>hardware-lib 8.2.1</strong><br>mqtt-lib 2.7.1<br>demo APK build 104</td><td>15 Oct 2026</td><td>Every exchange reaches the backend exactly once (D-0961): add*Listener / <code>MqttLib.addCommandListener</code> ignore a repeat registration of the same instance, <code>attachRabbahMqtt()</code> is the complete bridge and publishes the coded exchange items itself (samples <code>MdbMqttBridge</code> = two-line wrapper), <code>RabbahLog.log</code> drops an identical item within 30 ms (<code>dedupedItems</code>). Health check that can never get stuck: reported state held and replayed to any state/status/control listener on registration, re-announced on every real bus transition, 5 s heartbeat to the state listeners while direct vend is ON and the bus is INACTIVE/DISABLED; <code>currentState</code> = reported state, new <code>busState</code> = real. SESSION COMPLETE / VEND CANCEL / SUCCESS / FAILURE ACKed in every state, stray SESSION COMPLETE &rarr; END SESSION on the next POLL, RESET wipes every per-session flag. READER ENABLE / CANCEL answered in INACTIVE when direct vend is ON. New docs: API-REFERENCE.md, PULSE-README.md, samples/PulsePaymentSample.kt. Dashboard: device tabs, log recording to disk, History (offline) and Export.</td><td>None. Swap the AARs. Register listeners once; drop any custom bridge next to <code>attachRabbahMqtt</code>.</td></tr>
         <tr><td><strong>hardware-lib 8.2.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 103</td><td>8 Oct 2026</td><td>Force session end after vend: persisted setting (<code>setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong> toggle, SETTINGS_JSON <code>forceSessionEndAfterVend</code>, Kotlin <code>HardwareLib.setForceSessionEnd</code>). When ON the reader arms SESSION CANCEL REQUEST for the POLL after every VEND SUCCESS, so a VMC that never sends SESSION COMPLETE still closes the session; skipped when SESSION COMPLETE already arrived. END SESSION now clears every per-session flag (forced cancel, stale approve, pending request).</td><td>None required. Turn it on per machine from the dashboard.</td></tr>
@@ -604,7 +618,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.8.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-8.2.10.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-8.2.11.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -1335,6 +1349,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.10 · mqtt-lib 2.8.0 · demo app v2.25.0 (build 112). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.11 · mqtt-lib 2.8.0 · demo app v2.26.0 (build 113). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

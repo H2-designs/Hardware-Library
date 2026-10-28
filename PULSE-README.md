@@ -1,6 +1,6 @@
 # Pulse machines - what the Android app has to do
 
-hardware-lib 8.2.10, `PulseLib` (package `com.rabbah.mdb`). A pulse machine takes credit as coin pulses on one
+hardware-lib 8.2.11, `PulseLib` (package `com.rabbah.mdb`). A pulse machine takes credit as coin pulses on one
 digital output of the CM30, and may raise a digital input to say "ready for credit". The library drives every
 edge itself on a dedicated high-priority thread, so the app never touches the IO directly.
 

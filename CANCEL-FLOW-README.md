@@ -1,6 +1,6 @@
 # Vend cancel - who can cancel, what the app hears, what goes on the bus
 
-hardware-lib 8.2.10, 28 October 2026. The complete reference for every way a vend or a session can be cancelled, from
+hardware-lib 8.2.11, 28 October 2026. The complete reference for every way a vend or a session can be cancelled, from
 the machine, from the Android app and from the dashboard, and what the VendListener receives in each case. This
 replaces the 8.2.2 rule that the app's own cancel was silent. Companion files: `VENDLISTENER-README.md` (the handler),
 `SESSION-ENDED-README.md`, `API-REFERENCE.md`.
@@ -102,6 +102,13 @@ A failure that arrives within 200 ms of its `onVendRequest` is delivered 500 ms 
 posts its screen to the UI thread has drawn it before the failure clears it. Order is kept (a new request flushes a
 held failure first), the bus replies are not delayed, all reasons are covered. `setCancelGrace:WINDOW,DELAY`,
 `setCancelGrace:off`; `vendStats` `failureDelayed`.
+
+## 3a-ii. Vend event gap (8.2.11)
+
+Besides the grace, every pair of `VendListener` callbacks is spaced by at least the vend event gap (default 500 ms,
+`setVendEventGap:MS`, 0 = off): a failure, success or new request that would follow the previous callback sooner waits
+for the remainder, in order. Configure it from the dashboard (Event gap field), Kotlin (`setVendEventGap`) or React
+Native (`Mdb.setVendEventGap`). `vendStats` `eventsSpaced`.
 
 ## 3b. The late approval (8.2.8)
 

@@ -1,6 +1,6 @@
 # VendListener - how to implement it, and how to fix the usual mistakes
 
-hardware-lib 8.2.10, 28 October 2026. The payment hook is three callbacks. This document is the complete,
+hardware-lib 8.2.11, 28 October 2026. The payment hook is three callbacks. This document is the complete,
 copy-ready implementation plus the fix for every mistake we have seen in the field. Companion files:
 `IMPLEMENTATION-README.md` (the whole app), `API-REFERENCE.md`, `DUPLICATE-LOGS-README.md`.
 
@@ -226,6 +226,8 @@ Mdb.onVendFailure(async ({ reason }) => {
 - `approveVend()` cannot charge the next customer: it only arms when a request is pending, is refused while a cancel
   reply or a session end is armed (8.2.8), and is dropped by the cancel-reply POLL, VEND FAILURE, SESSION COMPLETE,
   END SESSION and by the next VEND REQUEST (8.2.8 - before that a same-session request could inherit it).
+- Events are spaced (8.2.11): two callbacks never reach you closer together than the vend event gap (default 500 ms,
+  `setVendEventGap:MS`, 0 = off), so a screen drawn for one event is on screen before the next one arrives.
 - One open vend at a time (8.2.9): if the machine starts a new vend while the previous one is still open, the old one
   is closed first with `onVendFailure(CANCELLED_BY_VMC)`, then `onVendRequest` fires for the new one - and a cancel
   reply or END SESSION still armed for the old vend is dropped instead of answering the new one.
