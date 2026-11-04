@@ -519,6 +519,10 @@
       <input type="checkbox" id="skipZeroToggle"><span class="slider"></span><span class="tlabel">Skip 00 00 Vend</span>
     </label>
     <span class="divider"></span>
+    <label class="tswitch" title="Warm resume (hardware-lib 8.2.13+, persisted). ON (default) = setWarmResume:on - a READER ENABLE that arrives while the reader is INACTIVE and no RESET has been seen since start (app restart, Close / Open here) is ACKed and the reader resumes as ENABLED: the machine was set up before the restart and will not send RESET / SETUP again. OFF = spec-strict INACTIVE: READER ENABLE stays unanswered (UNHANDLED rx=14 01) until the machine runs SETUP. A machine that sends RESET first is never affected. Synced from SETTINGS_JSON.">
+      <input type="checkbox" id="warmResumeToggle" checked><span class="slider"></span><span class="tlabel">Warm Resume</span>
+    </label>
+    <span class="divider"></span>
     <span class="label mode-mdb" title="Vend event gap (hardware-lib 8.2.11+, persisted): the minimum time between two VendListener callbacks reaching the app. A callback that would follow the previous one sooner waits for the remainder, in order, so the app's screen has time to draw one event before the next. Default 500 ms; 0 = off; max 5000. Press Enter or leave the field to send setVendEventGap:N. Synced from SETTINGS_JSON.">Event gap:</span>
     <input id="eventGapInput" type="number" min="0" max="5000" step="50" value="500" style="width:4.5em" title="Minimum ms between two VendListener callbacks (0 = off, max 5000). Press Enter or leave the field to send setVendEventGap:N.">
     <span class="label">ms</span>
@@ -1449,6 +1453,7 @@
     if (typeof data.forceSessionEndAfterVend === 'boolean') document.getElementById('forceEndToggle').checked = data.forceSessionEndAfterVend;
     if (typeof data.sessionCancelRetryMs === 'number') document.getElementById('cancelRetryToggle').checked = data.sessionCancelRetryMs > 0;
     if (typeof data.skipZeroVend === 'boolean') document.getElementById('skipZeroToggle').checked = data.skipZeroVend;
+    if (typeof data.warmResume === 'boolean') document.getElementById('warmResumeToggle').checked = data.warmResume;
     if (typeof data.vendEventGapMs === 'number') { document.getElementById('eventGapInput').value = String(data.vendEventGapMs); lastSentEventGap = data.vendEventGapMs; }
     if (typeof data.showPollTraffic === 'boolean') document.getElementById('pollVisibilityCheck').checked = data.showPollTraffic;
     if (typeof data.showUnhandledCmd === 'boolean') document.getElementById('unhandledVisibilityCheck').checked = data.showUnhandledCmd;
@@ -2029,6 +2034,9 @@
   document.getElementById('cancelRetryToggle').onchange = (e) => sendCommand(
     e.target.checked ? 'setSessionCancelRetry:on' : 'setSessionCancelRetry:off',
     e.target.checked ? 'Session-cancel retry ON (re-send SESSION CANCEL REQUEST after 1000 ms without SESSION COMPLETE)' : 'Session-cancel retry OFF (sent once)');
+  document.getElementById('warmResumeToggle').onchange = (e) => sendCommand(
+    e.target.checked ? 'setWarmResume:on' : 'setWarmResume:off',
+    e.target.checked ? 'Warm resume ON (READER ENABLE in INACTIVE without a RESET resumes the reader as ENABLED)' : 'Warm resume OFF (INACTIVE waits for RESET / SETUP)');
   document.getElementById('skipZeroToggle').onchange = (e) => sendCommand(
     e.target.checked ? 'setSkipZeroVend:on' : 'setSkipZeroVend:off',
     e.target.checked ? 'Skip 00 00 vend ON (VEND REQUEST 00 00 is ACKed and ignored)' : 'Skip 00 00 vend OFF (every VEND REQUEST reaches the app)');

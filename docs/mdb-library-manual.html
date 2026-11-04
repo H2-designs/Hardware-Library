@@ -110,7 +110,7 @@
 <header class="top">
   <span class="title">HARDWARE LIBRARY MANUAL</span>
   <nav>
-    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.12 / 2.8.0</a>
+    <a href="#v810" style="color: var(--accent); font-weight: 600">NEW 8.2.13 / 2.8.0</a>
     <a href="#relnotes">Release notes</a>
     <a href="#start">Getting started</a>
     <a href="#nomqtt">Without MQTT?</a>
@@ -133,16 +133,29 @@
     The complete developer manual for <code class="cmd">hardware-lib</code> and
     <code class="cmd">mqtt-lib</code>: every function with a working example, every dashboard
     command, and what actually happens inside when you call each one. Current as of
-    hardware-lib&nbsp;8.2.12 / mqtt-lib&nbsp;2.8.0.
+    hardware-lib&nbsp;8.2.13 / mqtt-lib&nbsp;2.8.0.
   </p>
 
 
   <!-- ============================================================ -->
   <section id="v810">
-    <h2><span class="eyebrow">NEW &mdash; 8.2.12 / mqtt-lib 2.8.0 &mdash; 28 October 2026</span>What changed in 8.2.12, 8.2.11, 8.2.10, 8.2.9, 8.2.8, 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
+    <h2><span class="eyebrow">NEW &mdash; 8.2.13 / mqtt-lib 2.8.0 &mdash; 4 November 2026</span>What changed in 8.2.13, 8.2.12, 8.2.11, 8.2.10, 8.2.9, 8.2.8, 8.2.7, 8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, mqtt-lib 2.8.0, 8.2.1, 8.2.0, 8.1.0 and mqtt-lib 2.7.x</h2>
     <p>Both additive. An app built on 8.0.0 / 2.6.0 compiles and behaves the same against 8.1.0 / 2.7.0;
     the steps below are only for using the new features. Upgrade steps for the Android app are in
     <code>AAR-HANDOFF-README.md</code>, section "Android: what changes from 8.0.0".</p>
+
+    <h3>8.2.13 &mdash; warm resume: a reader restart the machine never saw</h3>
+    <p>Field log (dashboard Close / Open on a live machine): <code>UNHANDLED rx=14 01</code> every 150 ms, then the app's
+    "Setup failed for MDB: Timed out waiting for 40000 ms". The reader restarted into INACTIVE and waited for RESET / SETUP;
+    the machine never saw the restart, so it only re-sent READER ENABLE and waited for the ACK before polling again. Same after
+    an app restart or crash. Now a READER ENABLE in INACTIVE while <strong>no RESET has been seen since start()</strong> is ACKed
+    and the reader resumes as ENABLED with the persisted level (auto mode arms SESSION BEGIN). A machine that sends RESET
+    first gets the normal strict handshake. Default ON, persisted: dashboard <strong>Warm Resume</strong> toggle,
+    <code class="cmd">setWarmResume:on|off</code>, Kotlin <code class="cmd">setWarmResume(enabled)</code> /
+    <code class="cmd">isWarmResume</code>, SETTINGS_JSON <code>warmResume</code>, backend key <code>mdb_warm_resume</code>;
+    log <code>[mdb] READER ENABLE while INACTIVE and no RESET since start - the VMC was set up before this restart; resuming as
+    ENABLED (warm resume, level 2)</code>; <code class="cmd">vendStats</code> <code>warmResumes</code>. 27 JVM bus-trace
+    scenarios pass.</p>
 
     <h3>8.2.12 &mdash; the eight fixes of the code review</h3>
     <p>No API change. (1) VEND SUCCESS fires <code class="cmd">onVendSuccess</code> only for a vend still open; after a VEND CANCEL /
@@ -408,6 +421,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
     <div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>Date</th><th>What changed</th><th>App impact</th></tr></thead>
       <tbody>
+        <tr><td><strong>hardware-lib 8.2.13</strong><br>mqtt-lib 2.8.0<br>dashboard 8.2.13<br>demo APK build 115</td><td>4 Nov 2026</td><td>Warm resume (default ON): a READER ENABLE in INACTIVE with no RESET since start is ACKed and the reader resumes as ENABLED - the machine never saw the reader restart (Close / Open, app restart); dashboard Warm Resume toggle / <code>setWarmResume:on|off</code>; <code>vendStats</code> <code>warmResumes</code>. react-native-mdb 1.4.2.</td><td>None.</td></tr>
         <tr><td><strong>hardware-lib 8.2.12</strong><br>mqtt-lib 2.8.0<br>dashboard 8.2.11<br>demo APK build 114</td><td>28 Oct 2026</td><td>Eight review fixes: stray VEND SUCCESS ignored (<code>successIgnored</code>), VEND SUCCESS / READER DISABLE wipe the vend flags, <code>beginSession()</code> only when ENABLED, one <code>onVendFailure</code> on a simultaneous app + machine cancel, one bus loop after stop()/start(), atomic cancel-grace hand-over, RS232 superseded vend = CANCELLED_BY_VMC. react-native-mdb 1.4.1.</td><td>None. beginSession() may now return false before READER ENABLE.</td></tr>
         <tr><td><strong>hardware-lib 8.2.11</strong> (never released)<br>mqtt-lib 2.8.0<br>dashboard 8.2.11<br>demo APK build 113</td><td>28 Oct 2026</td><td>Vend event gap (default ON 500 ms): a configurable minimum time between two VendListener callbacks; dashboard Event gap field / <code>setVendEventGap:MS|on|off</code>, Kotlin <code>setVendEventGap</code>, RN <code>Mdb.setVendEventGap</code>; SETTINGS_JSON <code>vendEventGapMs</code>; <code>vendStats</code> <code>eventsSpaced</code>. react-native-mdb 1.4.0 (+ setCancelGrace / getCancelGrace).</td><td>None.</td></tr>
         <tr><td><strong>hardware-lib 8.2.10</strong> (never released)<br>mqtt-lib 2.8.0<br>demo APK build 112</td><td>28 Oct 2026</td><td>Cancel grace delay 500 ms (was 350); a stored 350 migrated once. react-native-mdb 1.3.9.</td><td>None.</td></tr>
@@ -417,7 +431,7 @@ HardwareLib.vendListener = <span class="k">object</span> : HardwareLib.VendListe
         <tr><td><strong>hardware-lib 8.2.6</strong><br>mqtt-lib 2.8.0<br>demo APK build 108</td><td>27 Oct 2026</td><td>Ordered vend callbacks (one thread: <code>onVendRequest</code> completes before its outcome; field case of a payment screen left open after a fast cancel). <code>onVendFailure(reason)</code> overload with the reason captured at close time; interface methods are Java default methods. react-native-mdb 1.3.5.</td><td>Override <code>onVendFailure(reason)</code>; keep gateway work off the callback thread (a blocking handler now delays the outcome).</td></tr>
         <tr><td><strong>hardware-lib 8.2.5</strong><br>mqtt-lib 2.8.0<br>demo APK build 107</td><td>25 Oct 2026</td><td>Every cancel reaches <code>onVendFailure</code> with a reason: CANCELLED_BY_VMC, CANCELLED_BY_APP (delivered again), new CANCELLED_BY_OPERATOR for dashboard / remote cancels; <code>vendStats</code> <code>operatorCancels</code>; <code>[remote]</code> replies no longer muted by the Logs switch. CANCEL-FLOW-README.md.</td><td>Branch on the reason: CANCELLED_BY_APP = UI reset only, CANCELLED_BY_OPERATOR = void / reverse. Java switch: add the case.</td></tr>
         <tr><td><strong>hardware-lib 8.2.4</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.3</td><td>24 Oct 2026</td><td>Skip 00 00 vend requests: persisted switch <code>setSkipZeroVend:on|off</code>, dashboard <strong>Skip 00 00 Vend</strong> - a VEND REQUEST priced 00 00 is ACKed and dropped, the request with the real price works as usual; counted in <code>vendStats</code>. Demo APK not rebuilt.</td><td>None. Operators turn it on per machine.</td></tr>
-        <tr><td><strong>hardware-lib 8.2.3</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.2</td><td>24 Oct 2026</td><td>Session-cancel retry (D-1637): persisted switch <code>setSessionCancelRetry:on|off|MS[,COUNT] | setCancelGrace:on|off|WINDOW,DELAY | setVendEventGap:on|off|MS</code>, dashboard <strong>Cancel Retry</strong> - an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms, up to 3 times; a new VEND REQUEST stops it; counted in <code>vendStats</code>. RS232 <code>rx</code> patterns may start with <code>*</code> to match the END of a frame (<code>"* 53 E7"</code>), for machines that send one frame in two pieces. Existing settings and rule tables unchanged. Demo APK not rebuilt.</td><td>None. Operators turn the retry on per machine; add tail rules only where needed.</td></tr>
+        <tr><td><strong>hardware-lib 8.2.3</strong><br>mqtt-lib 2.8.0<br>react-native-mdb 1.3.2</td><td>24 Oct 2026</td><td>Session-cancel retry (D-1637): persisted switch <code>setSessionCancelRetry:on|off|MS[,COUNT] | setCancelGrace:on|off|WINDOW,DELAY | setVendEventGap:on|off|MS | setWarmResume:on|off</code>, dashboard <strong>Cancel Retry</strong> - an unanswered SESSION CANCEL REQUEST is re-sent after 1000 ms, up to 3 times; a new VEND REQUEST stops it; counted in <code>vendStats</code>. RS232 <code>rx</code> patterns may start with <code>*</code> to match the END of a frame (<code>"* 53 E7"</code>), for machines that send one frame in two pieces. Existing settings and rule tables unchanged. Demo APK not rebuilt.</td><td>None. Operators turn the retry on per machine; add tail rules only where needed.</td></tr>
         <tr><td><strong>hardware-lib 8.2.2</strong><br>mqtt-lib 2.8.0<br>demo APK build 105</td><td>22 Oct 2026</td><td>mqtt-lib 2.8.0: only coded RABBAH_LOG items on the backend's <code>logs</code> topic; plain lines, control lines, PONG and <code>version</code> move to <code>devices/&lt;id&gt;/ops</code> (D-0554 unknown_source flood), dashboard subscribes to both. The app's own <code>cancelVend()</code> (and the dashboard's <code>cancelVend</code>) no longer fires <code>onVendFailure</code>: the open vend is closed silently, the deny reply still goes out, <code>lastVendFailureReason</code> records CANCELLED_BY_APP. Machine-side ends (CANCELLED_BY_VMC / FAILED / SESSION_ENDED / RESET) unchanged, exactly once. Vend counters: <code>vendStats</code> / <code>VEND_STATS</code> (requests, successes, failures by reason, app cancels, ignored approves, stuck callbacks), dashboard <strong>Vend</strong> button.</td><td>Remove any "ignore CANCELLED_BY_APP" branch; nothing else.</td></tr>
         <tr><td><strong>hardware-lib 8.2.1</strong><br>mqtt-lib 2.7.1<br>demo APK build 104</td><td>15 Oct 2026</td><td>Every exchange reaches the backend exactly once (D-0961): add*Listener / <code>MqttLib.addCommandListener</code> ignore a repeat registration of the same instance, <code>attachRabbahMqtt()</code> is the complete bridge and publishes the coded exchange items itself (samples <code>MdbMqttBridge</code> = two-line wrapper), <code>RabbahLog.log</code> drops an identical item within 30 ms (<code>dedupedItems</code>). Health check that can never get stuck: reported state held and replayed to any state/status/control listener on registration, re-announced on every real bus transition, 5 s heartbeat to the state listeners while direct vend is ON and the bus is INACTIVE/DISABLED; <code>currentState</code> = reported state, new <code>busState</code> = real. SESSION COMPLETE / VEND CANCEL / SUCCESS / FAILURE ACKed in every state, stray SESSION COMPLETE &rarr; END SESSION on the next POLL, RESET wipes every per-session flag. READER ENABLE / CANCEL answered in INACTIVE when direct vend is ON. New docs: API-REFERENCE.md, PULSE-README.md, samples/PulsePaymentSample.kt. Dashboard: device tabs, log recording to disk, History (offline) and Export.</td><td>None. Swap the AARs. Register listeners once; drop any custom bridge next to <code>attachRabbahMqtt</code>.</td></tr>
         <tr><td><strong>hardware-lib 8.2.0</strong><br>mqtt-lib 2.7.0<br>demo APK build 103</td><td>8 Oct 2026</td><td>Force session end after vend: persisted setting (<code>setForceSessionEnd:on|off</code>, dashboard <strong>Force End</strong> toggle, SETTINGS_JSON <code>forceSessionEndAfterVend</code>, Kotlin <code>HardwareLib.setForceSessionEnd</code>). When ON the reader arms SESSION CANCEL REQUEST for the POLL after every VEND SUCCESS, so a VMC that never sends SESSION COMPLETE still closes the session; skipped when SESSION COMPLETE already arrived. END SESSION now clears every per-session flag (forced cancel, stale approve, pending request).</td><td>None required. Turn it on per machine from the dashboard.</td></tr>
@@ -630,7 +644,7 @@ HardwareLib.addControlListener / removeControlListener</pre>
     <p>Add the AARs (or the Gradle modules) and initialize once at app startup:</p>
     <pre class="code"><span class="c">// build.gradle (raw AARs; skip if using the Gradle modules directly)</span>
 implementation files(<span class="s">'libs/mqtt-lib-2.8.0.aar'</span>)
-implementation files(<span class="s">'libs/hardware-lib-8.2.12.aar'</span>)
+implementation files(<span class="s">'libs/hardware-lib-8.2.13.aar'</span>)
 implementation files(<span class="s">'libs/CM30-HardwareLibrary-1.0.9.aar'</span>)  <span class="c">// hardware-lib's hardware runtime</span></pre>
 
     <pre class="code"><span class="c">// In your Application class or first Activity - the whole startup:</span>
@@ -1361,6 +1375,6 @@ MqttLib.droppedMessages   <span class="c">// lost to queue overflow - rising = o
 </main>
 
 <footer>
-  CM30 MDB Slave project — developer manual. hardware-lib 8.2.12 · mqtt-lib 2.8.0 · demo app v2.27.0 (build 114). Companion docs: the architecture reference and the interactive vend simulator.
+  CM30 MDB Slave project — developer manual. hardware-lib 8.2.13 · mqtt-lib 2.8.0 · demo app v2.28.0 (build 115). Companion docs: the architecture reference and the interactive vend simulator.
 </footer>
 

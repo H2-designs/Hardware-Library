@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.12
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.13
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.12.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.13.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.12.aar')
+   implementation files('libs/hardware-lib-8.2.13.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -27,6 +27,19 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.13 - warm resume: a reader restart the machine never saw (4 November 2026)
+
+Field log (dashboard Close / Open on a live machine): `UNHANDLED rx=14 01` every 150 ms, then the app's "Setup failed
+for MDB: Timed out waiting for 40000 ms". The reader restarted into INACTIVE and waited for RESET / SETUP; the machine
+never saw the restart, so it only re-sent READER ENABLE and waited for the ACK before polling again - a deadlock. Same
+after an app restart or crash. Now: a READER ENABLE in INACTIVE while **no RESET has been seen since start()** is ACKed
+and the reader resumes as ENABLED with the persisted level (auto mode arms SESSION BEGIN; no JUST RESET announcement).
+A machine that sends RESET first gets the normal strict handshake. **Default ON**, persisted: dashboard **Warm Resume**
+toggle, `setWarmResume:on|off`, Kotlin `setWarmResume(enabled)` / `isWarmResume`, SETTINGS_JSON `warmResume`,
+backend key `mdb_warm_resume`; log `[mdb] READER ENABLE while INACTIVE and no RESET since start - the VMC was set up
+before this restart; resuming as ENABLED (warm resume, level 2)`; `vendStats` `warmResumes`. No API change.
+27 JVM bus-trace scenarios pass (S25 Close / Open then READER ENABLE only, S26 OFF, S27 RESET first).
 
 ### 8.2.12 - the eight fixes of the 28 October code review (28 October 2026)
 
@@ -419,7 +432,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.27.0 build 114** bundles hardware-lib 8.2.12 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.28.0 build 115** bundles hardware-lib 8.2.13 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

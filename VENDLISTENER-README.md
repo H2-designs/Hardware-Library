@@ -1,6 +1,6 @@
 # VendListener - how to implement it, and how to fix the usual mistakes
 
-hardware-lib 8.2.12, 28 October 2026. The payment hook is three callbacks. This document is the complete,
+hardware-lib 8.2.13, 4 November 2026. The payment hook is three callbacks. This document is the complete,
 copy-ready implementation plus the fix for every mistake we have seen in the field. Companion files:
 `IMPLEMENTATION-README.md` (the whole app), `API-REFERENCE.md`, `DUPLICATE-LOGS-README.md`.
 
