@@ -1,0 +1,79 @@
+<title>Release notes 8.2.14</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, a summary strip first, then the four sections an Android engineer scans in order. */
+  :root {
+    --bg: #F3F4F6; --surface: #FFFFFF; --line: #D5D9DF; --fg: #171A1E; --muted: #5D646E;
+    --accent: #1D4FB8; --accent-soft: #E4EBFA; --ok: #1E6B3A; --ok-soft: #E1F1E7; --warn: #8A5A00; --warn-soft: #FBF0D5;
+    --chip: #EEF0F3; --code-bg: #14171B; --code-fg: #D8DDE4;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #121418; --surface: #1B1F25; --line: #343B45; --fg: #E8EBEF; --muted: #A2AAB5;
+    --accent: #7FA6F2; --accent-soft: #1F2C45; --ok: #7CCB93; --ok-soft: #1B3324; --warn: #E3B457; --warn-soft: #3A2E12;
+    --chip: #22272E; --code-bg: #0E1013; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 32px 64px; }
+  main { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 0; max-width: 70ch; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .meta a { color: var(--accent); }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .tldr .pill { align-self: flex-start; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+  section header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .item { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .item:first-of-type { border-top: 0; }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: 13px; line-height: 1.55; padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .twrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 10px 8px 0; font-weight: 600; }
+  td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td code { white-space: nowrap; }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin: 0 0 6px; max-width: 70ch; }
+  @media (max-width: 560px) { section { padding: 14px 16px; } }
+</style>
+
+<style>
+  h1 { margin-bottom: 6px; }
+  h2 { margin-top: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  h3 { margin-top: 6px; }
+  main > * + * { margin-top: 0; }
+  main { gap: 14px; }
+  pre { white-space: pre; }
+  ol, ul { display: flex; flex-direction: column; gap: 6px; }
+</style>
+<main>
+<h1>Release notes - hardware-lib 8.2.14 + mqtt-lib 2.8.0 + dashboard 8.2.13</h1>
+<p>Release: https://github.com/RabbahSystems/hardware-library/releases/tag/v8.2.14 (and https://github.com/H2-designs/Hardware-Library/releases/tag/v8.2.14) Date: 5 November 2026. Replaces v8.2.13 (4 November). Cumulative against the fleet's hardware-lib 8.0.0 / mqtt-lib 2.6.0.</p>
+<h2>TL;DR for the Android app</h2>
+<ul><li>Swap <code>hardware-lib-8.2.14.aar</code>; mqtt-lib stays 2.8.0. Rebuild. No API change.</li><li><strong>CASH SALE (<code>13 05</code>) is answered.</strong> The machine reports every cash sale (price, item) to the cashless reader so it can be logged; the reader now ACKs it in every state and logs one line. It used to be UNHANDLED (no reply), so the machine retried it a few times after every cash sale (field log 5 November: <code>rx=13 05 00 FA 00 00 12 tx=UNHANDLED</code>). No VendListener callback: no money moves through the reader.</li><li>Everything from 8.2.13 applies: warm resume, vend event gap, cancel grace, stale-approve fix, the review fixes.</li></ul>
+<h2>Files</h2>
+<div class="twrap"><table><thead><tr><th>file</th><th>version</th></tr></thead><tbody><tr><td><code>libs/hardware-lib-8.2.14.aar</code></td><td>8.2.14 (fleet has 8.0.0)</td></tr><tr><td><code>libs/mqtt-lib-2.8.0.aar</code></td><td>2.8.0, unchanged (fleet has 2.6.0)</td></tr><tr><td><code>libs/CM30-HardwareLibrary-1.0.9.aar</code></td><td>unchanged</td></tr><tr><td><code>AAR-Update-latest.zip</code></td><td>the three AARs + the eight guides</td></tr><tr><td><code>react-native-mdb</code> 1.4.3</td><td>bundles hardware-lib 8.2.14, no JS change</td></tr><tr><td><code>Hardware-Dashboard-win32-x64-v8.2.13.zip</code></td><td>unchanged (Warm Resume toggle, Event gap field)</td></tr><tr><td><code>MDB-Slave-2-v2.29.0-build116-debug.apk</code></td><td>demo/test app on 8.2.14 (private release only)</td></tr></tbody></table></div>
+<pre><code>implementation files('libs/mqtt-lib-2.8.0.aar')
+implementation files('libs/hardware-lib-8.2.14.aar')
+implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')</code></pre>
+<h2>New in 8.2.14 (5 November) - CASH SALE answered</h2>
+<div class="twrap"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>frame</td><td><code>13 05 &lt;price hi&gt; &lt;price lo&gt; &lt;item hi&gt; &lt;item lo&gt;</code> - e.g. <code>13 05 00 FA 00 00</code> = price 250, item 0</td></tr><tr><td>meaning</td><td>a customer paid in cash; the VMC informs the cashless reader for its audit log (spec: reader replies ACK)</td></tr><tr><td>before</td><td>unhandled in every state: no reply, <code>tx=UNHANDLED</code>, the VMC retried the command</td></tr><tr><td>now</td><td>ACK in INACTIVE, DISABLED, ENABLED and VEND_STATE; state unchanged; no callback</td></tr><tr><td>log</td><td><code>[mdb] CASH SALE price=250 (250 minor units) item=0 - ACK (cash sale reported by the VMC, nothing to do)</code></td></tr><tr><td>exchange line</td><td><code>CASH SALE rx=13 05 00 FA 00 00 12 tx=ACK (CASH SALE price=250 item=0)</code> - coded item 132 (<code>MDB_CASH_SALE</code>) with price and item for the backend</td></tr><tr><td>vendStats</td><td><code>cashSales</code></td></tr></tbody></table></div>
+<h2>Since 8.0.0 - 8.2.13 and earlier</h2>
+<ul><li>8.2.13 warm resume (<code>setWarmResume</code>); 8.2.12 eight review fixes; 8.2.11 vend event gap (<code>setVendEventGap</code>); 8.2.10 cancel grace 200/500; 8.2.9 a new VEND REQUEST clears every flag of the previous vend; 8.2.8 a cancelled, failed or ended vend never leaves an approval behind (<code>approveVend()</code> false when the vend is over); 8.2.7 cancel grace; 8.2.6 ordered callbacks + <code>onVendFailure(reason)</code>; 8.2.5 every cancel with a reason; session-cancel retry; skip 00 00 vend; RS232 leading-<code>*</code>; mqtt-lib 2.8.0 ops channel; vendStats; health check that cannot get stuck; force session end.</li></ul>
+<h2>Verified on the JVM</h2>
+<p>Bus-trace harness (<code>source/MdbSlaveApp/hardware-lib/bus-trace/</code>): <strong>28 scenarios, all pass on 8.2.14</strong>. New: S28, a CASH SALE in each of the four states is ACKed, nothing reaches the VendListener, the state does not change, and a real VEND REQUEST afterwards still reaches the app. Not yet run on a real CM30.</p>
+<h2>Verify after deploy (dashboard passthrough)</h2>
+<div class="twrap"><table><thead><tr><th>send</th><th>expect</th></tr></thead><tbody><tr><td><code>version</code></td><td><code>[remote] mqtt-lib 2.8.0, hardware-lib 8.2.14 - client id ...</code></td></tr><tr><td>a cash sale on the machine</td><td><code>CASH SALE rx=13 05 ... tx=ACK (CASH SALE price=N item=M)</code>, no <code>UNHANDLED</code></td></tr><tr><td><code>vendStats</code></td><td><code>cashSales</code> counts them</td></tr></tbody></table></div>
+<h2>Known limits</h2>
+<ul><li>Not yet run on a real CM30.</li><li>Still open: SETUP / EXPANSION commands in ENABLED and VEND state are unanswered; no timeout for a vend that gets neither VEND SUCCESS nor VEND FAILURE after approval.</li><li>Everything listed for 8.2.13 still holds.</li></ul>
+</main>

@@ -1,6 +1,6 @@
 # Implementation guide - putting hardware-lib into the Android app
 
-hardware-lib 8.2.13 + mqtt-lib 2.8.0, 4 November 2026. This is the one document to follow when wiring the libraries
+hardware-lib 8.2.14 + mqtt-lib 2.8.0, 5 November 2026. This is the one document to follow when wiring the libraries
 into a payment app for the CM30 terminal, for MDB, RS232 and pulse machines. The companion files go deeper:
 `API-REFERENCE.md` (every function), `AAR-HANDOFF-README.md` (what changed per release), `PULSE-README.md`,
 `DUPLICATE-LOGS-README.md`, `VENDLISTENER-README.md` (the listener in full, with the fixes and the counters), `SESSION-ENDED-README.md`, `CANCEL-FLOW-README.md` (machine / app / operator cancel side by side), `samples/`.
@@ -28,7 +28,7 @@ Copy the three AARs from `AAR-Update-latest.zip` into the app's `libs/`:
 
 ```gradle
 implementation files('libs/mqtt-lib-2.8.0.aar')
-implementation files('libs/hardware-lib-8.2.13.aar')
+implementation files('libs/hardware-lib-8.2.14.aar')
 implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
 ```
 
@@ -316,6 +316,7 @@ From the dashboard passthrough bar after deploy:
 |---|---|---|
 | `rx=13 00 ... tx=UNHANDLED` | machine sends VEND REQUEST without a session, direct vend off | `setDirectVend:on` |
 | health check waits forever for ENABLED | app registered its listener after the event, old library | 8.2.1+ replays and heartbeats; see section 5 |
+| `rx=13 05 ... tx=UNHANDLED` after a cash sale on the machine | CASH SALE report; before 8.2.14 the reader did not answer it | 8.2.14 ACKs and logs it (`vendStats` `cashSales`); nothing to do in the app |
 | `UNHANDLED rx=14 01` in a loop right after an app restart or a dashboard Close / Open, app setup times out | the machine never saw the reader restart and only re-sends READER ENABLE; the strict INACTIVE state answered nothing | 8.2.13 warm resume answers it and resumes as ENABLED - check `getSettings` shows `"warmResume":true` |
 | `approveVend IGNORED - a cancel reply is already armed` / `SESSION COMPLETE already received` (8.2.8) | the payment finished after the machine or the app cancelled the vend | void the hold / reverse; nothing to fix in the library |
 | `approveVend IGNORED - no VEND REQUEST pending` | the machine cancelled or timed out before the gateway answered | void the hold; speed up the gateway or raise the machine's timeout |
@@ -337,7 +338,7 @@ Every rule above holds unchanged; the bridge registers its listeners once. Manua
 
 ## 14. Before the field
 
-- [ ] AARs 8.2.13 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
+- [ ] AARs 8.2.14 / 2.8.0 / 1.0.9 in `libs/`, `version` answers with them
 - [ ] `HardwareLib.init(applicationContext)` at boot, in every mode
 - [ ] one `attachRabbahMqtt()`, no custom bridge, listeners registered once
 - [ ] `onVendFailure` reverses on FAILED, SESSION_ENDED and RESET when approved, voids on CANCELLED_BY_VMC / CANCELLED_BY_OPERATOR, only resets the UI on CANCELLED_BY_APP

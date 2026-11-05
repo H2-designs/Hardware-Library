@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.13
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.14
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.13.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.14.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.13.aar')
+   implementation files('libs/hardware-lib-8.2.14.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -27,6 +27,16 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.14 - CASH SALE (13 05) answered (5 November 2026)
+
+Field log: `rx=13 05 00 FA 00 00 12 tx=UNHANDLED`. CASH SALE is the VMC reporting a cash sale (price 250, item 0) to the
+cashless reader for its audit log; the spec reply is ACK. It was unhandled in every state (the stray-command branch only
+covered 13 01-13 04), so the VMC retried it after every cash sale. Now: ACK in INACTIVE, DISABLED, ENABLED and
+VEND_STATE, state unchanged, no VendListener callback (no money moves through the reader), one log line
+`[mdb] CASH SALE price=250 (250 minor units) item=0 - ACK (cash sale reported by the VMC, nothing to do)`, exchange
+line `CASH SALE rx=... tx=ACK (CASH SALE price=250 item=0)` (coded item 132 carries price + item to the backend),
+`vendStats` `cashSales`. No API change. 28 JVM bus-trace scenarios pass.
 
 ### 8.2.13 - warm resume: a reader restart the machine never saw (4 November 2026)
 
@@ -312,7 +322,7 @@ ANY state is ACKed and jumps to INACTIVE. Everything not listed for a state goes
 | VEND SUCCESS 13 02 | ACK only (8.2.1) | ACK only (8.2.1) | ACK only (8.2.1) | ACK; onVendSuccess; with Force End ON arms SESSION CANCEL REQUEST |
 | VEND FAILURE 13 03 | ACK only (8.2.1) | ACK only (8.2.1) | ACK only (8.2.1) | ACK; onVendFailure (FAILED) |
 | SESSION COMPLETE 13 04 | ACK, END SESSION on next POLL, stays (8.2.1) | same | same | ACK; next POLL sends END SESSION -> ENABLED (onVendFailure SESSION_ENDED if a vend was still open) |
-| CASH SALE 13 05 | - | - | - | - (logged, unhandled) |
+| CASH SALE 13 05 | ACK | ACK | ACK | ACK (8.2.14: logged with price + item, counted, no callback) |
 | REVALUE REQUEST 15 00 | - | - | - | REVALUE DENIED (L2+) |
 | REVALUE LIMIT REQUEST 15 01 | - | - | - | REVALUE LIMIT AMOUNT (L2+) |
 
@@ -432,7 +442,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.28.0 build 115** bundles hardware-lib 8.2.13 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.29.0 build 116** bundles hardware-lib 8.2.14 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

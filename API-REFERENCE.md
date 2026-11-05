@@ -23,7 +23,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 | `init(context): Boolean` | Loads persisted settings and payloads, re-drives pulse polarity and the ready gate, registers the remote-command listener if mqtt-lib is initialised. Idempotent. |
 | `start(): Boolean` | Opens the CM30 MDB port and starts the bus loop. State resets to INACTIVE and is announced at once. Remote: `open`. |
 | `stop(): Boolean` | Closes the port, resets to INACTIVE, closes any open vend with reason RESET. Remote: `close`. |
-| `VERSION` | `"8.2.13"`. Remote `version` reports it together with mqtt-lib. |
+| `VERSION` | `"8.2.14"`. Remote `version` reports it together with mqtt-lib. |
 
 ### The payment hook - `vendListener`
 
@@ -66,6 +66,7 @@ Since app start, never persisted, like the mqtt-lib link counters. Remote `vendS
 | `eventsSpaced` | 8.2.11: callbacks that waited for the vend event gap |
 | `successIgnored` | 8.2.12: VEND SUCCESS for a vend already cancelled / failed - `onVendSuccess` not fired |
 | `warmResumes` | 8.2.13: reader restarts the machine never saw, picked up as ENABLED on its READER ENABLE |
+| `cashSales` | 8.2.14: CASH SALE (13 05) reports from the VMC - ACKed and logged, no callback |
 | `requestSupersededFlags` | 8.2.9: flags of a previous vend dropped by a new VEND REQUEST (stale approval, armed cancel reply, armed END SESSION, or an open vend closed first) |
 | `callbackStuck` | **the stuck-listener counter**: a callback still running after 3 s; `lastStuckCallback` names it, `lastStuckAgoSec` when |
 | `callbackThrew` / `noListener` | a callback threw / an event had nobody registered |
