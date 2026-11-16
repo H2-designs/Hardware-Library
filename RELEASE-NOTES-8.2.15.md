@@ -1,7 +1,7 @@
 # Release notes - hardware-lib 8.2.15 + react-native-mdb 1.5.0 (mqtt-lib 2.8.0 unchanged)
 
-Date: 16 November 2026. Not released yet (waiting for "release allowed"). Replaces v8.2.14 (5 November). Cumulative
-against the fleet's hardware-lib 8.0.0 / mqtt-lib 2.6.0.
+Release: https://github.com/RabbahSystems/hardware-library/releases/tag/v8.2.15 (and https://github.com/H2-designs/Hardware-Library/releases/tag/v8.2.15)
+Date: 16 November 2026. Replaces v8.2.14 (5 November). Cumulative against the fleet's hardware-lib 8.0.0 / mqtt-lib 2.6.0.
 
 ## TL;DR for the Android app
 
