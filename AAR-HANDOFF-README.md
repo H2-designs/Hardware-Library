@@ -1,4 +1,4 @@
-# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.14
+# AAR update — mqtt-lib 2.8.0 + hardware-lib 8.2.15
 
 Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what goes on the bus), IMPLEMENTATION-README.md (the end-to-end guide for the Android app: startup, VendListener with the reversal rule, approve/cancel, health check, settings, RS232, pulse, verify), API-REFERENCE.md (every public function of HardwareLib / Rs232Lib / PulseLib, by protocol), PULSE-README.md (pulse integration guide), DUPLICATE-LOGS-README.md (why log lines were duplicated and how 8.2.1 / 2.7.1 stops it), samples/ (PulsePaymentSample.kt, Rs232SampleActivity.kt, MdbMqttBridge.kt), RELEASE-NOTES-8.2.0.md.
 
@@ -6,11 +6,11 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 1. Replace BOTH AARs in your app's `libs/`:
    - `mqtt-lib-2.8.0.aar` (replaces 2.6.0 / 2.7.x)
-   - `hardware-lib-8.2.14.aar` (replace whatever version you bundle now)
+   - `hardware-lib-8.2.15.aar` (replace whatever version you bundle now)
 
    ```gradle
    implementation files('libs/mqtt-lib-2.8.0.aar')
-   implementation files('libs/hardware-lib-8.2.14.aar')
+   implementation files('libs/hardware-lib-8.2.15.aar')
    implementation files('libs/CM30-HardwareLibrary-1.0.9.aar')
    ```
 
@@ -27,6 +27,18 @@ Companion files: CANCEL-FLOW-README.md (who can cancel, what the app hears, what
 
 All additive: no breaking change, an app built on 8.0.0 / 2.6.0 compiles and behaves the same. The next
 section lists the code the Android app may add to USE the new parts.
+
+### 8.2.15 - "is the machine ready?" answered any time (16 November 2026)
+
+Field report: the machine finished its handshake before the app registered its listeners, so the app never saw it
+become ready (the state replay of 8.2.1 goes to whoever is registered at that moment; a React Native app subscribes
+later). Now readiness is a value and an event you cannot miss: `isMachineReady` (MDB reader ENABLED / VEND, or RS232
+machine heard), `isMdbReady`, `isMdbHandshakeDone`, `machineReadyJson()`, `readyListener` / `addReadyListener((ready,
+json))` **replayed once at registration** then edge-only, control line `MACHINE_READY:{...}`, remote `getMachineReady`.
+RS232: `Rs232Lib.isMachineReady`, rule event `"connect"` (tag CONNECT and HEARTBEAT), `setReadyTimeout(ms)` /
+`rs232ReadyTimeout:MS`. React Native 1.5.0: `getMachineReady()`, `onMachineReady(fn)`, `onStateChanged(fn)` - both
+events deliver the current value right after subscribing. Additive, no existing behaviour changes. 31 JVM bus-trace
+scenarios pass. Details: `RELEASE-NOTES-8.2.15.md`, `LISTENERS-README.md` section 10.3.1.
 
 ### 8.2.14 - CASH SALE (13 05) answered (5 November 2026)
 
@@ -442,7 +454,7 @@ not a network problem. Fixed on our side as far as the library can, and made vis
 - code: `MqttLib.statsJson()`, `MqttLib.connectionLosses` / `failedConnectAttempts` /
   `sessionsEstablished` / `activeClientId`
 
-Demo/test APK: **MDB-Slave-2 v2.29.0 build 116** bundles hardware-lib 8.2.14 + mqtt-lib 2.8.0.
+Demo/test APK: **MDB-Slave-2 v2.30.0 build 117** bundles hardware-lib 8.2.15 + mqtt-lib 2.8.0.
 
 What the library cannot fix: two physical units provisioned with the same device code, or a second process
 on the unit that connects with a fixed client id. The WARNING line above is how you spot that from the dashboard.

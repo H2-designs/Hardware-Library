@@ -4,8 +4,8 @@ Two fully decoupled Android libraries extracted from the proven MDB Slave app:
 
 | Artifact | What it is |
 |---|---|
-| `hardware-lib-8.0.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
-| `mqtt-lib-2.6.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
+| `hardware-lib-7.17.0.aar` | **(renamed from mdb-lib)** The full MDB Cashless Device #1 slave (levels 1/2/3, config store, settings) for real CM30 hardware. **Contains NO networking of any kind** — everything it produces exits through listeners, everything it accepts enters through plain functions. Every exchange carries a stable integer **CMD code** (see the schema below). |
+| `mqtt-lib-2.2.0.aar` | MQTT 3.1.1 transport (queue + publisher thread + auto-reconnect, broker **username/password** auth, retained presence/LWT, **connection-state listener**) **plus the Rabbah compact-log layer**: `RabbahLog`, the unified MDB/INFO codebooks, and `RabbahMqtt` (send/receive logs, text or JSON on any topic — zero MDB involvement). |
 | `CM30-HardwareLibrary-1.0.9.aar` | The CM30 vendor serial driver (hardware-lib needs it at runtime; AARs do not nest). |
 
 ## Architecture — who talks to whom
@@ -54,17 +54,14 @@ fully offline.
 
 > Migration note: the Kotlin package is still `com.rabbah.mdb` and a deprecated
 > `typealias MdbLib = HardwareLib` keeps old code compiling — the only hard change is the
-> gradle dependency (`project(':hardware-lib')` / `hardware-lib-8.0.0.aar`) and that MQTT
+> gradle dependency (`project(':hardware-lib')` / `hardware-lib-7.17.0.aar`) and that MQTT
 > forwarding now needs the bridge attached.
 
 ## The CMD code schema
 
 Every exchange the engine handles has ONE stable integer code (`MdbCmd`, append-only — codes
 are never renumbered). `exchangeListener` delivers them live; the hex APIs address them by
-number. **Since mqtt-lib 2.4.0 these same codes are the log-envelope codes**: a RABBAH_LOG
-item with `"s":"MDB"` carries `"m":"110".."136"` exactly as tabled below (older builds emitted
-0–26 for the same events; `getCodebook` always serves what the running build emits). One code
-space end to end — MDB 110–136, RS232 137–143.
+number.
 
 | Code | VMC sends | We reply | Reply hex editable? | RX captured |
 |---|---|---|---|---|
@@ -174,6 +171,7 @@ HardwareLib.removeExchangeListener(mine)   // true when it was registered
 // same pattern for the other feeds:
 HardwareLib.addLogListener { line, show -> ... }      / removeLogListener(...)
 HardwareLib.addStateListener { state -> ... }         / removeStateListener(...)
+HardwareLib.addReadyListener { ready, json -> ... }   / removeReadyListener(...)   // 8.2.15: replayed at once, then edge-only
 HardwareLib.addControlListener { tag, json -> ... }   / removeControlListener(...)
 ```
 
@@ -298,10 +296,7 @@ Rs232Lib.vendRequestListener = { price, frame ->
 
 - **Matching**: rx is hex where `??` matches ANY byte (that is how a vend request whose price
   bytes change per sale still matches one rule); a single trailing `*` matches ANY NUMBER of
-  remaining bytes for VARIABLE-LENGTH frames (`"F2 *"` matches every frame starting `F2`); a
-  single LEADING `*` (8.2.3) matches the frame's END instead (`"* 53 E7"` matches every frame
-  whose last two bytes are `53 E7` - the tail of a frame the machine sent in two pieces; put
-  such rules after the exact ones);
+  remaining bytes for VARIABLE-LENGTH frames (`"F2 *"` matches every frame starting `F2`);
   without `*` the frame length must equal the pattern length; first matching rule wins.
   Frames are cut from the byte stream by silence (`frameGapMs`, default 1000 ms — RS232 has
   no frame markers; the reply goes out this long after the machine's last byte. Tune live via
@@ -330,7 +325,7 @@ Rs232Lib.vendRequestListener = { price, frame ->
   `sendHex(hex)`, `simulateFrame(hex)` (feeds a fake machine frame through the matcher — test
   a rule table without hardware), `exchangeListener` (every frame: rxHex, ruleName, txHex,
   price), `vendRequestListener(price, frameHex)`.
-- **RS232 codebook schema** (7.17.0 / mqtt-lib 2.2.0+): serial exchanges ship as coded
+- **RS232 codebook schema** (7.17.0 / mqtt-lib 2.2.0): serial exchanges ship as coded
   RABBAH_LOG items (schema `"RS232"`) instead of raw text — parseable by the backend exactly
   like MDB. Codes (continue after the MDB CMD schema 110-136): 137 `RS232_RX_MATCHED` [rule, rx, tx|-, price], 138 `RS232_RX_UNMATCHED` [rx],
   139 `RS232_CRC_DISCARDED` [rx, expected], 140 `RS232_TX` [tx], 141 `RS232_PORT_OPEN`
@@ -347,18 +342,6 @@ Rs232Lib.vendRequestListener = { price, frame ->
   Apps using our mqtt-lib need exactly one call instead: `HardwareLib.attachRabbahMqtt()`
   (reflection — no compile dependency). Send `help` as a remote command to get the full
   command list back as a log line.
-- **Zero-wiring rescue** (mqtt-lib 2.3.0): the app doesn't even need the call above any more.
-  On the first successful broker connection mqtt-lib itself reflectively runs
-  `HardwareLib.attachRabbahMqtt()` (`MqttConfig.autoAttachHardware` — default `false` since 2.6.0: devices boot unattached, attach on demand via the dashboard HW toggle), so swapping
-  in the two current AARs is the entire integration — MDB logs, RS232 events and every remote
-  command go live with no app code. Two new built-in commands answered by mqtt-lib directly
-  (they work even when hardware-lib was never wired, and the dashboard has buttons for both):
-  `attachHardware` — wires the bridge on demand and reports success or the reason it can't
-  (hardware-lib absent / older than 7.16.0); `version` — reports the mqtt-lib and hardware-lib
-  versions actually bundled in the running app, e.g. `[remote] mqtt-lib 2.3.0, hardware-lib
-  7.19.0`. Field diagnosis rule of thumb: `ping`→`PONG` but everything else "unknown command"
-  means mqtt-lib is alive and hardware-lib is not attached — send `version`, then
-  `attachHardware`.
 - **Dashboard/backend commands** (via handleCommand, so they work over MQTT):
   `rs232Open` / `rs232Open:9600` / `rs232Open:9600,8,1,N`, `rs232Close`, `rs232Send:HEX`,
   `rs232SendFrame:HEADER;DATAHEX`, `rs232SendAscii:HEADER;TEXT` (e.g.
@@ -462,9 +445,9 @@ MqttLib.init(MqttConfig(
 ))
 ```
 
-The Hardware Dashboard desktop app (`dashboard-app/`, packaged exe on the GitHub Releases page) speaks plain MQTT TCP to the same broker
+The `log-viewer.html` dashboard can point at the same broker via its **WebSocket** listener
 (mosquitto needs `listener 9001` + `protocol websockets`): open it once as
-`Hardware Dashboard.exe` (F2 sets broker / user / password) — values persist in
+`log-viewer.html?broker=ws://YOUR-SERVER:9001&user=rabbah&pass=…` — values persist in
 localStorage (query wins over stored). A browser cannot speak plain TCP 1883.
 
 `rabbahlog-sample-v1.4.apk` (in `dist/`) is the proof app: editable broker settings on screen,
@@ -476,7 +459,7 @@ status line, and an `inbox` subscription you can hit with `mosquitto_pub`.
 Preferred: consume the modules directly (`implementation project(':hardware-lib')`,
 `project(':mqtt-lib')`) — see the demo `app/`.
 
-If consuming raw AARs instead: add `hardware-lib-8.0.0.aar`, `mqtt-lib-2.6.0.aar`, **and**
+If consuming raw AARs instead: add `hardware-lib-7.17.0.aar`, `mqtt-lib-2.2.0.aar`, **and**
 `CM30-HardwareLibrary-1.0.9.aar` (hardware-lib needs it at runtime; AARs do not nest). If you
 skip MQTT entirely, `hardware-lib` + the CM30 AAR alone are enough.
 
@@ -499,12 +482,8 @@ HardwareLib.vendListener = object : HardwareLib.VendListener {
         }
     }
     override fun onVendSuccess(itemNumber: Int) { scope.launch { paymentGateway.capture() } }
-    override fun onVendFailure() {                // 8.0.0: THE non-success outcome - fires exactly once
-        // for every VEND REQUEST that did not reach onVendSuccess: machine cancel, dispense
-        // failure, session ended with the vend still open (machines that send no cancel/failure),
-        // reset - NOT your own cancelVend() (8.2.2). Dismiss the payment UI, void the hold, refund if you had
-        // approved. HardwareLib.lastVendFailureReason tells you which case it was.
-        scope.launch { paymentGateway.cancelUiAndVoid(); if (approved) paymentGateway.refund(); resetUiToIdle() } }
+    override fun onVendFailure()                { scope.launch { paymentGateway.refund() } }
+    override fun onSessionEnded()               { /* per-session cleanup */ }
 }
 ```
 
@@ -530,10 +509,6 @@ is reported back in `SETTINGS_JSON:` so a watching dashboard always shows the re
 | `HardwareLib.cancelVend(): Boolean` | `cancelVend` | The simple cancel — sends the standing response set above |
 | `HardwareLib.cancelVend(CancelResponse): Boolean` | `cancelVend:sessionCancel` / `cancelVend:vendDenied` | One-time override without touching the standing mode |
 | `HardwareLib.setAutoSession(Boolean)` / `isAutoSession` | `setSessionMode:auto` / `setSessionMode:manual` | true = sessions begin by themselves, false = manual |
-| `PulseLib.initPulse(high: Boolean)` *(persisted 7.27.0)* | `initPulse:true` / `initPulse:false` | pulse polarity; remembered as `pulseMode` and re-applied at HardwareLib.init(); dashboard Init High / Init Low + mode label |
-| `PulseLib.setReadyFeedback(value, channel)` / `setReadyFeedback(null)` *(persisted 7.26.0)* | `setReadyFeedback:[yes,]value[,channel]` / `:on` / `:off` | digital-in gate before every pulse train; survives restarts; dashboard **Ready FB** toggle |
-| `HardwareLib.setDirectVend(Boolean)` / `isDirectVend` *(7.28.0)* | `setDirectVend:on` / `setDirectVend:off` | accept VEND REQUEST in any state for VMCs that skip the handshake (default off). Dashboard: **Direct Vend** toggle |
-| `HardwareLib.setAutoBeginCooldown(Int)` / `autoBeginCooldown` *(7.25.0)* | `setAutoBeginCooldown:0-50` | idle POLLs after END SESSION before auto SESSION BEGIN (default 3; 0 = next POLL). Dashboard: the **cooldown** field beside the mode selector |
 | `HardwareLib.setMdbLevel(1..3)` | `setMdbLevel:1\|2\|3` | MDB feature level (handshake + payloads) |
 | `HardwareLib.setMqttLogging(Boolean)` / `isMqttLoggingEnabled` | `setMqttLogging:on\|off` | Gate the remote log stream (`publishRemote` on events + the "LOG" control tag) — local listeners and the control plane keep working while muted |
 | `HardwareLib.setPollVisibility(Boolean)` | `setPollVisibility:on\|off` | Log-debug: show idle POLL/ACK |
@@ -543,6 +518,7 @@ is reported back in `SETTINGS_JSON:` so a watching dashboard always shows the re
 | `HardwareLib.handleCommand(text): Boolean` | — | Feed ANY transport's received text in; consumes what it recognizes |
 | `HardwareLib.vendListener / logListener / statusListener / stateListener / exchangeListener / controlListener` | — | The full listener surface (see table above) |
 | `HardwareLib.currentState: String` / `isSessionActive` / `sessionId` | — | Read state on demand: INACTIVE_STATE, DISABLED_STATE, ENABLED_STATE, VEND_STATE |
+| `HardwareLib.isMachineReady` / `isMdbReady` / `isMdbHandshakeDone` / `machineReadyJson()` / `readyListener` / `addReadyListener` (8.2.15) | `getMachineReady`, `rs232ReadyTimeout:MS` | "Is the machine ready?" answered idempotently for MDB (reader ENABLED / VEND) and RS232 (machine heard; rule `event:"connect"`); the listener is replayed on registration so an app that starts after the handshake still gets its answer; control line `MACHINE_READY:` |
 | `HardwareLib.getReplyHex(code)` / `setReplyHex(code, hex)` / `lastReceivedHex(code)` / `lastReceivedJson()` / `replyConfigName(code)` | — | CMD-code hex access (see schema above) |
 | `HardwareLib.priceToAmount(raw)` / `priceToMinorUnits(raw)` | — | Standalone price converters using the live READER_CONFIG_DATA scale/decimals |
 
@@ -588,7 +564,7 @@ acks — is `MdbConfigStore`'s job. Over MQTT, send JSON on the commands topic:
 
 Per-name validation, per-name ack lines, and a full `CONFIG_JSON:` snapshot come back
 automatically. The legacy text form (`setConfig:NAME:hex`, `resetConfig:NAME`, `getConfig`)
-still works, so the existing `dashboard-app/dashboard.html` dashboard needs no changes. Locally:
+still works, so the existing `log-viewer.html` dashboard needs no changes. Locally:
 `MdbConfigStore.applyJson(json)`, `.get(name)`, `.set(name, hex)`, `.snapshotJson()`.
 
 Special byte worth knowing: **Always Idle** (Level 3) is bit 5 of the LAST byte (Z34) of

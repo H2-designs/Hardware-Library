@@ -23,7 +23,7 @@ HardwareLib.init(applicationContext)   // persistence for settings + payloads; n
 | `init(context): Boolean` | Loads persisted settings and payloads, re-drives pulse polarity and the ready gate, registers the remote-command listener if mqtt-lib is initialised. Idempotent. |
 | `start(): Boolean` | Opens the CM30 MDB port and starts the bus loop. State resets to INACTIVE and is announced at once. Remote: `open`. |
 | `stop(): Boolean` | Closes the port, resets to INACTIVE, closes any open vend with reason RESET. Remote: `close`. |
-| `VERSION` | `"8.2.14"`. Remote `version` reports it together with mqtt-lib. |
+| `VERSION` | `"8.2.15"`. Remote `version` reports it together with mqtt-lib. |
 
 ### The payment hook - `vendListener`
 
@@ -95,6 +95,11 @@ Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `ve
 | `isSessionActive: Boolean` | true between BEGIN SESSION and END SESSION. |
 | `stateListener` / `addStateListener` | plain state name, edge-triggered on every transition. |
 | `statusListener` | JSON `{"state","recentActivity"}` plus `busState` and `directVend` when direct vend rewrites the state. Same payload as the `VMC_STATUS:` control line. |
+| `isMachineReady: Boolean` (8.2.15) | `isMdbReady \|\| Rs232Lib.isMachineReady` - idempotent "can the machine sell now?", readable before or after the handshake. |
+| `isMdbReady: Boolean` (8.2.15) | reader running and the reported state is `ENABLED_STATE` / `VEND_STATE` (direct vend ON counts). |
+| `isMdbHandshakeDone: Boolean` (8.2.15) | the VMC completed SETUP since `start()`; stays true through READER DISABLE, false after RESET / `stop()`. |
+| `machineReadyJson(): String` (8.2.15) | `{"ready","mdb":{"ready","running","handshake","state","busState","directVend","recentActivity","level"},"rs232":{"ready","open","connected","lastRule","lastRxAgeMs","rules","connectRules","readyTimeoutMs"},"at"}`. Remote `getMachineReady` ships it as `MACHINE_READY:`. |
+| `readyListener` / `addReadyListener((ready, json))`, `removeReadyListener` (8.2.15) | replayed once at registration with the current value, then only when readiness flips (never on heartbeats or session begin/end). |
 | `sessionId: String?` | the id correlating every log of the current vend. |
 
 ### Settings - all persisted, all mirrored to the dashboard as `SETTINGS_JSON`
@@ -156,7 +161,7 @@ Code: `HardwareLib.vendStatsJson()`, `vendRequestCount`, `vendSuccessCount`, `ve
 |---|---|
 | `logListener` / `addLogListener((line, showOnScreen))` | every log line; `showOnScreen=false` marks per-poll noise - never render those into a growing view. |
 | `exchangeListener` / `addExchangeListener((MdbExchangeEvent))` | one structured event per bus exchange: `code` (110-136), `rxHex`, `txName`, `params`, `message`, `sessionId`, `timestampMs`. |
-| `controlListener` / `addControlListener((tag, json))` | `SETTINGS_JSON`, `CONFIG_JSON`, `VMC_STATUS`, `LOG`. |
+| `controlListener` / `addControlListener((tag, json))` | `SETTINGS_JSON`, `CONFIG_JSON`, `VMC_STATUS`, `VEND_STATS`, `MACHINE_READY` (8.2.15), `LOG`. A late registration gets `VMC_STATUS`, `SETTINGS_JSON` and `MACHINE_READY` at once. |
 | `addRs232EventListener((eventName, params))` | the coded RS232 events 137-143. |
 | `remove...Listener(sameReference)` | the matching removals. The `add` lists never deduplicate: register once per process (see the handoff README). |
 | `attachRabbahMqtt()` / `detachRabbahMqtt()` | wire / unwire everything to mqtt-lib (remote commands in, logs and control lines out). Idempotent. mqtt-lib can do this itself on connect. |
@@ -196,7 +201,15 @@ replies. Frames are cut by silence (`frameGapMs`). First matching rule wins.
 | `tx` | hex reply sent immediately on match; `""` = match and report, send nothing |
 | `priceHi` / `priceLo` | byte positions of a binary price (hi*256+lo); negative counts from the end |
 | `amountStart` / `amountEnd` | ASCII digit price inside the frame; end is exclusive, -1 = up to the CRC |
-| `event` (8.1.0) | `vendRequest` (needs a price), `vendSuccess`, `vendFailure`, `vendCancel` -> fires `HardwareLib.vendListener` exactly like MDB (price as minor units, item -1; reasons FAILED / CANCELLED_BY_VMC) |
+| `event` (8.1.0) | `vendRequest` (needs a price), `vendSuccess`, `vendFailure`, `vendCancel` -> fires `HardwareLib.vendListener` exactly like MDB (price as minor units, item -1; reasons FAILED / CANCELLED_BY_VMC); `connect` (8.2.15) -> marks the machine as heard (`isMachineReady`), no vend callback - tag the handshake and heartbeat rules with it |
+
+### Machine ready (8.2.15)
+
+| member | what it does |
+|---|---|
+| `isMachineReady: Boolean` | port open **and** the machine has been heard on this connection: a frame matched a rule tagged `"event":"connect"`, or any rule when the table has no connect-tagged rule. False after `close()`, when the reader dies, and after the ready timeout. Folded into `HardwareLib.isMachineReady` / `readyListener`. |
+| `setReadyTimeout(ms): Boolean` / `readyTimeoutMs` | 0 = off (default), max 600000. With a timeout, readiness drops after that long without a matched frame (heartbeat stopped, cable out) and comes back on the next connect frame. Persisted (`rs232_rules` prefs). Remote `rs232ReadyTimeout:MS` or `:off`. |
+| `readyJson(): String` | the `rs232` half of `HardwareLib.machineReadyJson()`. |
 
 ### Sending
 
@@ -253,9 +266,10 @@ setPollVisibility:on|off | setUnhandledVisibility:on|off | setPeripheralVisibili
 getSettings | vendStats | getConfig | setConfig:NAME:hex | resetConfig:NAME | {"setConfig":{...}} | {"resetConfig":[...]} | simulateExchange:HEX
 initPulse:true|false | sendPulse:w,p,c | setReadyFeedback:[yes,]value[,channel]|ch=val,ch=val|on|off | checkMachineReady
 rs232Open[:baud[,dataBits,stopBits,parity]] | rs232Close | rs232Send:HEX | rs232SendFrame:HEADER;DATAHEX | rs232SendAscii:HEADER;TEXT
-rs232Simulate:HEX | rs232Crc:on|off | rs232Gap:MS | getRs232Rules | clearRs232Rules | {"setRs232Rules":[...]}
+rs232Simulate:HEX | rs232Crc:on|off | rs232Gap:MS | rs232ReadyTimeout:MS|off | getRs232Rules | clearRs232Rules | {"setRs232Rules":[...]}
+getMachineReady                                                     (8.2.15: MACHINE_READY:{...} + one [remote] line)
 ping | version | help | attachHardware | detachHardware | mqttStats          (the last five answered by mqtt-lib itself)
 ```
 
 Replies come back on the device's log stream: plain `[remote]` / `[mdb]` / `[rs232]` / `[pulse]` lines, and the
-control lines `SETTINGS_JSON:`, `CONFIG_JSON:`, `RS232_RULES_JSON:`, `VMC_STATUS:`, `MQTT_STATS:`, `PONG`.
+control lines `SETTINGS_JSON:`, `CONFIG_JSON:`, `RS232_RULES_JSON:`, `VMC_STATUS:`, `MACHINE_READY:`, `MQTT_STATS:`, `PONG`.

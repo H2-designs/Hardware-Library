@@ -1523,6 +1523,21 @@
       ' · vend open=' + d.vendOpen + ' · since ' + d.sinceSec + ' s';
   }
 
+  /** MACHINE_READY:{...} from hardware-lib 8.2.15 - the idempotent "is the machine ready?" snapshot (sent on every
+   *  change, once when the device's bridge starts, and on the getMachineReady command) as one readable line. */
+  function formatMachineReady(json) {
+    let d; try { d = JSON.parse(json); } catch (e) { return '[machine ready] ' + json; }
+    const m = d.mdb || {}, r = d.rs232 || {};
+    const mdbText = !m.running ? 'reader not running'
+      : (m.handshake ? 'handshake done, ' : 'no handshake yet, ') + m.state + (m.directVend ? ', direct vend' : '');
+    const rsText = !r.open ? 'port closed'
+      : r.connected ? 'heard ' + (r.lastRule || '?') + (r.lastRxAgeMs >= 0 ? ' ' + Math.round(r.lastRxAgeMs / 1000) + ' s ago' : '')
+      : 'port open, nothing matched yet';
+    return '[machine ready] ' + (d.ready ? 'YES' : 'NO') +
+      ' · MDB ' + (m.ready ? 'ready' : 'not ready') + ' (' + mdbText + ')' +
+      ' · RS232 ' + (r.ready ? 'ready' : 'not ready') + ' (' + rsText + (r.readyTimeoutMs > 0 ? ', timeout ' + r.readyTimeoutMs + ' ms' : '') + ')';
+  }
+
   function applyVmcStatus(json) {
     let data;
     try {
@@ -1753,6 +1768,10 @@
     }
     if (text.startsWith('VEND_STATS:')) {
       addLine(formatVendStats(text.slice('VEND_STATS:'.length)), 'info', fromDevice);
+      return;
+    }
+    if (text.startsWith('MACHINE_READY:')) {
+      addLine(formatMachineReady(text.slice('MACHINE_READY:'.length)), 'info', fromDevice);
       return;
     }
     if (text.startsWith('MQTT_STATS:')) {

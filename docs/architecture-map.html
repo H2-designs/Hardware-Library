@@ -1,0 +1,331 @@
+<title>hardware-lib Architecture Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one column of figures, each a full-width schematic with a caption; a key table at the end. */
+  :root {
+    --bg: #f6f7f5;
+    --fg: #1c2321;
+    --muted: #5d6763;
+    --rule: #c9d0cc;
+    --box: #ffffff;
+    --box-soft: #eceff0;
+    --accent: #0e7c72;        /* hardware-lib, the product */
+    --accent-soft: #d9efec;
+    --warm: #b4541e;          /* the one thing that carries money: VendListener */
+    --warm-soft: #f6e4d8;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151a19; --fg: #e4e8e6; --muted: #9ba6a1; --rule: #343d3a;
+      --box: #1f2624; --box-soft: #2a3331; --accent: #4fc3b5; --accent-soft: #163c38;
+      --warm: #e8925e; --warm-soft: #46291a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151a19; --fg: #e4e8e6; --muted: #9ba6a1; --rule: #343d3a;
+    --box: #1f2624; --box-soft: #2a3331; --accent: #4fc3b5; --accent-soft: #163c38;
+    --warm: #e8925e; --warm-soft: #46291a; color-scheme: dark;
+  }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 48px; }
+  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 40px; }
+  header h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+  figure { margin: 0; display: grid; gap: 12px; }
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--box); padding: 12px; }
+  svg { display: block; min-width: 720px; width: 100%; height: auto; font-family: var(--font-body); font-size: 12px; color: var(--fg); }
+  figcaption { color: var(--muted); font-size: 0.9rem; max-width: 80ch; }
+  figcaption b { color: var(--fg); font-weight: 600; }
+  /* svg classes */
+  .b   { fill: var(--box-soft); stroke: var(--rule); stroke-width: 1; }
+  .bh  { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+  .bw  { fill: var(--warm-soft); stroke: var(--warm); stroke-width: 1.2; }
+  .frame { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 5 4; }
+  .t   { fill: currentColor; }
+  .tm  { fill: var(--muted); font-size: 11px; }
+  .tmono { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+  .th  { fill: var(--accent); font-weight: 600; }
+  .tw  { fill: var(--warm); font-weight: 600; }
+  .ln  { stroke: currentColor; stroke-width: 1.2; fill: none; }
+  .lnw { stroke: var(--warm); stroke-width: 1.6; fill: none; }
+  .lnh { stroke: var(--accent); stroke-width: 1.4; fill: none; }
+  .lnd { stroke: currentColor; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  td code { font-family: var(--font-mono); font-size: 0.84em; }
+  .wrap { overflow-x: auto; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow">hardware-lib 8.2.15 · mqtt-lib 2.8.0 · dashboard 8.2.13 · 16 November 2026</p>
+    <h1>hardware-lib Architecture Map</h1>
+    <p>Three drawings: the whole stack from the vending machine to the dashboard, the threads inside the MDB engine, and the state machine the reader runs on the bus. Teal is hardware-lib, the product. Orange is the one path money travels on.</p>
+  </header>
+
+  <!-- ============================ FIGURE 1: THE STACK ============================ -->
+  <figure>
+    <div class="scroll">
+      <svg viewBox="0 0 1000 760" role="img" aria-label="The stack: three machine types feed the CM30 vendor AAR, hardware-lib answers the bus and raises VendListener callbacks to the app, mqtt-lib carries logs and commands between hardware-lib and the broker, and the dashboard and backend sit on the broker topics.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--warm)"/></marker>
+          <marker id="arh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker>
+        </defs>
+
+        <!-- Row A: machines -->
+        <rect class="b" x="20" y="20" width="520" height="52" rx="3"/>
+        <text class="t" x="280" y="42" text-anchor="middle" font-weight="600">Vending machine controller (VMC) · MDB master</text>
+        <text class="tm" x="280" y="60" text-anchor="middle">polls Cashless Device #1 at address 0x10, 9-bit bus</text>
+        <rect class="b" x="560" y="20" width="200" height="52" rx="3"/>
+        <text class="t" x="660" y="42" text-anchor="middle" font-weight="600">Serial machine</text>
+        <text class="tm" x="660" y="60" text-anchor="middle">RS232 frames, own protocol</text>
+        <rect class="b" x="780" y="20" width="200" height="52" rx="3"/>
+        <text class="t" x="880" y="42" text-anchor="middle" font-weight="600">Coin-pulse machine</text>
+        <text class="tm" x="880" y="60" text-anchor="middle">pulse in, ready signal out</text>
+
+        <!-- bus arrows -->
+        <line class="ln" x1="150" y1="72" x2="150" y2="130" marker-end="url(#ar)"/>
+        <text class="tmono" x="160" y="92">RESET · POLL · SETUP · READER ENABLE</text>
+        <text class="tmono" x="160" y="106">VEND REQUEST · VEND SUCCESS · CASH SALE</text>
+        <line class="ln" x1="500" y1="130" x2="500" y2="72" marker-end="url(#ar)"/>
+        <text class="tmono" x="490" y="92" text-anchor="end">ACK · JUST RESET · READER CONFIG DATA</text>
+        <text class="tmono" x="490" y="106" text-anchor="end">BEGIN SESSION · VEND APPROVED · END SESSION</text>
+        <line class="ln" x1="660" y1="72" x2="660" y2="130" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <text class="tmono" x="668" y="104">rx frame / tx reply</text>
+        <line class="ln" x1="880" y1="72" x2="880" y2="130" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <text class="tmono" x="888" y="104">digital IO</text>
+
+        <!-- Row B: vendor AAR -->
+        <rect class="b" x="20" y="130" width="960" height="60" rx="3" fill="none"/>
+        <text class="tm" x="28" y="146">CM30-HardwareLibrary-1.0.9.aar · vendor, armeabi-v7a only</text>
+        <rect class="b" x="30" y="152" width="500" height="30" rx="3"/>
+        <text class="t" x="280" y="171" text-anchor="middle"><tspan font-family="IBM Plex Mono, monospace">MdbSlave</tspan> · libmdbSlave.so · receiveCommand / sendAnswer</text>
+        <rect class="b" x="560" y="152" width="200" height="30" rx="3"/>
+        <text class="t" x="660" y="171" text-anchor="middle">libRS232.so</text>
+        <rect class="b" x="780" y="152" width="190" height="30" rx="3"/>
+        <text class="t" x="875" y="171" text-anchor="middle">libDigitalIO.so</text>
+
+        <line class="ln" x1="280" y1="190" x2="280" y2="226" marker-end="url(#ar)" marker-start="url(#ar)"/>
+        <line class="ln" x1="660" y1="190" x2="660" y2="226" marker-end="url(#ar)" marker-start="url(#ar)"/>
+        <line class="ln" x1="875" y1="190" x2="875" y2="226" marker-end="url(#ar)" marker-start="url(#ar)"/>
+
+        <!-- Row C: hardware-lib -->
+        <rect class="frame" x="20" y="228" width="960" height="222" rx="4"/>
+        <text class="th" x="30" y="246" font-size="13">hardware-lib 8.2.15 · com.rabbah.mdb · no networking inside</text>
+
+        <rect class="bh" x="30" y="258" width="230" height="40" rx="3"/>
+        <text class="t" x="145" y="275" text-anchor="middle" font-weight="600">MdbSlaveWrapper</text>
+        <text class="tm" x="145" y="290" text-anchor="middle">port open/close · checksum · reply bytes</text>
+
+        <rect class="bh" x="280" y="258" width="120" height="40" rx="3"/>
+        <text class="t" x="340" y="275" text-anchor="middle" font-weight="600">MdbCmd</text>
+        <text class="tm" x="340" y="290" text-anchor="middle">codes 110-136</text>
+
+        <rect class="bh" x="420" y="258" width="110" height="40" rx="3"/>
+        <text class="t" x="475" y="275" text-anchor="middle" font-weight="600">MdbConfigStore</text>
+        <text class="tm" x="475" y="290" text-anchor="middle">13 payloads</text>
+
+        <line class="lnh" x1="145" y1="298" x2="145" y2="312" marker-end="url(#arh)"/>
+        <rect class="bh" x="30" y="314" width="500" height="120" rx="3"/>
+        <text class="t" x="40" y="333" font-weight="600" font-size="13">HardwareLib · the MDB engine</text>
+        <text class="tm" x="40" y="352">state machine INACTIVE → DISABLED → ENABLED → VEND_STATE, one bus thread</text>
+        <text class="tm" x="40" y="368">vend flags · approveVend() / cancelVend() · cancel grace · event gap · warm resume</text>
+        <text class="tm" x="40" y="384">23 settings (MdbSettings, persisted) · 50+ remote commands via handleCommand(text)</text>
+        <text class="tm" x="40" y="400">feeds: log lines · exchange events · state · status · control lines · vendStats</text>
+        <text class="tw" x="40" y="422">VendListener: onVendRequest · onVendSuccess · onVendFailure(reason)</text>
+
+        <rect class="bh" x="560" y="258" width="200" height="64" rx="3"/>
+        <text class="t" x="660" y="278" text-anchor="middle" font-weight="600">Rs232Lib</text>
+        <text class="tm" x="660" y="294" text-anchor="middle">rules: rx pattern → tx reply</text>
+        <text class="tm" x="660" y="309" text-anchor="middle">?? and * wildcards · CRC · frame gap</text>
+        <line class="lnh" x1="560" y1="300" x2="532" y2="340" marker-end="url(#arh)"/>
+        <text class="tmono" x="548" y="352" text-anchor="end">rule event:</text>
+        <text class="tmono" x="548" y="365" text-anchor="end">vendRequest…</text>
+
+        <rect class="bh" x="780" y="258" width="190" height="64" rx="3"/>
+        <text class="t" x="875" y="278" text-anchor="middle" font-weight="600">PulseLib</text>
+        <text class="tm" x="875" y="294" text-anchor="middle">coin-pulse trains out</text>
+        <text class="tm" x="875" y="309" text-anchor="middle">machine-ready gate in</text>
+
+        <rect class="bh" x="560" y="340" width="410" height="94" rx="3"/>
+        <text class="t" x="570" y="359" font-weight="600">attachRabbahMqtt() · the only meeting point with mqtt-lib</text>
+        <text class="tm" x="570" y="377">out: log lines (when MQTT logging on), coded exchanges, RS232 events,</text>
+        <text class="tm" x="570" y="392">control lines VMC_STATUS · SETTINGS_JSON · CONFIG_JSON · VEND_STATS</text>
+        <text class="tm" x="570" y="407">in: every command text from cmd + passthrough → handleCommand()</text>
+        <text class="tm" x="570" y="424">reflection only: hardware-lib compiles without mqtt-lib</text>
+        <line class="lnd" x1="530" y1="374" x2="560" y2="374"/>
+
+        <!-- Row D: consumers -->
+        <line class="lnw" x1="150" y1="450" x2="150" y2="490" marker-end="url(#arw)"/>
+        <text class="tmono" x="158" y="468" style="fill:var(--warm)">onVendRequest(amount, minorUnits, item)</text>
+        <text class="tmono" x="158" y="481" style="fill:var(--warm)">onVendSuccess · onVendFailure(reason)</text>
+        <line class="lnw" x1="60" y1="490" x2="60" y2="450" marker-end="url(#arw)"/>
+        <text class="tmono" x="52" y="482" text-anchor="end" style="fill:var(--warm)" transform="rotate(-90 52 482)">approve / cancel</text>
+
+        <rect class="bw" x="20" y="492" width="320" height="78" rx="3"/>
+        <text class="t" x="30" y="511" font-weight="600" font-size="13">Your Android app</text>
+        <text class="tm" x="30" y="528">takes the payment, then approveVend() or cancelVend()</text>
+        <text class="tm" x="30" y="543">captures on success, voids / refunds on failure</text>
+        <text class="tm" x="30" y="558">sets listeners before init(context), then start()</text>
+
+        <line class="ln" x1="500" y1="450" x2="500" y2="490" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <rect class="b" x="360" y="492" width="300" height="78" rx="3"/>
+        <text class="t" x="370" y="511" font-weight="600">Bridges</text>
+        <text class="tm" x="370" y="528">MdbMqttBridge.kt in the demo app MDB-Slave-2</text>
+        <text class="tm" x="370" y="543">react-native-mdb 1.5.0: same calls as promises,</text>
+        <text class="tm" x="370" y="558">callbacks as JS events MdbVendRequest / Success / Failure</text>
+
+        <line class="ln" x1="840" y1="450" x2="840" y2="490" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <rect class="b" x="680" y="492" width="300" height="78" rx="3"/>
+        <text class="t" x="690" y="511" font-weight="600">mqtt-lib 2.8.0 · com.rabbah.mqtt</text>
+        <text class="tm" x="690" y="528">MqttLib: MQTT 3.1.1 over TCP, queue, presence</text>
+        <text class="tm" x="690" y="543">RabbahLog: coded log envelope for the backend</text>
+        <text class="tm" x="690" y="558">no MDB knowledge · calls attachRabbahMqtt() on connect</text>
+
+        <!-- Row E: broker -->
+        <line class="ln" x1="840" y1="570" x2="840" y2="608" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <rect class="b" x="20" y="610" width="960" height="48" rx="3"/>
+        <text class="t" x="30" y="629" font-weight="600">MQTT broker · devices/&lt;deviceId&gt;/…</text>
+        <text class="tmono" x="30" y="647">logs = coded MDB + RS232 items   ops = plain lines + control lines   cmd = backend commands   passthrough = dashboard commands   status = retained online/offline</text>
+
+        <!-- Row F: dashboard + backend -->
+        <line class="ln" x1="260" y1="658" x2="260" y2="698" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <text class="tmono" x="268" y="682">logs + ops in · passthrough out</text>
+        <line class="ln" x1="740" y1="658" x2="740" y2="698" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <text class="tmono" x="748" y="682">logs in · cmd out · machine settings</text>
+        <rect class="b" x="20" y="700" width="460" height="48" rx="3"/>
+        <text class="t" x="30" y="719" font-weight="600">Hardware Dashboard 8.2.13 · Electron, Windows or macOS</text>
+        <text class="tm" x="30" y="737">live log, state, settings switches, Config panel, RS232 panel, Vend stats, passthrough bar</text>
+        <rect class="b" x="520" y="700" width="460" height="48" rx="3"/>
+        <text class="t" x="530" y="719" font-weight="600">Rabbah backend</text>
+        <text class="tm" x="530" y="737">audit log of every exchange, per-machine settings (mdb_* keys), remote operations</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 1. The stack.</b> Three kinds of machine enter through the vendor AAR. hardware-lib owns every protocol decision and talks to the app only through the three VendListener callbacks and two calls back. mqtt-lib owns the broker link and nothing else; the two libraries meet once, in attachRabbahMqtt. The dashboard and the backend never touch the device directly, only the five topics.</figcaption>
+  </figure>
+
+  <!-- ============================ FIGURE 2: THREADS ============================ -->
+  <figure>
+    <div class="scroll">
+      <svg viewBox="0 0 1000 330" role="img" aria-label="Three threads inside HardwareLib: the bus thread reads a frame, replies, updates flags and hands off; the offload thread formats log lines and exchange events for listeners and mqtt-lib; the single vend delivery thread applies the cancel grace, the event gap and the watchdog before calling the app.">
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--warm)"/></marker>
+        </defs>
+        <!-- lane 1: bus thread -->
+        <rect class="b" x="20" y="20" width="960" height="78" rx="3"/>
+        <text class="th" x="30" y="38" font-size="12">bus thread · one per start() · never waits for the app</text>
+        <rect class="bh" x="30" y="48" width="150" height="40" rx="3"/><text class="t" x="105" y="66" text-anchor="middle">receiveCommand()</text><text class="tm" x="105" y="80" text-anchor="middle">blocking read</text>
+        <line class="ln" x1="180" y1="68" x2="210" y2="68" marker-end="url(#ar2)"/>
+        <rect class="bh" x="212" y="48" width="170" height="40" rx="3"/><text class="t" x="297" y="66" text-anchor="middle">decide the reply</text><text class="tm" x="297" y="80" text-anchor="middle">RESET · CASH SALE · per state</text>
+        <line class="ln" x1="382" y1="68" x2="412" y2="68" marker-end="url(#ar2)"/>
+        <rect class="bh" x="414" y="48" width="150" height="40" rx="3"/><text class="t" x="489" y="66" text-anchor="middle">send bytes</text><text class="tm" x="489" y="80" text-anchor="middle">ACK / payload + CHK</text>
+        <line class="ln" x1="564" y1="68" x2="594" y2="68" marker-end="url(#ar2)"/>
+        <rect class="bh" x="596" y="48" width="170" height="40" rx="3"/><text class="t" x="681" y="66" text-anchor="middle">update vend flags</text><text class="tm" x="681" y="80" text-anchor="middle">request · approve · cancel · end</text>
+        <line class="ln" x1="766" y1="68" x2="796" y2="68" marker-end="url(#ar2)"/>
+        <rect class="bh" x="798" y="48" width="172" height="40" rx="3"/><text class="t" x="884" y="66" text-anchor="middle">hand off</text><text class="tm" x="884" y="80" text-anchor="middle">queueExchange · notifyVend</text>
+
+        <!-- hand-off arrows -->
+        <line class="ln" x1="840" y1="98" x2="840" y2="140" marker-end="url(#ar2)"/>
+        <text class="tmono" x="848" y="122">queueExchange(cmd, sent)</text>
+        <line class="lnw" x1="930" y1="98" x2="930" y2="236" marker-end="url(#arw2)"/>
+        <text class="tmono" x="938" y="190" style="fill:var(--warm)" transform="rotate(90 938 190)">notifyVend(name)</text>
+
+        <!-- lane 2: offload -->
+        <rect class="b" x="20" y="142" width="960" height="70" rx="3"/>
+        <text class="th" x="30" y="160" font-size="12">offload thread · formatting and fan-out</text>
+        <rect class="bh" x="30" y="170" width="200" height="34" rx="3"/><text class="t" x="130" y="191" text-anchor="middle">classify → MdbCmd code + template</text>
+        <line class="ln" x1="230" y1="187" x2="260" y2="187" marker-end="url(#ar2)"/>
+        <rect class="bh" x="262" y="170" width="250" height="34" rx="3"/><text class="t" x="387" y="191" text-anchor="middle">log · exchange · state · status · control listeners</text>
+        <line class="ln" x1="512" y1="187" x2="542" y2="187" marker-end="url(#ar2)"/>
+        <rect class="b" x="544" y="170" width="250" height="34" rx="3"/><text class="t" x="669" y="191" text-anchor="middle">mqtt-lib enqueue → logs / ops topics</text>
+
+        <!-- lane 3: vend delivery -->
+        <rect class="b" x="20" y="238" width="960" height="78" rx="3"/>
+        <text class="tw" x="30" y="256" font-size="12">vend delivery thread · exactly one, FIFO · the only thread that calls your VendListener</text>
+        <rect class="bw" x="30" y="266" width="200" height="40" rx="3"/><text class="t" x="130" y="284" text-anchor="middle">cancel grace hold</text><text class="tm" x="130" y="298" text-anchor="middle">failure &lt; 200 ms after request → +500 ms</text>
+        <line class="lnw" x1="230" y1="286" x2="260" y2="286" marker-end="url(#arw2)"/>
+        <rect class="bw" x="262" y="266" width="180" height="40" rx="3"/><text class="t" x="352" y="284" text-anchor="middle">vend event gap</text><text class="tm" x="352" y="298" text-anchor="middle">≥ 500 ms since the previous start</text>
+        <line class="lnw" x1="442" y1="286" x2="472" y2="286" marker-end="url(#arw2)"/>
+        <rect class="bw" x="474" y="266" width="160" height="40" rx="3"/><text class="t" x="554" y="284" text-anchor="middle">3 s watchdog</text><text class="tm" x="554" y="298" text-anchor="middle">logs stuck, counts, never kills</text>
+        <line class="lnw" x1="634" y1="286" x2="664" y2="286" marker-end="url(#arw2)"/>
+        <rect class="bw" x="666" y="266" width="220" height="40" rx="3"/><text class="t" x="776" y="284" text-anchor="middle">listener call in try / catch</text><text class="tm" x="776" y="298" text-anchor="middle">onVendRequest · onVendSuccess · onVendFailure</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 2. Threads inside the engine.</b> The bus thread does nothing but read, reply and set flags, so the MDB reply window is never missed. Everything the app or the dashboard sees is produced on the other two threads. Because vend delivery is one FIFO thread, a request always reaches the app before its outcome, and two callbacks never run at once.</figcaption>
+  </figure>
+
+  <!-- ============================ FIGURE 3: STATE MACHINE ============================ -->
+  <figure>
+    <div class="scroll">
+      <svg viewBox="0 0 1000 250" role="img" aria-label="The four reader states and the bus commands that move between them: RESET to INACTIVE from anywhere, setup to DISABLED, READER ENABLE to ENABLED, the POLL that carries BEGIN SESSION to VEND_STATE, and the POLL that carries END SESSION back to ENABLED.">
+        <defs>
+          <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--warm)"/></marker>
+        </defs>
+        <!-- states -->
+        <rect class="bh" x="30" y="90" width="170" height="60" rx="30"/>
+        <text class="t" x="115" y="116" text-anchor="middle" font-weight="600">INACTIVE</text><text class="tm" x="115" y="133" text-anchor="middle">setup handshake</text>
+        <rect class="bh" x="290" y="90" width="170" height="60" rx="30"/>
+        <text class="t" x="375" y="116" text-anchor="middle" font-weight="600">DISABLED</text><text class="tm" x="375" y="133" text-anchor="middle">set up, reader off</text>
+        <rect class="bh" x="550" y="90" width="170" height="60" rx="30"/>
+        <text class="t" x="635" y="116" text-anchor="middle" font-weight="600">ENABLED</text><text class="tm" x="635" y="133" text-anchor="middle">ready, BEGIN SESSION armed</text>
+        <rect class="bw" x="810" y="90" width="170" height="60" rx="30"/>
+        <text class="t" x="895" y="116" text-anchor="middle" font-weight="600">VEND_STATE</text><text class="tm" x="895" y="133" text-anchor="middle">session open, vends happen</text>
+
+        <!-- forward transitions -->
+        <line class="ln" x1="200" y1="110" x2="288" y2="110" marker-end="url(#ar3)"/>
+        <text class="tmono" x="244" y="100" text-anchor="middle">last setup step</text>
+        <text class="tmono" x="244" y="170" text-anchor="middle">L1 SETUP MAX/MIN · L2 REQUEST ID</text>
+        <text class="tmono" x="244" y="183" text-anchor="middle">L3 ENABLE OPTIONS</text>
+        <line class="ln" x1="460" y1="110" x2="548" y2="110" marker-end="url(#ar3)"/>
+        <text class="tmono" x="504" y="100" text-anchor="middle">READER ENABLE 14 01</text>
+        <line class="lnw" x1="720" y1="110" x2="808" y2="110" marker-end="url(#arw3)"/>
+        <text class="tmono" x="764" y="100" text-anchor="middle" style="fill:var(--warm)">POLL → BEGIN SESSION</text>
+        <!-- backward transitions -->
+        <line class="lnw" x1="808" y1="130" x2="720" y2="130" marker-end="url(#arw3)"/>
+        <text class="tmono" x="764" y="160" text-anchor="middle" style="fill:var(--warm)">POLL → END SESSION</text>
+        <text class="tmono" x="764" y="173" text-anchor="middle">after SESSION COMPLETE, READER DISABLE</text>
+        <text class="tmono" x="764" y="186" text-anchor="middle">or SESSION CANCEL REQUEST answered</text>
+        <line class="ln" x1="548" y1="130" x2="460" y2="130" marker-end="url(#ar3)"/>
+        <text class="tmono" x="504" y="160" text-anchor="middle">READER DISABLE 14 00</text>
+        <!-- reset from anywhere -->
+        <path class="lnd" d="M895 90 L895 40 L115 40 L115 88" marker-end="url(#ar3)"/>
+        <path class="lnd" d="M635 90 L635 40"/>
+        <path class="lnd" d="M375 90 L375 40"/>
+        <text class="tmono" x="505" y="32" text-anchor="middle">RESET 10 from any state → ACK, INACTIVE, open vend closed with onVendFailure(RESET)</text>
+        <!-- shortcuts -->
+        <path class="lnd" d="M115 150 L115 215 L895 215 L895 150" marker-end="url(#ar3)"/>
+        <text class="tmono" x="505" y="209" text-anchor="middle">direct vend ON: a VEND REQUEST from INACTIVE, DISABLED or ENABLED jumps straight here · warm resume: READER ENABLE in INACTIVE with no RESET seen → ENABLED</text>
+        <text class="tmono" x="505" y="240" text-anchor="middle">CASH SALE 13 05 is ACKed in every state without moving</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 3. The reader's state machine.</b> The machine drives every transition; the reader only chooses what to put on a POLL. Orange marks the two POLL replies that open and close the session the vend lives in. The dashed paths are the two shortcuts that exist for real machines: direct vend for controllers that skip the handshake, and warm resume for a reader restart the machine never noticed.</figcaption>
+  </figure>
+
+  <!-- ============================ KEY ============================ -->
+  <section>
+    <p class="eyebrow">Where each box lives</p>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>Box</th><th>Code</th><th>Delivered as</th></tr></thead>
+        <tbody>
+          <tr><td>HardwareLib, MdbSlaveWrapper, MdbCmd, MdbConfigStore, MdbSettings, Rs232Lib, PulseLib</td><td><code>source/MdbSlaveApp/hardware-lib/src/main/java/com/rabbah/mdb/</code></td><td><code>libs/hardware-lib-8.2.15.aar</code></td></tr>
+          <tr><td>MqttLib, RabbahLog</td><td><code>source/MdbSlaveApp/mqtt-lib/</code></td><td><code>libs/mqtt-lib-2.8.0.aar</code></td></tr>
+          <tr><td>Vendor AAR</td><td>supplied by the CM30 maker</td><td><code>libs/CM30-HardwareLibrary-1.0.9.aar</code></td></tr>
+          <tr><td>MdbMqttBridge, demo app MDB-Slave-2</td><td><code>source/MdbSlaveApp/app/</code></td><td>APK v2.30.0 build 117, private release only</td></tr>
+          <tr><td>react-native-mdb</td><td>H2-designs/Hardware-ReactNative</td><td>npm package 1.5.0, bundles the two AARs</td></tr>
+          <tr><td>Hardware Dashboard</td><td><code>dashboard-app/</code></td><td>Electron package v8.2.13, or <code>npm start</code></td></tr>
+          <tr><td>RS232 Test, pulse-sample</td><td><code>source/MdbSlaveApp/rs232-sample/</code>, <code>pulse-sample/</code></td><td>standalone APKs without MQTT</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
